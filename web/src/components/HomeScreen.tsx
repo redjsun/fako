@@ -17,6 +17,137 @@ export interface HomeScreenProps {
   onToggleTheme: () => void;
 }
 
+/**
+ * Mini-tabuleiro plano da Cobrinha idêntico ao GameBoard.tsx:
+ * - Grade suave em verde claro (#eaf3e8 e linhas #c2dec0)
+ * - Cobrinha oficial com cantos arredondados, cabeça #1d4a27 e olhos expressivos
+ * - Maçã oficial com cabinho de madeira, folha verde e brilho
+ */
+const HomeSnakeBoardVisual: React.FC = () => {
+  return (
+    <div className="hero-board-side" aria-hidden="true">
+      <div className="hero-mini-board">
+        <svg
+          viewBox="0 0 216 148"
+          className="hero-board-svg"
+          xmlns="http://www.w3.org/2000/svg"
+          aria-label="Cobrinha do FAKO no tabuleiro"
+        >
+          <defs>
+            <pattern
+              id="homeHeroBoardGrid"
+              width="24"
+              height="24"
+              patternUnits="userSpaceOnUse"
+            >
+              <path
+                d="M 24 0 L 0 0 0 24"
+                fill="none"
+                stroke="rgba(47, 107, 58, 0.16)"
+                strokeWidth="1.2"
+              />
+            </pattern>
+          </defs>
+
+          {/* Fundo do Mini-Tabuleiro plano com cantos suaves */}
+          <rect width="216" height="148" rx="16" fill="#eaf3e8" />
+          <rect width="216" height="148" rx="16" fill="url(#homeHeroBoardGrid)" />
+          <rect
+            width="216"
+            height="148"
+            rx="16"
+            fill="none"
+            stroke="#c2dec0"
+            strokeWidth="1.6"
+          />
+
+          {/* 1. CORPO DA COBRINHA (3 segmentos verdes idênticos ao GameBoard.tsx) */}
+          {[28, 52, 76].map((x, i) => (
+            <g key={i}>
+              <rect
+                x={x}
+                y={86}
+                width={20}
+                height={20}
+                rx={5}
+                fill="#2f6b3a"
+              />
+              {/* Brilho orgânico suave no topo de cada bloco */}
+              <rect
+                x={x + 1.5}
+                y={88}
+                width={17}
+                height={6}
+                rx={2.5}
+                fill="rgba(255, 255, 255, 0.14)"
+              />
+            </g>
+          ))}
+
+          {/* 2. CABEÇA DA COBRINHA (#1d4a27 arredondada) */}
+          <rect
+            x={100}
+            y={86}
+            width={21}
+            height={20}
+            rx={6.5}
+            fill="#1d4a27"
+          />
+
+          {/* 3. OLHOS EXPRESSIVOS (olhando para a direita/maçã) */}
+          {/* Olho Superior */}
+          <circle cx={113} cy={91.5} r={3} fill="#ffffff" />
+          <circle cx={114.2} cy={91.5} r={1.5} fill="#111a13" />
+          <circle cx={113.8} cy={91} r={0.6} fill="#ffffff" />
+
+          {/* Olho Inferior */}
+          <circle cx={113} cy={100.5} r={3} fill="#ffffff" />
+          <circle cx={114.2} cy={100.5} r={1.5} fill="#111a13" />
+          <circle cx={113.8} cy={100} r={0.6} fill="#ffffff" />
+
+          {/* 4. MAÇÃ OFICIAL DO JOGO */}
+          {/* Sombra da Maçã */}
+          <ellipse
+            cx={174}
+            cy={110}
+            rx={11}
+            ry={3.2}
+            fill="rgba(0, 0, 0, 0.12)"
+          />
+          {/* Corpo Vermelho */}
+          <circle cx={174} cy={97} r={12} fill="#dc3545" />
+          {/* Brilho */}
+          <ellipse
+            cx={170}
+            cy={93}
+            rx={3.8}
+            ry={2.2}
+            transform="rotate(-35 170 93)"
+            fill="rgba(255, 255, 255, 0.42)"
+          />
+          {/* Cabinho de Madeira */}
+          <path
+            d="M 174 85 C 173 80, 172 77, 177 74"
+            fill="none"
+            stroke="#5a3d28"
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+          {/* Folha Verde */}
+          <ellipse
+            cx={180}
+            cy={76}
+            rx={3.8}
+            ry={2}
+            transform="rotate(25 180 76)"
+            fill="#2f6b3a"
+          />
+        </svg>
+      </div>
+    </div>
+  );
+};
+
 export const HomeScreen: React.FC<HomeScreenProps> = ({
   user,
   stats,
@@ -52,7 +183,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       <header className="figma-home-topbar">
         {/* Logo FAKO Oficial (3 segmentos + maçã + FAKO) */}
         <div className="figma-nav-left">
-          <FakoLogo size="medium" />
+          <FakoLogo size="medium" textColor={theme === "dark" ? "#ffffff" : "#112a17"} />
         </div>
 
         {/* Links Centrais em Pílula */}
@@ -167,17 +298,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               </div>
             </div>
 
-            {/* Mini Tabuleiro da Cobrinha Inclinado */}
-            <div className="hero-board-side" aria-hidden="true">
-              <div className="hero-mini-board">
-                <div className="mini-checkered-grid">
-                  <div className="grid-snake-cell cell-1" />
-                  <div className="grid-snake-cell cell-2" />
-                  <div className="grid-snake-cell cell-3" />
-                  <div className="grid-apple-circle" />
-                </div>
-              </div>
-            </div>
+            {/* Mini Tabuleiro da Cobrinha Plano */}
+            <HomeSnakeBoardVisual />
           </section>
 
           {/* 2. Seção: Categorias das informações */}
@@ -199,7 +321,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 onKeyDown={(e) => e.key === "Enter" && handleCategoryClick("Saúde")}
               >
                 <div className="cat-icon-circle saude">
-                  <span>🩺</span>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#135128" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+                    <path d="M12 7.5v5M9.5 10h5" strokeWidth="2" />
+                  </svg>
                 </div>
                 <h3 className="cat-card-title saude-title">Saúde</h3>
                 <p className="cat-card-desc">
@@ -216,7 +341,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 onKeyDown={(e) => e.key === "Enter" && handleCategoryClick("Tecnologia")}
               >
                 <div className="cat-icon-circle tecnologia">
-                  <span>💻</span>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#135128" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <rect x="2" y="3" width="20" height="14" rx="2" />
+                    <path d="M8 21h8M12 17v4" />
+                  </svg>
                 </div>
                 <h3 className="cat-card-title tecnologia-title">Tecnologia</h3>
                 <p className="cat-card-desc">
@@ -235,7 +363,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 }
               >
                 <div className="cat-icon-circle gerais">
-                  <span>🌍</span>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#135128" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20M2 12h20" />
+                  </svg>
                 </div>
                 <h3 className="cat-card-title gerais-title">Conhecimentos Gerais</h3>
                 <p className="cat-card-desc">
@@ -250,7 +381,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <h3 className="flow-card-heading">Como o FAKO funciona</h3>
             <div className="flow-steps-track">
               <div className="flow-step-item">
-                <span className="step-icon">🐍</span>
+                <span className="step-icon">🎮</span>
                 <span className="step-label">Jogar</span>
               </div>
               <span className="flow-arrow-separator">➔</span>
@@ -263,25 +394,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
               <div className="flow-step-item">
                 <span className="step-icon">🔍</span>
-                <span className="step-label">Analisar</span>
-              </div>
-              <span className="flow-arrow-separator">➔</span>
-
-              <div className="flow-step-item">
-                <span className="step-icon">🤔</span>
-                <span className="step-label">Decidir</span>
+                <span className="step-label">Avaliar</span>
               </div>
               <span className="flow-arrow-separator">➔</span>
 
               <div className="flow-step-item">
                 <span className="step-icon">💬</span>
                 <span className="step-label">Feedback</span>
-              </div>
-              <span className="flow-arrow-separator">➔</span>
-
-              <div className="flow-step-item highlight-learn">
-                <span className="step-icon">🎓</span>
-                <span className="step-label">Aprender</span>
               </div>
             </div>
           </section>
@@ -322,7 +441,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             {/* Faixa explicativa do tamanho do tabuleiro */}
             <div className="journey-grid-info-pill">
               <span className="info-check">✓</span>
-              <span>Níveis 1–3: tabuleiro 7×7 • Níveis 4–6: 6×6</span>
+              <span>Tabuleiro clássico 16×16 • 6 níveis progressivos</span>
             </div>
           </div>
 
@@ -356,6 +475,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   <span className="fact-statement">Vacinas causam autismo.</span>
                   <span className="fact-tagline">Não confiável • Saúde</span>
                 </div>
+                <span className="fact-status-badge badge-hit">
+                  Confiável <span className="status-badge-icon">✓</span>
+                </span>
               </div>
 
               {/* Item 2 */}
@@ -367,6 +489,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   </span>
                   <span className="fact-tagline">Não confiável • Conh. Gerais</span>
                 </div>
+                <span className="fact-status-badge badge-miss">
+                  Não confiável <span className="status-badge-icon">✕</span>
+                </span>
               </div>
 
               {/* Item 3 */}
@@ -378,6 +503,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   </span>
                   <span className="fact-tagline">Confiável • Tecnologia</span>
                 </div>
+                <span className="fact-status-badge badge-hit">
+                  Confiável <span className="status-badge-icon">✓</span>
+                </span>
               </div>
             </div>
           </div>

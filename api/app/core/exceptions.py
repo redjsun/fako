@@ -32,6 +32,10 @@ class BusinessRuleError(DomainError):
     status_code = 422
 
 
+class ServiceUnavailableError(DomainError):
+    status_code = 503
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(DomainError)
     def handle_domain_error(_: Request, exc: DomainError) -> JSONResponse:

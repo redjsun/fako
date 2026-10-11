@@ -187,6 +187,21 @@ body {
   width: 100%;
 }
 
+.fako-app.screen-tutorial {
+  max-width: 960px;
+  width: 100%;
+}
+
+.fako-app.screen-categories {
+  max-width: 960px;
+  width: 100%;
+}
+
+.fako-app.screen-journey {
+  max-width: 1020px;
+  width: 100%;
+}
+
 .game-container {
   display: flex;
   flex-direction: column;
@@ -554,6 +569,123 @@ body {
   font-size: 0.72rem;
   font-weight: 700;
   color: var(--text-muted);
+}
+
+/* Seleção Semântica (Confiável vs Não Confiável) */
+.semantic-interaction {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.semantic-buttons-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.semantic-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 14px 10px;
+  border-radius: var(--radius-md);
+  border: 2px solid var(--border-color);
+  background: var(--bg-card);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.semantic-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+
+.semantic-btn-icon {
+  font-size: 1.8rem;
+  margin-bottom: 4px;
+}
+
+.semantic-btn-title {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 800;
+  margin-bottom: 2px;
+}
+
+.semantic-btn-sub {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  line-height: 1.25;
+}
+
+.semantic-btn-key {
+  margin-top: 6px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--bg-card-subtle);
+  color: var(--text-muted);
+}
+
+.btn-confiavel.active {
+  border-color: #16a34a;
+  background: rgba(22, 163, 74, 0.12);
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.25);
+}
+
+.btn-confiavel .semantic-btn-title {
+  color: #16a34a;
+}
+
+.btn-nao-confiavel.active {
+  border-color: #dc2626;
+  background: rgba(220, 38, 38, 0.12);
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.25);
+}
+
+.btn-nao-confiavel .semantic-btn-title {
+  color: #dc2626;
+}
+
+.official-status-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-card-subtle);
+  border: 1px solid var(--border-color);
+}
+
+.official-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.official-badge {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 800;
+  padding: 4px 12px;
+  border-radius: 99px;
+}
+
+.badge-confiavel {
+  background: rgba(22, 163, 74, 0.16);
+  color: #15803d;
+  border: 1px solid rgba(22, 163, 74, 0.35);
+}
+
+.badge-nao-confiavel {
+  background: rgba(220, 38, 38, 0.16);
+  color: #b91c1c;
+  border: 1px solid rgba(220, 38, 38, 0.35);
 }
 
 /* ==================== FASE DE REVELAÇÃO ==================== */
@@ -1146,11 +1278,68 @@ body:has(.screen-login) {
 
 .fako-logo-text {
   font-family: var(--font-display);
-  font-size: 2.1rem;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  color: #ffffff;
+  font-size: 1.45rem;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  color: #112a17;
   line-height: 1;
+}
+
+:root[data-theme="dark"] .fako-logo-text {
+  color: #ffffff;
+}
+
+.fako-brand-panel .fako-logo-text {
+  color: #ffffff;
+}
+
+/* Tamanhos do FakoLogo */
+.fako-logo-wrapper.size-small {
+  gap: 8px;
+}
+.fako-logo-wrapper.size-small .logo-seg {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+.fako-logo-wrapper.size-small .logo-apple-dot {
+  width: 7.5px;
+  height: 7.5px;
+}
+.fako-logo-wrapper.size-small .fako-logo-text {
+  font-size: 1.15rem;
+}
+
+.fako-logo-wrapper.size-medium {
+  gap: 10px;
+}
+.fako-logo-wrapper.size-medium .logo-seg {
+  width: 10.5px;
+  height: 10.5px;
+  border-radius: 3px;
+}
+.fako-logo-wrapper.size-medium .logo-apple-dot {
+  width: 9.5px;
+  height: 9.5px;
+}
+.fako-logo-wrapper.size-medium .fako-logo-text {
+  font-size: 1.45rem;
+}
+
+.fako-logo-wrapper.size-large {
+  gap: 12px;
+}
+.fako-logo-wrapper.size-large .logo-seg {
+  width: 11.5px;
+  height: 11.5px;
+  border-radius: 3.5px;
+}
+.fako-logo-wrapper.size-large .logo-apple-dot {
+  width: 10.5px;
+  height: 10.5px;
+}
+.fako-logo-wrapper.size-large .fako-logo-text {
+  font-size: 2.1rem;
 }
 
 /* Headline Principal: Jogue. Analise. Aprenda. */
@@ -2493,65 +2682,60 @@ body:has(.screen-login) {
   border-color: #ffffff;
 }
 
-/* Mini Tabuleiro da Cobrinha */
+/* Mini Tabuleiro da Cobrinha (Plano e Idêntico ao GameBoard) */
 .hero-board-side {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding-left: 10px;
+  padding-left: 14px;
+  flex-shrink: 0;
+  z-index: 2;
 }
 
 .hero-mini-board {
-  width: 140px;
-  height: 140px;
-  background-color: #c5e19d;
+  width: 216px;
+  max-width: 100%;
   border-radius: 16px;
-  transform: rotate(-5deg);
-  box-shadow: -4px 10px 24px rgba(0, 0, 0, 0.18);
-  padding: 9px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.25s ease;
+  box-shadow: 0 10px 24px rgba(18, 59, 29, 0.22);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
 }
 
 .hero-mini-board:hover {
-  transform: rotate(-2deg) scale(1.03);
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 14px 28px rgba(18, 59, 29, 0.28);
 }
 
-.mini-checkered-grid {
+.hero-board-svg {
   width: 100%;
-  height: 100%;
-  border-radius: 10px;
-  background-color: #b0d486;
-  background-image: 
-    linear-gradient(45deg, #bedd93 25%, transparent 25%),
-    linear-gradient(-45deg, #bedd93 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, #bedd93 75%),
-    linear-gradient(-45deg, transparent 75%, #bedd93 75%);
-  background-size: 32px 32px;
-  display: flex;
-  align-items: flex-end;
-  padding: 12px 10px;
-  gap: 5px;
+  height: auto;
+  display: block;
 }
 
-.grid-snake-cell {
-  width: 22px;
-  height: 22px;
-  background-color: #1e6b35;
-  border-radius: 5px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
-}
-
-.grid-apple-circle {
-  width: 18px;
-  height: 18px;
-  background-color: #dc2626;
-  border-radius: 50%;
-  margin-left: 6px;
-  margin-bottom: 2px;
-  box-shadow: 0 2px 5px rgba(220, 38, 38, 0.4);
+@media (max-width: 768px) {
+  .figma-hero-banner {
+    flex-direction: column;
+    align-items: center;
+    gap: 22px;
+    padding: 24px 20px;
+    text-align: center;
+  }
+  .hero-text-side {
+    max-width: 100%;
+    align-items: center;
+  }
+  .hero-button-row {
+    justify-content: center;
+  }
+  .hero-board-side {
+    padding-left: 0;
+    width: 100%;
+  }
+  .hero-mini-board {
+    max-width: 210px;
+  }
 }
 
 /* 2. Categorias das Informações */
@@ -2621,56 +2805,53 @@ body:has(.screen-login) {
 }
 
 .cat-icon-circle {
-  width: 38px;
-  height: 38px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.15rem;
+  background-color: #eaf6ec;
+  border: 1px solid #d5ecd8;
+  color: #135128;
 }
 
-.cat-icon-circle.saude {
-  background-color: #fde8e8;
-}
-
-.cat-icon-circle.tecnologia {
-  background-color: #e8f0fe;
-}
-
+.cat-icon-circle.saude,
+.cat-icon-circle.tecnologia,
 .cat-icon-circle.gerais {
-  background-color: #f0e8ff;
+  background-color: #eaf6ec;
+  border-color: #d5ecd8;
 }
 
-:root[data-theme="dark"] .cat-icon-circle.saude {
-  background-color: rgba(220, 38, 38, 0.22);
+:root[data-theme="dark"] .cat-icon-circle {
+  background-color: rgba(43, 168, 74, 0.15);
+  border-color: rgba(94, 216, 125, 0.25);
+  color: #5ed87d;
 }
 
-:root[data-theme="dark"] .cat-icon-circle.tecnologia {
-  background-color: rgba(26, 115, 232, 0.22);
-}
-
-:root[data-theme="dark"] .cat-icon-circle.gerais {
-  background-color: rgba(124, 58, 237, 0.22);
+:root[data-theme="dark"] .cat-icon-circle svg {
+  stroke: #5ed87d;
 }
 
 .cat-card-title {
   font-family: var(--font-display);
-  font-size: 0.98rem;
-  font-weight: 800;
+  font-size: 1.02rem;
+  font-weight: 850;
   letter-spacing: -0.01em;
+  color: #174322;
 }
 
-.saude-title {
-  color: #e63946;
-}
-
-.tecnologia-title {
-  color: #1a73e8;
-}
-
+.saude-title,
+.tecnologia-title,
 .gerais-title {
-  color: #6c5ce7;
+  color: #174322;
+}
+
+:root[data-theme="dark"] .cat-card-title,
+:root[data-theme="dark"] .saude-title,
+:root[data-theme="dark"] .tecnologia-title,
+:root[data-theme="dark"] .gerais-title {
+  color: #edf5ed;
 }
 
 .cat-card-desc {
@@ -2709,9 +2890,8 @@ body:has(.screen-login) {
 .flow-steps-track {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 16px;
   overflow-x: auto;
-  gap: 8px;
   padding-bottom: 2px;
 }
 
@@ -2719,23 +2899,15 @@ body:has(.screen-login) {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
+  color: rgba(255, 255, 255, 0.95);
   white-space: nowrap;
 }
 
 .flow-arrow-separator {
-  color: rgba(255, 255, 255, 0.35);
-  font-size: 0.72rem;
-}
-
-.flow-step-item.highlight-learn {
-  background-color: #f3b23e;
-  color: #1a1a1a;
-  padding: 3px 8px;
-  border-radius: 6px;
-  font-weight: 800;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.76rem;
 }
 
 /* ================= COLUNA DIREITA ================= */
@@ -2954,6 +3126,8 @@ body:has(.screen-login) {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  flex: 1;
+  min-width: 0;
 }
 
 .fact-statement {
@@ -2977,110 +3151,921 @@ body:has(.screen-login) {
   color: #9ba89d;
 }
 
-
-/* ==================== 3. TELA DE TUTORIAL ==================== */
-.tutorial-page {
-  width: 100%;
-  animation: fadeIn 0.25s ease-out;
+.fact-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
-.tutorial-container {
+.fact-status-badge.badge-hit {
+  background-color: #e3f6ea;
+  color: #1f7a3a;
+}
+
+.fact-status-badge.badge-miss {
+  background-color: #fde8e8;
+  color: #d32f2f;
+}
+
+:root[data-theme="dark"] .fact-status-badge.badge-hit {
+  background-color: rgba(43, 168, 74, 0.2);
+  color: #5ed87d;
+}
+
+:root[data-theme="dark"] .fact-status-badge.badge-miss {
+  background-color: rgba(220, 38, 38, 0.2);
+  color: #f87171;
+}
+
+.status-badge-icon {
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+
+/* ==================== 3. TELA DE TUTORIAL (FIGMA REDESIGN) ==================== */
+.tutorial-page {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 16px;
+  animation: fadeIn 0.25s ease-out;
+  box-sizing: border-box;
+}
+
+.tutorial-card {
+  background: #f4f8f3;
+  border: 1px solid #dce8db;
+  border-radius: 26px;
+  padding: 32px 34px;
+  box-shadow: 0 16px 40px rgba(23, 83, 42, 0.08);
   display: flex;
   flex-direction: column;
   gap: 12px;
+  max-width: 860px;
+  width: 100%;
+  text-align: left;
+  box-sizing: border-box;
 }
 
 .tutorial-topbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-}
-
-.tutorial-badge-step {
-  font-size: 0.78rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  background: var(--brand-green-light);
-  color: var(--brand-green);
-  padding: 4px 12px;
-  border-radius: 99px;
-}
-
-.skip-button {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  font-weight: 700;
-  font-size: 0.84rem;
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 6px;
-  transition: color 0.15s ease;
-}
-
-.skip-button:hover {
-  color: var(--text-main);
-  background: var(--bg-card-subtle);
-}
-
-.tutorial-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  padding: 22px 20px;
-  box-shadow: var(--shadow-md);
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  min-height: 310px;
-}
-
-.tutorial-header {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 4px;
-}
-
-.tutorial-step-icon {
-  font-size: 2.6rem;
-  line-height: 1;
+  width: 100%;
   margin-bottom: 2px;
 }
 
-.tutorial-title {
-  font-family: var(--font-display);
-  font-size: 1.45rem;
+.tutorial-step-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #e2ede1;
+  padding: 5px 12px;
+  border-radius: 9999px;
+  border: 1px solid rgba(47, 107, 58, 0.15);
+}
+
+.pill-dots {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pill-dots .dot {
+  width: 7px;
+  height: 9px;
+  border-radius: 2.5px;
+  display: inline-block;
+}
+
+.pill-dots .dot-active {
+  background: #0b6638;
+}
+
+.pill-dots .dot-inactive {
+  background: #c5dfc3;
+}
+
+.pill-dots .dot-green {
+  background: #1b6d3b;
+}
+
+.pill-dots .dot-red {
+  background: #dc2626;
+}
+
+.pill-text {
+  font-size: 0.76rem;
   font-weight: 800;
-  color: var(--text-main);
+  color: #17532a;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1;
 }
 
-.tutorial-subtitle {
-  font-size: 0.84rem;
+.tutorial-skip-btn {
+  background: none;
+  border: none;
+  color: #2b5d3c;
+  font-size: 0.88rem;
   font-weight: 600;
-  color: var(--text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  transition: color 0.15s ease, background-color 0.15s ease;
 }
 
-.tutorial-body-text {
-  font-size: 0.92rem;
-  color: var(--text-main);
-  line-height: 1.5;
-  text-align: center;
+.tutorial-skip-btn:hover {
+  color: #0c2514;
+  background: rgba(43, 93, 60, 0.08);
+}
+
+.tutorial-skip-btn .close-x {
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+
+
+.tutorial-header-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.tutorial-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #17532a;
+}
+
+.tutorial-target-icon {
+  width: 28px;
+  height: 28px;
+}
+
+.tutorial-icon-emoji {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.tutorial-title {
+  font-family: var(--font-display, inherit);
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #0e2a16;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+
+
+.tutorial-headline {
+  font-family: var(--font-display, inherit);
+  font-size: 2.05rem;
+  font-weight: 900;
+  line-height: 1.15;
+  color: #17532a;
+  margin: 2px 0 0 0;
+  letter-spacing: -0.02em;
+}
+
+.tutorial-subheadline {
+  font-family: var(--font-display, inherit);
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1.25;
+  color: #1b6e41;
+  margin: 2px 0 0 0;
+  letter-spacing: -0.01em;
+}
+
+.tutorial-lead-desc {
+  font-size: 0.98rem;
+  font-weight: 500;
+  color: #21482f;
+  line-height: 1.45;
+  margin: 0 0 4px 0;
+}
+
+.tutorial-lead-desc strong {
+  font-weight: 800;
+  color: #145c36;
 }
 
 /* Snippets Visuais nos Passos do Tutorial */
 .tutorial-visual-box {
-  background: var(--bg-card-subtle);
-  border: 1px dashed var(--border-strong);
-  border-radius: var(--radius-md);
+  background: var(--bg-card-subtle, #f0f6ef);
+  border: 1px dashed var(--border-strong, #c2d8bf);
+  border-radius: var(--radius-md, 14px);
   padding: 14px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 8px;
+}
+
+/* Ilustração da Cobrinha Oficial do Tabuleiro (Passo 1) */
+.tutorial-board-visual {
+  width: 100%;
+  margin: 4px 0 8px 0;
+  filter: drop-shadow(0 2px 8px rgba(37, 122, 62, 0.06));
+}
+
+.tutorial-board-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 14px;
+}
+
+/* Ilustração dos Controles + Cobrinha Oficial (Passo 2 - Figma) */
+.tutorial-controls-visual {
+  width: 100%;
+  background: #edf5ea;
+  border: 1.5px solid #c7dec4;
+  border-radius: 16px;
+  padding: 16px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  box-sizing: border-box;
+  margin: 4px 0 8px 0;
+  filter: drop-shadow(0 2px 8px rgba(37, 122, 62, 0.06));
+}
+
+.tutorial-dpad-col {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  padding: 2px 6px;
+}
+
+.tutorial-dpad-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 34px);
+  grid-template-rows: repeat(3, 34px);
+  gap: 5px;
+  align-items: center;
+  justify-items: center;
+}
+
+.dpad-cell {
+  width: 34px;
+  height: 34px;
+}
+
+.dpad-btn {
+  width: 34px;
+  height: 34px;
+  background: #17532a;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 3px 6px rgba(23, 83, 42, 0.18);
+  transition: transform 0.1s ease;
+}
+
+.dpad-center-spacer {
+  width: 34px;
+  height: 34px;
+}
+
+.tutorial-visual-divider {
+  width: 1.5px;
+  height: 72px;
+  background: #9dc496;
+  border-radius: 1px;
+  flex-shrink: 0;
+}
+
+.tutorial-mini-board-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tutorial-sub-board-svg {
+  width: 100%;
+  max-width: 230px;
+  height: auto;
+  display: block;
+}
+
+/* Destaque de Pílula no Texto (Passo 3: 60 segundos) */
+.tutorial-highlight-pill {
+  background: #d8edd6;
+  color: #17532a;
+  font-weight: 800;
+  padding: 1px 7px;
+  border-radius: 9999px;
+  display: inline-block;
+  border: 1px solid rgba(47, 107, 58, 0.18);
+  font-size: 0.95em;
+}
+
+/* Container de Fluxo do Passo 3 (Figma) */
+.tutorial-step3-container {
+  width: 100%;
+  background: #edf5ea;
+  border: 1.5px solid #c7dec4;
+  border-radius: 16px;
+  padding: 16px 10px;
+  margin: 4px 0 8px 0;
+  box-sizing: border-box;
+  filter: drop-shadow(0 2px 8px rgba(37, 122, 62, 0.06));
+}
+
+.step3-flow-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  width: 100%;
+}
+
+.step3-flow-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.step3-flow-box {
+  width: 100%;
+  height: 72px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.step3-sub-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.step3-flow-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #17532a;
+  margin-top: 6px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.step3-flow-arrow {
+  color: #278647;
+  font-size: 1.15rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 1px;
+  flex-shrink: 0;
+}
+
+.step3-question-box {
+  background: #eaf3e8;
+  border: 1px solid #c7dec4;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  box-sizing: border-box;
+}
+
+.step3-speech-bubble {
+  background: #ffffff;
+  border: 1px solid #a8d5a2;
+  border-radius: 7px;
+  padding: 5px 6px;
+  text-align: center;
+  position: relative;
+  margin-bottom: 5px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+}
+
+.step3-speech-bubble p {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #0e2a16;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.step3-speech-bubble .bubble-tail {
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 4px solid #a8d5a2;
+}
+
+.step3-timer-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: #daf0d7;
+  border: 1px solid #b8dfb4;
+  color: #17532a;
+  font-size: 0.7rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  line-height: 1;
+}
+
+/* Container do Passo 4 (Barra de Confiabilidade - Figma) */
+.tutorial-step4-container {
+  width: 100%;
+  background: #edf5ea;
+  border: 1.5px solid #c7dec4;
+  border-radius: 20px;
+  padding: 24px 28px;
+  margin: 6px 0 10px 0;
+  box-sizing: border-box;
+  display: flex;
+  gap: 22px;
+  align-items: stretch;
+  filter: drop-shadow(0 2px 8px rgba(37, 122, 62, 0.06));
+}
+
+.step4-slider-col {
+  flex: 1 1 0;
+  min-width: 320px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.step4-speech-bubble {
+  background: #ffffff;
+  border: 1.5px solid #94d391;
+  border-radius: 14px;
+  padding: 8px 24px;
+  text-align: center;
+  position: relative;
+  margin: 0 auto 16px auto;
+  width: fit-content;
+  max-width: 95%;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+}
+
+.step4-speech-bubble p {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #0e2a16;
+  margin: 0;
+  line-height: 1.35;
+}
+
+.step4-speech-bubble .bubble-tail {
+  position: absolute;
+  bottom: -7px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 7px solid #94d391;
+}
+
+.step4-speech-bubble .bubble-tail::after {
+  content: "";
+  position: absolute;
+  bottom: 2px;
+  left: -5px;
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid #ffffff;
+}
+
+.step4-labels-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  width: 100%;
+  margin-bottom: 10px;
+  position: relative;
+  min-height: 36px;
+}
+
+.step4-tag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  z-index: 1;
+}
+
+.tag-unreliable {
+  justify-content: flex-start;
+}
+
+.tag-reliable {
+  justify-content: flex-end;
+}
+
+.tag-circle-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #ffffff;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.icon-alert {
+  background: #e03b3b;
+}
+
+.icon-check {
+  background: #2bb358;
+}
+
+.tag-text {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #17532a;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.tag-text small {
+  font-size: 0.72rem;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.step4-markers-pair {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  position: absolute;
+  left: 47.5%;
+  bottom: 0;
+  transform: translateX(-50%);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.step4-marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  position: relative;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.marker-you {
+  background: #1e729e;
+  color: #ffffff;
+}
+
+.marker-ref {
+  background: #a3d8a0;
+  color: #0f4422;
+}
+
+.marker-arrow {
+  width: 0;
+  height: 0;
+  border-left: 4.5px solid transparent;
+  border-right: 4.5px solid transparent;
+  position: absolute;
+  bottom: -5px;
+}
+
+.arrow-you {
+  border-top: 5px solid #1e729e;
+  right: 14px;
+}
+
+.arrow-ref {
+  border-top: 5px solid #a3d8a0;
+  left: 14px;
+}
+
+.step4-track-container {
+  width: 100%;
+  position: relative;
+  margin-top: 4px;
+}
+
+.step4-gradient-track {
+  width: 100%;
+  height: 15px;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, #e54b4b 0%, #e27d60 25%, #c8a867 45%, #7bc67a 70%, #34a853 100%);
+  position: relative;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.step4-thumb-you {
+  position: absolute;
+  left: 45%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 15px;
+  height: 26px;
+  background: #1e729e;
+  border-radius: 9999px;
+  border: 2px solid #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  z-index: 2;
+}
+
+.thumb-dot {
+  width: 3.5px;
+  height: 3.5px;
+  border-radius: 50%;
+  background: #ffffff;
+}
+
+.step4-bar-ref {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 5px;
+  height: 24px;
+  border-radius: 2.5px;
+  background: #1c3d2b;
+  z-index: 1;
+}
+
+.step4-ticks-track {
+  position: relative;
+  width: 100%;
+  height: 26px;
+  margin-top: 6px;
+}
+
+.tick-mark {
+  position: absolute;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.tick-0 {
+  left: 0;
+  transform: translateX(0);
+}
+
+.tick-25 {
+  left: 25%;
+  transform: translateX(-50%);
+}
+
+.tick-50 {
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.tick-75 {
+  left: 75%;
+  transform: translateX(-50%);
+}
+
+.tick-100 {
+  left: 100%;
+  transform: translateX(-100%);
+}
+
+.tick-pin {
+  width: 1.5px;
+  height: 7px;
+  background: #6f9a6b;
+}
+
+.tick-val {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #17532a;
+  margin-top: 2px;
+  line-height: 1;
+}
+
+.step4-bracket-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 4px;
+  width: 100%;
+}
+
+.step4-bracket-span {
+  display: flex;
+  align-items: center;
+  width: 30%;
+  height: 10px;
+}
+
+.step4-bracket-span .bracket-edge {
+  width: 1.5px;
+  height: 10px;
+  background: #237242;
+  flex-shrink: 0;
+}
+
+.step4-bracket-span .bracket-dashed-bar {
+  flex: 1;
+  border-top: 1.5px dashed #237242;
+  margin: 0;
+  height: 0;
+}
+
+.bracket-caption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.bracket-caption-title {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #17532a;
+  line-height: 1.2;
+}
+
+.bracket-caption-sub {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #21482f;
+  line-height: 1.2;
+}
+
+.step4-vertical-divider {
+  width: 1px;
+  background: #c5dfc3;
+  margin: 0 4px;
+  flex-shrink: 0;
+  align-self: stretch;
+}
+
+.step4-side-col {
+  flex: 0 0 220px;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  justify-content: center;
+}
+
+.step4-info-card {
+  background: #e2ede0;
+  border: 1px solid #c8dfc6;
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.step4-info-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #0d4223;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 800;
+  font-style: italic;
+  font-family: serif;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.step4-info-text {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: #174d2b;
+  margin: 0;
+  line-height: 1.35;
+}
+
+.step4-legend-card {
+  background: #e2ede0;
+  border: 1px solid #c8dfc6;
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.step4-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.step4-legend-circle {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.circle-you {
+  background: #1e729e;
+}
+
+.circle-ref {
+  background: #173b22;
+}
+
+.step4-legend-name {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #174d2b;
+}
+
+@media (max-width: 768px) {
+  .tutorial-card {
+    padding: 24px 18px;
+    border-radius: 20px;
+  }
+  .tutorial-step4-container {
+    flex-direction: column;
+    gap: 16px;
+    padding: 18px 16px;
+  }
+  .step4-slider-col {
+    min-width: 0;
+    width: 100%;
+  }
+  .step4-vertical-divider {
+    display: none;
+  }
+  .step4-side-col {
+    flex: auto;
+    width: 100%;
+    min-width: 0;
+    flex-direction: row;
+    gap: 10px;
+  }
+  .step4-info-card,
+  .step4-legend-card {
+    flex: 1;
+    padding: 10px 12px;
+  }
 }
 
 .preview-bubble {
@@ -3213,43 +4198,263 @@ body:has(.screen-login) {
   color: #b91c1c;
 }
 
-/* Dots do Tutorial */
-.step-dots {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 8px;
-  margin: 4px 0;
-}
-
-.step-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--border-strong);
-  border: none;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  padding: 0;
-}
-
-.step-dot.active {
-  width: 26px;
-  border-radius: 99px;
-  background: var(--brand-green);
-}
-
+/* Ações Inferiores (Pill Buttons) */
 .tutorial-actions {
   display: flex;
-  gap: 8px;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  margin-top: 10px;
 }
 
-.tutorial-actions .secondary-button {
-  flex: 1;
+.tutorial-btn-outline {
+  padding: 10px 24px;
+  border-radius: 9999px;
+  border: 1.5px solid #17532a;
+  background: transparent;
+  color: #17532a;
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  flex: 0 0 auto;
 }
 
-.tutorial-actions .next-button {
-  flex: 2;
+.tutorial-btn-outline:hover:not(:disabled) {
+  background: rgba(23, 83, 42, 0.08);
+}
+
+.tutorial-btn-outline:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  border-color: #7fa487;
+  color: #7fa487;
+}
+
+.tutorial-btn-solid {
+  flex: 0 0 auto;
+  padding: 10px 28px;
+  border-radius: 9999px;
+  border: none;
+  background: #17532a;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.tutorial-btn-solid:hover {
+  background: #11401f;
+}
+
+.tutorial-btn-solid:active {
+  transform: scale(0.99);
+}
+
+/* Suporte ao Modo Escuro no Tutorial */
+body.theme-dark .tutorial-card,
+.fako-app.theme-dark .tutorial-card {
+  background: #132216;
+  border-color: #213c27;
+}
+
+body.theme-dark .tutorial-step-pill,
+.fako-app.theme-dark .tutorial-step-pill {
+  background: rgba(34, 197, 94, 0.15);
+  border-color: rgba(34, 197, 94, 0.25);
+}
+
+body.theme-dark .pill-text,
+.fako-app.theme-dark .pill-text {
+  color: #86efac;
+}
+
+body.theme-dark .tutorial-skip-btn,
+.fako-app.theme-dark .tutorial-skip-btn {
+  color: #a7f3d0;
+}
+
+body.theme-dark .tutorial-title,
+.fako-app.theme-dark .tutorial-title {
+  color: #f0fdf4;
+}
+
+body.theme-dark .tutorial-headline,
+.fako-app.theme-dark .tutorial-headline {
+  color: #4ade80;
+}
+
+body.theme-dark .tutorial-lead-desc,
+.fako-app.theme-dark .tutorial-lead-desc {
+  color: #d1fae5;
+}
+
+body.theme-dark .tutorial-btn-outline,
+.fako-app.theme-dark .tutorial-btn-outline {
+  border-color: #4ade80;
+  color: #4ade80;
+}
+
+body.theme-dark .tutorial-btn-solid,
+.fako-app.theme-dark .tutorial-btn-solid {
+  background: #22c55e;
+  color: #052e16;
+}
+
+body.theme-dark .tutorial-btn-solid:hover,
+.fako-app.theme-dark .tutorial-btn-solid:hover {
+  background: #16a34a;
+}
+
+body.theme-dark .tutorial-controls-visual,
+.fako-app.theme-dark .tutorial-controls-visual {
+  background: #15271a;
+  border-color: #26432c;
+}
+
+body.theme-dark .tutorial-visual-divider,
+.fako-app.theme-dark .tutorial-visual-divider {
+  background: #2b5033;
+}
+
+body.theme-dark .dpad-btn,
+.fako-app.theme-dark .dpad-btn {
+  background: #1e6b36;
+}
+
+body.theme-dark .tutorial-gamepad-icon path,
+.fako-app.theme-dark .tutorial-gamepad-icon path {
+  fill: #4ade80;
+}
+
+body.theme-dark .tutorial-highlight-pill,
+.fako-app.theme-dark .tutorial-highlight-pill {
+  background: rgba(34, 197, 94, 0.2);
+  color: #86efac;
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+body.theme-dark .tutorial-step3-container,
+.fako-app.theme-dark .tutorial-step3-container {
+  background: #15271a;
+  border-color: #26432c;
+}
+
+body.theme-dark .step3-question-box,
+.fako-app.theme-dark .step3-question-box {
+  background: #122015;
+  border-color: #26432c;
+}
+
+body.theme-dark .step3-speech-bubble,
+.fako-app.theme-dark .step3-speech-bubble {
+  background: #1b3522;
+  border-color: #2d5a39;
+}
+
+body.theme-dark .step3-speech-bubble p,
+.fako-app.theme-dark .step3-speech-bubble p {
+  color: #f0fdf4;
+}
+
+body.theme-dark .step3-speech-bubble .bubble-tail,
+.fako-app.theme-dark .step3-speech-bubble .bubble-tail {
+  border-top-color: #2d5a39;
+}
+
+body.theme-dark .step3-timer-pill,
+.fako-app.theme-dark .step3-timer-pill {
+  background: #1e3d27;
+  border-color: #2d5b39;
+  color: #86efac;
+}
+
+body.theme-dark .step3-flow-label,
+.fako-app.theme-dark .step3-flow-label {
+  color: #86efac;
+}
+
+body.theme-dark .step3-flow-arrow,
+.fako-app.theme-dark .step3-flow-arrow {
+  color: #4ade80;
+}
+
+body.theme-dark .tutorial-step4-container,
+.fako-app.theme-dark .tutorial-step4-container {
+  background: #15271a;
+  border-color: #26432c;
+}
+
+body.theme-dark .step4-speech-bubble,
+.fako-app.theme-dark .step4-speech-bubble {
+  background: #1b3522;
+  border-color: #2d5a39;
+}
+
+body.theme-dark .step4-speech-bubble p,
+.fako-app.theme-dark .step4-speech-bubble p {
+  color: #f0fdf4;
+}
+
+body.theme-dark .step4-speech-bubble .bubble-tail,
+.fako-app.theme-dark .step4-speech-bubble .bubble-tail {
+  border-top-color: #2d5a39;
+}
+
+body.theme-dark .step4-info-card,
+.fako-app.theme-dark .step4-info-card,
+body.theme-dark .step4-legend-card,
+.fako-app.theme-dark .step4-legend-card {
+  background: #1a3221;
+  border-color: #284c32;
+}
+
+body.theme-dark .step4-info-icon,
+.fako-app.theme-dark .step4-info-icon {
+  background: #166534;
+  color: #f0fdf4;
+}
+
+body.theme-dark .step4-info-text,
+.fako-app.theme-dark .step4-info-text,
+body.theme-dark .step4-legend-name,
+.fako-app.theme-dark .step4-legend-name {
+  color: #d1fae5;
+}
+
+body.theme-dark .step4-vertical-divider,
+.fako-app.theme-dark .step4-vertical-divider {
+  background: #26432c;
+}
+
+body.theme-dark .tutorial-fako-brand-text,
+.fako-app.theme-dark .tutorial-fako-brand-text {
+  color: #4ade80;
+}
+
+body.theme-dark .tutorial-subheadline,
+.fako-app.theme-dark .tutorial-subheadline {
+  color: #86efac;
+}
+
+body.theme-dark .tag-text,
+.fako-app.theme-dark .tag-text,
+body.theme-dark .tick-val,
+.fako-app.theme-dark .tick-val,
+body.theme-dark .bracket-caption-title,
+.fako-app.theme-dark .bracket-caption-title {
+  color: #86efac;
+}
+
+body.theme-dark .bracket-caption-sub,
+.fako-app.theme-dark .bracket-caption-sub {
+  color: #a7f3d0;
 }
 
 /* ==================== 4. TELA MINHA JORNADA ==================== */

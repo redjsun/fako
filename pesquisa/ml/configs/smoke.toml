@@ -1,0 +1,18 @@
+# Execução mínima de ponta a ponta no dataset de fixture (tests/fixtures), para o CI.
+nome = "smoke"
+modelo = "referencia"
+saida = "pesquisa/ml/saidas/smoke"
+sementes = [42]
+
+[dados]
+dataset = "pesquisa/ml/tests/fixtures/dataset_smoke.jsonl"
+texto = "original"
+
+[treino]
+ngram_palavras = [1, 2]
+min_df = 1
+max_df = 1.0
+sublinear_tf = true
+ngram_caracteres = []
+grade_c = [1]
+max_iter = 200

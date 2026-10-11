@@ -13,8 +13,24 @@ docs:
   - id: planejamento-retreino
     titulo: Planejamento de coleta contínua e retreino
     arquivo: doc/planejamento-retreino.md
-    descricao: Plano futuro (não implementado) de agendamento com supercronic, portão de qualidade e versionamento de modelos.
+    descricao: Coleta diária com supercronic (implementada) e plano do retreino, com portão de qualidade e versionamento de modelos.
   - id: guia-classificacao
     titulo: Guia de classificação e anotação
     arquivo: doc/guia-classificacao.md
     descricao: Rótulos do framework de desordem informacional, arquitetura planejada do classificador, divisão dos dados e guia de anotação da equipe.
+  - id: padronizacao
+    titulo: Padronização do texto curto pela LLM
+    arquivo: doc/padronizacao.md
+    descricao: Lote e cache da extração de afirmações no treino (issue #20), regra para várias afirmações ou nenhuma e validação pelo teste de atalho.
+  - id: dataset-verdadeiras
+    titulo: Dataset de verdadeiros confiáveis
+    arquivo: doc/dataset-verdadeiras.md
+    descricao: Critérios de verdadeiro confiável (issue #6), filtros das matérias de portal, auditoria manual com medição do ruído e origem portal_verificado.
+  - id: banco-perguntas
+    titulo: Banco de perguntas do jogo
+    arquivo: doc/banco-perguntas.md
+    descricao: A afirmação do jogo é o texto do treino (≤ 25 palavras), contexto na revelação, notícias de API externa rotuladas pelo classificador e checagens, revisão humana.
+  - id: relatorio-tecnico
+    titulo: Relatório técnico do classificador
+    arquivo: doc/relatorio-tecnico.md
+    descricao: Preparação dos dados, treino, critério de escolha, métricas e análise (referência TF-IDF e BERTimbau), desafios e aprendizados.

@@ -1,0 +1,31 @@
+Você extrai afirmações checáveis de textos em português do Brasil (notícias, posts, mensagens de WhatsApp, alegações).
+
+Uma afirmação checável é um fato que pode ser confirmado ou desmentido com fontes: algo que aconteceu, um número, uma lei, uma decisão, um efeito, uma declaração de alguém. Opinião, previsão vaga, pergunta, convite, xingamento e elogio não são afirmações checáveis.
+
+Regras:
+1. A PRIMEIRA afirmação da lista é a afirmação PRINCIPAL do texto: a que o texto quer que o leitor acredite, a manchete ou o boato central. Não é a primeira frase do texto. Se o texto começa com contexto ("O presidente viajou ontem ao Nordeste...") e depois traz o fato central, o fato central vem primeiro.
+2. Depois da principal, liste até 4 outras afirmações checáveis importantes, da mais para a menos importante. No máximo 5 no total.
+3. Cada afirmação é UMA frase curta (até 30 palavras), completa e compreensível sozinha: troque pronomes e "ele", "o órgão", "a medida" pelo nome a que se referem.
+4. Não julgue se é verdade e não corrija. Reproduza o que o texto afirma, mesmo que pareça falso ou absurdo. Não acrescente informação que não está no texto.
+5. Quem disse: se o texto atribui a afirmação a alguém ("Fulano disse que X", "segundo o ministério, X", "X, afirmou o deputado"), escreva só X em "texto" e o autor em "quem_disse". Nunca transforme "Fulano disse que X" em "X" sem preencher "quem_disse". Se o próprio texto afirma, "quem_disse" é null.
+6. Não copie chamadas para compartilhar, links, assinaturas, nomes de veículo, "URGENTE", emojis nem pedidos de "leia mais".
+7. Escreva em português, com maiúscula no início e sem ponto final.
+8. "e_opiniao" é true quando o texto é só opinião, análise ou comentário, sem fato checável; nesse caso "afirmacoes" fica vazia. Se houver opinião e também fatos checáveis, "e_opiniao" é false e os fatos entram na lista.
+
+Responda apenas com JSON, neste formato:
+{"e_opiniao": false, "afirmacoes": [{"texto": "...", "quem_disse": null}]}
+
+Exemplos:
+
+Texto: Deputado Fulano de Tal disse nesta terça que a vacina contra a covid causa infertilidade em mulheres. O Ministério da Saúde ampliou a vacinação para todas as idades na semana passada.
+JSON: {"e_opiniao": false, "afirmacoes": [{"texto": "A vacina contra a covid causa infertilidade em mulheres", "quem_disse": "deputado Fulano de Tal"}, {"texto": "O Ministério da Saúde ampliou a vacinação contra a covid para todas as idades", "quem_disse": null}]}
+
+Texto: URGENTE!!! Compartilhem antes que apaguem: o governo vai confiscar a poupança de todos os brasileiros a partir de segunda-feira.
+JSON: {"e_opiniao": false, "afirmacoes": [{"texto": "O governo vai confiscar a poupança de todos os brasileiros a partir de segunda-feira", "quem_disse": null}]}
+
+Texto: Acho que esse governo é o pior da história. Ninguém aguenta mais tanta incompetência.
+JSON: {"e_opiniao": true, "afirmacoes": []}
+
+Texto:
+{texto}
+JSON:

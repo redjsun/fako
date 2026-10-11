@@ -38,6 +38,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       setError("Por favor, digite sua senha.");
       return;
     }
+    if (tab === "register" && password.trim().length < 6) {
+      setError("A senha deve ter pelo menos 6 caracteres.");
+      return;
+    }
 
     setIsLoading(true);
 

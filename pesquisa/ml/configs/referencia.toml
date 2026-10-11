@@ -1,0 +1,18 @@
+# Experimento 1: referência TF-IDF + regressão logística ordinal (Frank e Hall), issue #9.
+nome = "referencia"
+modelo = "referencia"
+saida = "models/2026-11/referencia"
+sementes = [42]
+
+[dados]
+dataset = "pesquisa/data/processed/dataset.jsonl"
+texto = "original"
+
+[treino]
+ngram_palavras = [1, 2]
+min_df = 3
+max_df = 0.9
+sublinear_tf = true
+ngram_caracteres = [3, 5]   # opcional; [] desliga
+grade_c = [0.25, 0.5, 1, 2, 4, 8, 16]   # escolhido pelo F1 macro da validação
+max_iter = 2000

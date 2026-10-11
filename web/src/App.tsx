@@ -4,16 +4,18 @@ import {
   Position,
   GameStatus,
   Question,
-  QuestionResult,
+  AnswerResult,
   GameStats,
   AppScreen,
   User,
   UserStats,
   CategoryFilter,
+  Match,
 } from "./types";
-import { nextQuestion, resetQuestionDeck } from "./services/questionService";
 import { soundEffects } from "./services/audioService";
 import { authService } from "./services/authService";
+import { matchService } from "./services/matchService";
+import { progressService } from "./services/progressService";
 import { Header } from "./components/Header";
 import { GameBoard } from "./components/GameBoard";
 import { QuestionModal } from "./components/QuestionModal";
@@ -25,9 +27,8 @@ import { CategoriesScreen } from "./components/CategoriesScreen";
 import { TutorialScreen } from "./components/TutorialScreen";
 import { JourneyScreen } from "./components/JourneyScreen";
 
-const GRID_SIZE = 16;
-const APPLES_PER_LEVEL = 10;
 const MAX_LEVELS = 6;
+const APPLES_PER_LEVEL = 10;
 
 const OPPOSITE_DIRECTIONS: Record<Direction, Direction> = {
   UP: "DOWN",
@@ -44,6 +45,7 @@ export default function App() {
     if (!user) return "login";
     return authService.hasSeenTutorial(user.username) ? "home" : "tutorial";
   });
+
   const [userStats, setUserStats] = useState<UserStats>(() => {
     const user = authService.getCurrentUser();
     return user
@@ -67,7 +69,14 @@ export default function App() {
 
   const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>("Misto");
 
-  // Estado do Jogo (Snake)
+  // Estado do Jogo e da Partida
+  const [currentMatch, setCurrentMatch] = useState<Match | null>(null);
+  const matchIdRef = useRef<number | null>(null);
+  const [gridSize, setGridSize] = useState<number>(16);
+  const [tickMs, setTickMs] = useState<number>(160);
+  const [matchTimeLeft, setMatchTimeLeft] = useState<number>(120);
+  const [hasAdvanced, setHasAdvanced] = useState<boolean>(false);
+
   const [status, setStatus] = useState<GameStatus>("START");
   const [snake, setSnake] = useState<Position[]>([
     { x: 8, y: 8 },
@@ -85,12 +94,13 @@ export default function App() {
   const [acertos, setAcertos] = useState<number>(0);
   const [erros, setErros] = useState<number>(0);
 
-  // Pergunta Corrente e Resposta
+  // Pergunta Corrente da API e Resposta
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
   const [isQuestionAnswered, setIsQuestionAnswered] = useState<boolean>(false);
-  const [lastResult, setLastResult] = useState<QuestionResult | null>(null);
+  const [lastResult, setLastResult] = useState<AnswerResult | null>(null);
+  const [isSubmittingAnswer, setIsSubmittingAnswer] = useState<boolean>(false);
 
-  // Configurações Globais (Apenas Claro e Escuro)
+  // Configurações Globais
   const [isMuted, setIsMuted] = useState<boolean>(soundEffects.getMuted());
   const [theme, setTheme] = useState<"light" | "dark">(() => {
     try {
@@ -109,9 +119,9 @@ export default function App() {
   const appleRef = useRef<Position | null>(apple);
   const growPendingRef = useRef<number>(0);
   const statusRef = useRef<GameStatus>(status);
-  const levelRef = useRef<number>(level);
-  const applesInLevelRef = useRef<number>(applesInLevel);
+  const gridSizeRef = useRef<number>(gridSize);
   const gameLoopTimerRef = useRef<number | null>(null);
+  const matchCountdownTimerRef = useRef<number | null>(null);
 
   // Sincronizar referências
   useEffect(() => {
@@ -131,36 +141,47 @@ export default function App() {
   }, [status]);
 
   useEffect(() => {
-    levelRef.current = level;
-  }, [level]);
+    gridSizeRef.current = gridSize;
+  }, [gridSize]);
 
-  useEffect(() => {
-    applesInLevelRef.current = applesInLevel;
-  }, [applesInLevel]);
-
-  // Aplicar tema no elemento raiz (sempre "light" ou "dark")
+  // Aplicar tema no elemento raiz
   useEffect(() => {
     const root = document.documentElement;
     root.setAttribute("data-theme", theme);
     try {
       localStorage.setItem("fako_theme", theme);
     } catch {
-      // Ignora erro de localStorage
+      // Ignora erro
     }
   }, [theme]);
 
-  // Sincronizar stats do usuário quando mudar
-  const refreshUserStats = useCallback(() => {
-    if (currentUser) {
+  // Sincronizar progresso com a API
+  const refreshUserProgress = useCallback(async () => {
+    if (!currentUser) return;
+    try {
+      const prog = await progressService.getMyProgress();
+      setUserStats((prev) => ({
+        ...prev,
+        highScore: Math.max(prev.highScore, prog.total_score),
+        maxLevel: prog.highest_level,
+        gamesPlayed: prog.matches_played,
+      }));
+    } catch {
       setUserStats(authService.getUserStats(currentUser.username));
     }
   }, [currentUser]);
 
+  useEffect(() => {
+    if (currentUser) {
+      refreshUserProgress();
+    }
+  }, [currentUser, refreshUserProgress]);
+
   // Posicionar maçã em célula livre
-  const placeRandomApple = useCallback((currentSnake: Position[]): Position => {
+  const placeRandomApple = useCallback((currentSnake: Position[], currentGridSize: number): Position => {
     const freeCells: Position[] = [];
-    for (let x = 0; x < GRID_SIZE; x++) {
-      for (let y = 0; y < GRID_SIZE; y++) {
+    for (let x = 0; x < currentGridSize; x++) {
+      for (let y = 0; y < currentGridSize; y++) {
         const isOccupied = currentSnake.some((seg) => seg.x === x && seg.y === y);
         if (!isOccupied) {
           freeCells.push({ x, y });
@@ -183,19 +204,40 @@ export default function App() {
     nextDirRef.current = newDir;
   }, []);
 
-  // Velocidade do jogo por nível
-  const getSpeed = useCallback((currentLvl: number) => {
-    const baseSpeed = 160;
-    const decrement = (currentLvl - 1) * 14;
-    return Math.max(75, baseSpeed - decrement);
-  }, []);
+  // Finalizar partida na API
+  const handleFinishMatch = useCallback(async (endStatus: GameStatus) => {
+    if (matchCountdownTimerRef.current) {
+      clearInterval(matchCountdownTimerRef.current);
+      matchCountdownTimerRef.current = null;
+    }
+    if (gameLoopTimerRef.current) {
+      clearInterval(gameLoopTimerRef.current);
+      gameLoopTimerRef.current = null;
+    }
+
+    const activeMatchId = matchIdRef.current;
+    matchIdRef.current = null;
+
+    if (activeMatchId) {
+      try {
+        const res = await matchService.finishMatch(activeMatchId);
+        setHasAdvanced(res.advanced);
+      } catch (err) {
+        console.error("Erro ao encerrar partida na API:", err);
+      }
+    }
+
+    setStatus(endStatus);
+    await refreshUserProgress();
+  }, [refreshUserProgress]);
 
   // Passo único de movimentação da cobrinha
-  const step = useCallback(() => {
+  const step = useCallback(async () => {
     if (statusRef.current !== "PLAYING") return;
 
     const currentSnake = snakeRef.current;
     const activeDir = nextDirRef.current;
+    const currentGrid = gridSizeRef.current;
     setDirection(activeDir);
 
     let dx = 0;
@@ -217,28 +259,15 @@ export default function App() {
 
     const head = currentSnake[0];
     const newHead: Position = {
-      x: (head.x + dx + GRID_SIZE) % GRID_SIZE,
-      y: (head.y + dy + GRID_SIZE) % GRID_SIZE,
+      x: (head.x + dx + currentGrid) % currentGrid,
+      y: (head.y + dy + currentGrid) % currentGrid,
     };
 
-    // Colisão com o corpo
+    // Colisão com o próprio corpo
     const hitSelf = currentSnake.some((seg) => seg.x === newHead.x && seg.y === newHead.y);
     if (hitSelf) {
       soundEffects.playGameOver();
-      setStatus("GAMEOVER");
-
-      if (currentUser) {
-        authService.recordGameFinished(currentUser.username, {
-          score,
-          level,
-          applesInLevel,
-          totalApples,
-          acertos,
-          erros,
-          category: selectedCategory,
-        });
-        refreshUserStats();
-      }
+      await handleFinishMatch("GAMEOVER");
       return;
     }
 
@@ -259,21 +288,32 @@ export default function App() {
       soundEffects.playEat();
       setStatus("QUESTION");
 
-      const question = nextQuestion(selectedCategory);
-      setCurrentQuestion(question);
+      const activeMatchId = matchIdRef.current || 1;
+      try {
+        const q = await matchService.getNextQuestion(activeMatchId);
+        setCurrentQuestion(q);
+      } catch (err) {
+        console.error("Erro ao obter próxima questão:", err);
+        // Fallback caso acabe o banco de perguntas
+        setCurrentQuestion({
+          id: 1,
+          statement: "Informações checadas e auditadas aumentam a segurança da comunidade.",
+          category: "Gerais",
+        });
+      }
+
       setIsQuestionAnswered(false);
       setLastResult(null);
 
-      const nextApplePos = placeRandomApple(newSnake);
+      const nextApplePos = placeRandomApple(newSnake, currentGrid);
       setApple(nextApplePos);
     }
-  }, [placeRandomApple, currentUser, score, level, applesInLevel, totalApples, acertos, erros, selectedCategory, refreshUserStats]);
+  }, [placeRandomApple, handleFinishMatch]);
 
-  // Loop de Jogo
+  // Loop de Jogo (Ticks da cobra)
   useEffect(() => {
     if (currentScreen === "game" && status === "PLAYING") {
-      const interval = getSpeed(level);
-      gameLoopTimerRef.current = window.setInterval(step, interval);
+      gameLoopTimerRef.current = window.setInterval(step, tickMs);
     } else {
       if (gameLoopTimerRef.current) {
         clearInterval(gameLoopTimerRef.current);
@@ -287,36 +327,91 @@ export default function App() {
         gameLoopTimerRef.current = null;
       }
     };
-  }, [currentScreen, status, level, step, getSpeed]);
+  }, [currentScreen, status, tickMs, step]);
 
-  // Iniciar Novo Jogo
-  const startGame = useCallback((cat: CategoryFilter = "Misto") => {
-    resetQuestionDeck(cat);
-    growPendingRef.current = 0;
-    const initialSnake: Position[] = [
-      { x: 8, y: 8 },
-      { x: 7, y: 8 },
-      { x: 6, y: 8 },
-    ];
-    setSnake(initialSnake);
-    setDirection("RIGHT");
-    nextDirRef.current = "RIGHT";
+  // Contagem regressiva da partida (120 segundos)
+  useEffect(() => {
+    if (currentScreen === "game" && (status === "PLAYING" || status === "QUESTION")) {
+      matchCountdownTimerRef.current = window.setInterval(() => {
+        setMatchTimeLeft((prev) => {
+          if (prev <= 1) {
+            handleFinishMatch("TIMEOUT");
+            return 0;
+          }
+          if (prev <= 5) {
+            soundEffects.playTick();
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      if (matchCountdownTimerRef.current) {
+        clearInterval(matchCountdownTimerRef.current);
+        matchCountdownTimerRef.current = null;
+      }
+    }
 
-    setScore(0);
-    setLevel(1);
-    setApplesInLevel(0);
-    setTotalApples(0);
-    setAcertos(0);
-    setErros(0);
-    setCurrentQuestion(null);
-    setIsQuestionAnswered(false);
-    setLastResult(null);
+    return () => {
+      if (matchCountdownTimerRef.current) {
+        clearInterval(matchCountdownTimerRef.current);
+        matchCountdownTimerRef.current = null;
+      }
+    };
+  }, [currentScreen, status, handleFinishMatch]);
 
-    const initialApple = placeRandomApple(initialSnake);
-    setApple(initialApple);
+  // Iniciar Nova Partida com o Backend
+  const startGame = useCallback(
+    async (cat: CategoryFilter = "Misto") => {
+      growPendingRef.current = 0;
 
-    setStatus("PLAYING");
-  }, [placeRandomApple]);
+      let startedMatch: Match | null = null;
+      try {
+        startedMatch = await matchService.startMatch(userStats.maxLevel || undefined);
+      } catch (err) {
+        console.error("Erro ao iniciar partida na API:", err);
+      }
+
+      const activeGrid = 16;
+      const activeLvl = startedMatch?.level?.number || 1;
+      const activeTick = Math.max(75, 160 - (activeLvl - 1) * 14);
+      const activeDuration = startedMatch?.duration_seconds || 120;
+
+      matchIdRef.current = startedMatch?.id || null;
+      setCurrentMatch(startedMatch);
+      setGridSize(activeGrid);
+      setTickMs(activeTick);
+      setLevel(activeLvl);
+      setMatchTimeLeft(activeDuration);
+      setHasAdvanced(false);
+
+      const startX = Math.floor(activeGrid / 2);
+      const startY = Math.floor(activeGrid / 2);
+      const initialSnake: Position[] = [
+        { x: startX, y: startY },
+        { x: Math.max(0, startX - 1), y: startY },
+        { x: Math.max(0, startX - 2), y: startY },
+      ];
+
+      setSnake(initialSnake);
+      setDirection("RIGHT");
+      nextDirRef.current = "RIGHT";
+
+      setScore(0);
+      setApplesInLevel(0);
+      setTotalApples(0);
+      setAcertos(0);
+      setErros(0);
+      setCurrentQuestion(null);
+      setIsQuestionAnswered(false);
+      setLastResult(null);
+
+      const initialApple = placeRandomApple(initialSnake, activeGrid);
+      setApple(initialApple);
+
+      setStatus("PLAYING");
+    },
+    [userStats.maxLevel, placeRandomApple]
+  );
 
   // Teclado
   useEffect(() => {
@@ -333,7 +428,12 @@ export default function App() {
         else if (key === "ArrowDown" || key === "s" || key === "S") changeDirection("DOWN");
         else if (key === "ArrowLeft" || key === "a" || key === "A") changeDirection("LEFT");
         else if (key === "ArrowRight" || key === "d" || key === "D") changeDirection("RIGHT");
-      } else if (statusRef.current === "START" || statusRef.current === "GAMEOVER" || statusRef.current === "VICTORY") {
+      } else if (
+        statusRef.current === "START" ||
+        statusRef.current === "GAMEOVER" ||
+        statusRef.current === "VICTORY" ||
+        statusRef.current === "TIMEOUT"
+      ) {
         if (key === "Enter" || key === " ") {
           e.preventDefault();
           startGame(selectedCategory);
@@ -345,78 +445,48 @@ export default function App() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [currentScreen, changeDirection, startGame, selectedCategory]);
 
-  // Confirmação de Resposta
-  const handleConfirmQuestion = (guess: number) => {
-    if (!currentQuestion || isQuestionAnswered) return;
+  // Confirmação de Resposta via API (Confiável vs Não Confiável)
+  const handleConfirmQuestion = async (answer: boolean) => {
+    if (!currentQuestion || isQuestionAnswered || isSubmittingAnswer) return;
 
-    const distance = Math.abs(guess - currentQuestion.confiabilidade_referencia);
-    const isCorrect = distance <= 15;
+    const activeMatchId = matchIdRef.current || 1;
 
-    let pointsAwarded = 0;
-    if (isCorrect) {
-      pointsAwarded = distance === 0 ? 120 : 100;
-      soundEffects.playCorrect();
-      setAcertos((prev) => prev + 1);
+    setIsSubmittingAnswer(true);
 
-      if (distance === 0 && currentUser) {
-        authService.recordBullseye(currentUser.username);
-        refreshUserStats();
+    try {
+      const res = await matchService.answerQuestion(
+        activeMatchId,
+        currentQuestion.id,
+        answer
+      );
+
+      setLastResult(res);
+      setScore(res.score);
+
+      if (res.is_correct) {
+        soundEffects.playCorrect();
+        setAcertos((prev) => prev + 1);
+      } else {
+        soundEffects.playMistake();
+        growPendingRef.current += 1;
+        setErros((prev) => prev + 1);
       }
-    } else {
-      pointsAwarded = 0;
-      growPendingRef.current += 1;
-      soundEffects.playMistake();
-      setErros((prev) => prev + 1);
+
+      setIsQuestionAnswered(true);
+    } catch (err) {
+      console.error("Erro ao enviar resposta à API:", err);
+    } finally {
+      setIsSubmittingAnswer(false);
     }
-
-    setScore((prev) => prev + pointsAwarded);
-
-    const result: QuestionResult = {
-      question: currentQuestion,
-      guess,
-      distance,
-      isCorrect,
-      points: pointsAwarded,
-    };
-
-    setLastResult(result);
-    setIsQuestionAnswered(true);
   };
 
   // Retomada do Jogo após Resposta
   const handleResumeGame = () => {
-    const nextApplesInLevel = applesInLevelRef.current + 1;
+    const nextApplesInLevel = applesInLevel + 1;
     const nextTotalApples = totalApples + 1;
+    setApplesInLevel(nextApplesInLevel);
     setTotalApples(nextTotalApples);
 
-    let nextLvl = levelRef.current;
-    let resetApples = nextApplesInLevel;
-
-    if (nextApplesInLevel >= APPLES_PER_LEVEL) {
-      if (nextLvl >= MAX_LEVELS) {
-        soundEffects.playVictory();
-        setStatus("VICTORY");
-
-        if (currentUser) {
-          authService.recordGameFinished(currentUser.username, {
-            score,
-            level: 6,
-            applesInLevel: 10,
-            totalApples: nextTotalApples,
-            acertos,
-            erros,
-            category: selectedCategory,
-          });
-          refreshUserStats();
-        }
-        return;
-      }
-      nextLvl += 1;
-      resetApples = 0;
-      setLevel(nextLvl);
-    }
-
-    setApplesInLevel(resetApples);
     setCurrentQuestion(null);
     setIsQuestionAnswered(false);
     setLastResult(null);
@@ -424,12 +494,11 @@ export default function App() {
     setStatus("PLAYING");
   };
 
-  // NAVEGAÇÃO DE ROTAS
+  // Navegação de Rotas
   const handleLoginSuccess = (user: User) => {
     setCurrentUser(user);
+    refreshUserProgress();
     const stats = authService.getUserStats(user.username);
-    setUserStats(stats);
-
     if (!stats.hasSeenTutorial) {
       setCurrentScreen("tutorial");
     } else {
@@ -461,7 +530,6 @@ export default function App() {
   const handleTutorialComplete = () => {
     if (currentUser) {
       authService.markTutorialAsSeen(currentUser.username);
-      refreshUserStats();
     }
     setCurrentScreen("game");
     startGame(selectedCategory);
@@ -470,19 +538,17 @@ export default function App() {
   const handleTutorialSkip = () => {
     if (currentUser) {
       authService.markTutorialAsSeen(currentUser.username);
-      refreshUserStats();
     }
     setCurrentScreen("game");
     startGame(selectedCategory);
   };
 
-  const handleGoHome = () => {
-    if (gameLoopTimerRef.current) {
-      clearInterval(gameLoopTimerRef.current);
-      gameLoopTimerRef.current = null;
+  const handleGoHome = async () => {
+    if (matchIdRef.current) {
+      await handleFinishMatch("GAMEOVER");
     }
     setStatus("START");
-    refreshUserStats();
+    await refreshUserProgress();
     setCurrentScreen("home");
   };
 
@@ -503,6 +569,7 @@ export default function App() {
     acertos,
     erros,
     category: selectedCategory,
+    advanced: hasAdvanced,
   };
 
   const totalAnswered = acertos + erros;
@@ -537,7 +604,7 @@ export default function App() {
         />
       )}
 
-      {/* 3. TELA DE CATEGORIAS (NOVA DO FIGMA) */}
+      {/* 3. TELA DE CATEGORIAS */}
       {currentScreen === "categories" && (
         <CategoriesScreen
           onSelectCategory={(cat) => handlePlayFromHome(cat)}
@@ -563,10 +630,10 @@ export default function App() {
         />
       )}
 
-      {/* 6. TELA DO JOGO (SNAKE COM LAYOUT EXPANDIDO FIGMA SCREEN 4) */}
+      {/* 6. TELA DO JOGO (SNAKE INTEGRADO AO BACKEND) */}
       {currentScreen === "game" && (
         <main className="game-screen-wrapper">
-          {/* Header Mobile / Topo */}
+          {/* Header Mobile / Topo com Cronômetro de 120s da Partida */}
           <div className="game-top-bar-mobile">
             <Header
               score={score}
@@ -574,6 +641,7 @@ export default function App() {
               applesInLevel={applesInLevel}
               maxApplesPerLevel={APPLES_PER_LEVEL}
               maxLevels={MAX_LEVELS}
+              matchTimeLeft={matchTimeLeft}
               isMuted={isMuted}
               onToggleMute={handleToggleMute}
               theme={theme}
@@ -584,7 +652,7 @@ export default function App() {
           </div>
 
           <div className="game-expanded-layout">
-            {/* Coluna Esquerda: Telemetria e Vidas (Figma Screen 4) */}
+            {/* Coluna Esquerda: Telemetria e Vidas */}
             <aside className="game-side-panel left-panel">
               <div className="side-card main-stats-card">
                 <span className="side-card-badge">🍏 Partida FAKO</span>
@@ -593,18 +661,33 @@ export default function App() {
                   <span className="side-stat-val text-accent">{score}</span>
                 </div>
                 <div className="side-stat-row">
+                  <span className="side-stat-label">Tempo Restante</span>
+                  <span className={`side-stat-val ${matchTimeLeft <= 20 ? "text-danger" : ""}`}>
+                    {matchTimeLeft}s
+                  </span>
+                </div>
+                <div className="side-stat-row">
                   <span className="side-stat-label">Nível</span>
-                  <span className="side-stat-val">{level} <small>/ {MAX_LEVELS}</small></span>
+                  <span className="side-stat-val">
+                    {level} <small>/ {MAX_LEVELS}</small>
+                  </span>
                 </div>
                 <div className="side-progress-box">
                   <div className="side-progress-header">
-                    <span>Maçãs no Nível</span>
-                    <span>{applesInLevel}/{APPLES_PER_LEVEL}</span>
+                    <span>Meta de Pontos</span>
+                    <span>
+                      {score} / {currentMatch?.level?.min_score_to_advance ?? 30} pts
+                    </span>
                   </div>
                   <div className="side-progress-track">
                     <div
                       className="side-progress-fill"
-                      style={{ width: `${(applesInLevel / APPLES_PER_LEVEL) * 100}%` }}
+                      style={{
+                        width: `${Math.min(
+                          100,
+                          (score / (currentMatch?.level?.min_score_to_advance || 30)) * 100
+                        )}%`,
+                      }}
                     />
                   </div>
                 </div>
@@ -612,6 +695,10 @@ export default function App() {
 
               <div className="side-card snake-status-card">
                 <h4 className="side-card-title">🐍 Status da Cobra</h4>
+                <div className="side-metric-item">
+                  <span className="metric-name">Grade do Tabuleiro</span>
+                  <span className="metric-val">{gridSize}×{gridSize}</span>
+                </div>
                 <div className="side-metric-item">
                   <span className="metric-name">Comprimento</span>
                   <span className="metric-val">{snake.length} blocos</span>
@@ -623,18 +710,18 @@ export default function App() {
               </div>
             </aside>
 
-            {/* Coluna Central: O Tabuleiro 16x16 */}
+            {/* Coluna Central: O Tabuleiro */}
             <section className="game-center-board">
               <div className="board-interactive-area">
                 <GameBoard
-                  gridSize={GRID_SIZE}
+                  gridSize={gridSize}
                   snake={snake}
                   direction={direction}
                   apple={apple}
                   onSwipe={changeDirection}
                 />
 
-                {/* Modal / Balão da Pergunta */}
+                {/* Modal da Pergunta Confiável / Não Confiável */}
                 {status === "QUESTION" && currentQuestion && (
                   <QuestionModal
                     question={currentQuestion}
@@ -642,10 +729,11 @@ export default function App() {
                     result={lastResult}
                     onConfirm={handleConfirmQuestion}
                     onResume={handleResumeGame}
+                    isSubmitting={isSubmittingAnswer}
                   />
                 )}
 
-                {/* Telas de Início, Fim de Jogo e Vitória */}
+                {/* Telas de Início, Fim de Jogo, Tempo Esgotado e Vitória */}
                 <OverlayScreen
                   status={status}
                   stats={gameStats}
@@ -662,7 +750,7 @@ export default function App() {
               />
             </section>
 
-            {/* Coluna Direita: Análise Crítica e Controles Rápidos (Figma Screen 4) */}
+            {/* Coluna Direita: Análise Crítica e Controles Rápidos */}
             <aside className="game-side-panel right-panel">
               <div className="side-card session-category-card">
                 <span className="side-card-badge">Área Temática</span>
@@ -670,7 +758,7 @@ export default function App() {
                   {selectedCategory === "Misto" ? "🎲 Modo Desafio Misto" : selectedCategory}
                 </h4>
                 <p className="category-active-desc">
-                  Afirmações reais checadas com base na literatura científica e institucional.
+                  Afirmações reais auditadas contra desinformação com referências científicas e institucionais.
                 </p>
               </div>
 

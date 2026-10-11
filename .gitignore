@@ -8,8 +8,15 @@ node_modules/
 dist/
 *.tsbuildinfo
 
-# Dados brutos e processados: gerados por scripts/baixar_dados.sh e scripts/preparar_dados.py
+# Dados brutos e processados: gerados por pesquisa/dados/baixar_dados.sh e preparar_dados.py
 data/
+
+# Modelos treinados (pesquisa/ml/), lidos pela API; versionados em models/AAAA-MM/
+models/
 .ipynb_checkpoints/
-anotacoes/*_trabalho*
-anotacoes/*.bak
+# Saídas dos diagnósticos de pesquisa/ml/ (atalho.json etc.), geradas a cada rodada
+pesquisa/ml/saidas/
+
+# Planilhas de trabalho da anotação (têm o texto das matérias) e cópias de segurança
+pesquisa/anotacoes/*_trabalho*
+pesquisa/anotacoes/*.bak

@@ -1,8 +1,8 @@
 # Guia de classificação e anotação
 
 > **Status:** os dados e a divisão em treino, validação e teste (seções 3 e 5) estão
-> implementados em `scripts/preparar_dados.py`. O classificador (seção 4) e a anotação
-> (seções 7 e 8) são planejados: `ml/` ainda não existe e `/admin/ai/classify` usa o
+> implementados em `pesquisa/dados/preparar_dados.py`. O classificador (seção 4) e a anotação
+> (seções 7 e 8) são planejados: `pesquisa/ml/` ainda não existe e `/admin/ai/classify` usa o
 > `FakeAIClient`. Revisão de 05/10/2026 do guia original (PDF), alinhada ao que o projeto
 > tem hoje.
 
@@ -311,7 +311,7 @@ teste não devem ser anotados para treino.
 - **A classe verdadeira tem outro gênero de texto.** Títulos de portal contra alegações e
   mensagens de rede social. Parte do que o modelo aprende é gênero, não veracidade; o teste
   de atalho e as métricas por fonte e por dataset medem isso
-  (`notebooks/eda_2_conjunto.ipynb`).
+  (`pesquisa/notebooks/eda_2_conjunto.ipynb`).
 - **As épocas não se sobrepõem entre as bases** (Fake.br até 2018, FakeRecogna em
   2019–2021). Cada época tem seus assuntos, e a queda das checagens de 2025 em diante, no
   `teste`, mede o drift (ver `doc/planejamento-retreino.md`).

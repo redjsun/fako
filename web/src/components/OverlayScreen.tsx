@@ -16,7 +16,12 @@ export const OverlayScreen: React.FC<OverlayScreenProps> = ({
   onRestart,
   onGoHome,
 }) => {
-  if (status !== "START" && status !== "GAMEOVER" && status !== "VICTORY") {
+  if (
+    status !== "START" &&
+    status !== "GAMEOVER" &&
+    status !== "VICTORY" &&
+    status !== "TIMEOUT"
+  ) {
     return null;
   }
 
@@ -45,14 +50,14 @@ export const OverlayScreen: React.FC<OverlayScreenProps> = ({
               <div className="rule-item">
                 <span className="rule-icon">⏱️</span>
                 <div>
-                  <strong>Avalie em 15s:</strong> Deslize a barra de 0% (Nada confiável) a 100% (Totalmente confiável).
+                  <strong>Partida de 120 segundos:</strong> Responda às afirmações e acumule pontos antes que o tempo esgote.
                 </div>
               </div>
 
               <div className="rule-item">
-                <span className="rule-icon">🎯</span>
+                <span className="rule-icon">🛡️</span>
                 <div>
-                  <strong>Margem de 15 pontos:</strong> Palpites com distância de até 15 da referência oficial pontuam cheio.
+                  <strong>Confiável vs Não Confiável:</strong> Analise criticamente com base no consenso científico e institucional.
                 </div>
               </div>
 
@@ -66,7 +71,7 @@ export const OverlayScreen: React.FC<OverlayScreenProps> = ({
               <div className="rule-item">
                 <span className="rule-icon">🏆</span>
                 <div>
-                  <strong>6 Níveis de Progressão:</strong> A cada 10 maçãs você sobe de nível. Complete o nível 6 para vencer!
+                  <strong>Progressão de Níveis:</strong> Atinja a pontuação mínima exigida para liberar novos níveis!
                 </div>
               </div>
             </div>
@@ -92,13 +97,25 @@ export const OverlayScreen: React.FC<OverlayScreenProps> = ({
           </div>
         )}
 
-        {status === "GAMEOVER" && (
+        {(status === "GAMEOVER" || status === "TIMEOUT") && (
           <div className="overlay-content gameover-screen">
-            <div className="overlay-status-icon">💥</div>
-            <h2 className="overlay-title">A cobrinha se mordeu!</h2>
+            <div className="overlay-status-icon">
+              {status === "TIMEOUT" ? "⏱️" : "💥"}
+            </div>
+            <h2 className="overlay-title">
+              {status === "TIMEOUT" ? "Tempo da partida esgotado!" : "A cobrinha se mordeu!"}
+            </h2>
             <p className="overlay-subtitle">
-              Você colidiu com seu próprio corpo. Mas sua mente ficou mais afiada!
+              {status === "TIMEOUT"
+                ? "Os 120 segundos terminaram. Veja seu desempenho nesta rodada:"
+                : "Você colidiu com seu próprio corpo. Mas sua mente ficou mais afiada!"}
             </p>
+
+            {stats.advanced && (
+              <div className="advance-notice-pill">
+                🎉 Parabéns! Você atingiu a meta e liberou o próximo nível!
+              </div>
+            )}
 
             <div className="stats-grid">
               <div className="stat-card">
@@ -106,7 +123,7 @@ export const OverlayScreen: React.FC<OverlayScreenProps> = ({
                 <span className="stat-card-value text-accent">{stats.score}</span>
               </div>
               <div className="stat-card">
-                <span className="stat-card-label">Nível Alcançado</span>
+                <span className="stat-card-label">Nível</span>
                 <span className="stat-card-value">{stats.level} / 6</span>
               </div>
               <div className="stat-card">
@@ -149,7 +166,7 @@ export const OverlayScreen: React.FC<OverlayScreenProps> = ({
             <div className="overlay-status-icon">🏆</div>
             <h2 className="overlay-title">Você Zerou o FAKO!</h2>
             <p className="overlay-subtitle">
-              Incrível! Você completou os 6 níveis de checagem de fatos com maestria!
+              Incrível! Você completou os níveis de checagem de fatos com maestria!
             </p>
 
             <div className="stats-grid">

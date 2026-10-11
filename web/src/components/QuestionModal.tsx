@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Question, QuestionResult } from "../types";
+import { Question, AnswerResult } from "../types";
 import { soundEffects } from "../services/audioService";
 
 interface QuestionModalProps {
   question: Question;
   isAnswered: boolean;
-  result: QuestionResult | null;
-  onConfirm: (guess: number) => void;
+  result: AnswerResult | null;
+  onConfirm: (answer: boolean) => void;
   onResume: () => void;
+  isSubmitting?: boolean;
 }
 
 export const QuestionModal: React.FC<QuestionModalProps> = ({
@@ -16,16 +17,17 @@ export const QuestionModal: React.FC<QuestionModalProps> = ({
   result,
   onConfirm,
   onResume,
+  isSubmitting = false,
 }) => {
   const QUESTION_DURATION = 45;
-  const [guess, setGuess] = useState<number>(50);
+  const [selectedAnswer, setSelectedAnswer] = useState<boolean | null>(null);
   const [timeLeft, setTimeLeft] = useState<number>(QUESTION_DURATION);
   const timerRef = useRef<number | null>(null);
   const lastSecondRef = useRef<number>(QUESTION_DURATION);
 
   // Reiniciar estado da pergunta
   useEffect(() => {
-    setGuess(50);
+    setSelectedAnswer(null);
     setTimeLeft(QUESTION_DURATION);
     lastSecondRef.current = QUESTION_DURATION;
 
@@ -46,10 +48,11 @@ export const QuestionModal: React.FC<QuestionModalProps> = ({
           clearInterval(timerRef.current);
           timerRef.current = null;
         }
-        // Auto-confirmação com o palpite corrente
-        setGuess((currentVal) => {
-          onConfirm(currentVal);
-          return currentVal;
+        // Auto-confirmação: usa a escolha atual ou padrão (true)
+        setSelectedAnswer((currentVal) => {
+          const finalVal = currentVal ?? true;
+          onConfirm(finalVal);
+          return finalVal;
         });
       }
     }, 100);
@@ -69,171 +72,175 @@ export const QuestionModal: React.FC<QuestionModalProps> = ({
     }
   }, [isAnswered]);
 
-  // Teclas Enter / Espaço para confirmar ou continuar
+  // Teclas de atalho: 1 ou C (Confiável), 2 ou N (Não Confiável), Enter (Confirmar/Continuar)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        if (!isAnswered) {
-          onConfirm(guess);
-        } else {
+      if (isAnswered) {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
           onResume();
         }
-      } else if (e.key === " " && isAnswered) {
+        return;
+      }
+
+      if (e.key === "1" || e.key === "c" || e.key === "C") {
+        setSelectedAnswer(true);
+      } else if (e.key === "2" || e.key === "n" || e.key === "N") {
+        setSelectedAnswer(false);
+      } else if (e.key === "ArrowLeft") {
+        setSelectedAnswer(true);
+      } else if (e.key === "ArrowRight") {
+        setSelectedAnswer(false);
+      } else if (e.key === "Enter") {
         e.preventDefault();
-        onResume();
+        if (selectedAnswer !== null && !isSubmitting) {
+          onConfirm(selectedAnswer);
+        }
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isAnswered, guess, onConfirm, onResume]);
+  }, [isAnswered, selectedAnswer, isSubmitting, onConfirm, onResume]);
 
-  const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (isAnswered) return;
-    setGuess(Number(e.target.value));
-  };
+  const statement = question.statement || question.afirmacao || "";
+  const category = question.category || question.categoria || "Gerais";
 
   const getCategoryClass = (cat: string) => {
-    switch (cat) {
-      case "Saúde":
-        return "cat-saude";
-      case "Tecnologia":
-        return "cat-tecnologia";
-      case "Conhecimentos Gerais":
-        return "cat-gerais";
-      default:
-        return "cat-default";
-    }
+    const lower = cat.toLowerCase();
+    if (lower.includes("saúde") || lower.includes("saude")) return "cat-saude";
+    if (lower.includes("tec")) return "cat-tecnologia";
+    if (lower.includes("geral") || lower.includes("conhecimento")) return "cat-gerais";
+    return "cat-default";
   };
 
   const isLowTime = timeLeft <= 5 && !isAnswered;
 
   return (
-    <div className="bubble-backdrop" role="dialog" aria-modal="true" aria-labelledby="question-text">
+    <div
+      className="bubble-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="question-text"
+    >
       <div className="speech-bubble">
         {/* Cabeçalho do balão: Categoria e Cronômetro */}
         <div className="bubble-header">
-          <span className={`category-tag ${getCategoryClass(question.categoria)}`}>
-            {question.categoria}
+          <span className={`category-tag ${getCategoryClass(category)}`}>
+            {category}
           </span>
           <div className={`countdown-timer ${isLowTime ? "timer-alert" : ""}`}>
             <span className="timer-icon">⏳</span>
-            <span className="timer-seconds">{isAnswered ? "Finalizado" : `${timeLeft}s`}</span>
+            <span className="timer-seconds">
+              {isAnswered ? "Finalizado" : `${timeLeft}s`}
+            </span>
           </div>
         </div>
 
         {/* Afirmação para checagem */}
         <p className="statement-text" id="question-text">
-          "{question.afirmacao}"
+          "{statement}"
         </p>
 
-        {/* FASE 1: Seletor Deslizante de Confiabilidade */}
+        {/* FASE 1: Seleção de Confiabilidade (Confiável vs Não Confiável) */}
         {!isAnswered ? (
-          <div className="slider-interaction">
-            <div className="slider-feedback-box">
-              <span className="slider-title">Qual é a confiabilidade desta informação?</span>
-              <div className="slider-current-value">
-                <span className="value-number">{guess}%</span>
-                <span className="value-descriptor">
-                  {guess <= 20
-                    ? "Altamente duvidosa"
-                    : guess <= 40
-                    ? "Pouco confiável"
-                    : guess <= 60
-                    ? "Inconclusiva / Mediana"
-                    : guess <= 80
-                    ? "Bastante confiável"
-                    : "Fortemente comprovada"}
-                </span>
-              </div>
-            </div>
+          <div className="semantic-interaction">
+            <span className="slider-title">
+              Como você classifica a confiabilidade desta informação?
+            </span>
 
-            <div className="slider-track-container">
-              <input
-                type="range"
-                className="confidence-slider"
-                min="0"
-                max="100"
-                step="5"
-                value={guess}
-                onChange={handleSliderChange}
-                aria-label="Escala de confiabilidade de 0 a 100 porcento"
-              />
-              <div className="scale-extremes">
-                <span>0% Nada confiável</span>
-                <span>50%</span>
-                <span>100% Totalmente confiável</span>
-              </div>
+            <div className="semantic-buttons-row">
+              <button
+                type="button"
+                className={`semantic-btn btn-confiavel ${
+                  selectedAnswer === true ? "active" : ""
+                }`}
+                onClick={() => setSelectedAnswer(true)}
+              >
+                <span className="semantic-btn-icon">🛡️</span>
+                <span className="semantic-btn-title">Confiável</span>
+                <span className="semantic-btn-sub">Informação verídica / segura</span>
+                <span className="semantic-btn-key">Atalho: 1 ou C</span>
+              </button>
+
+              <button
+                type="button"
+                className={`semantic-btn btn-nao-confiavel ${
+                  selectedAnswer === false ? "active" : ""
+                }`}
+                onClick={() => setSelectedAnswer(false)}
+              >
+                <span className="semantic-btn-icon">⚠️</span>
+                <span className="semantic-btn-title">Não Confiável</span>
+                <span className="semantic-btn-sub">Mito, golpe ou boato falso</span>
+                <span className="semantic-btn-key">Atalho: 2 ou N</span>
+              </button>
             </div>
 
             <button
               type="button"
               className="action-button confirm-button"
-              onClick={() => onConfirm(guess)}
+              disabled={selectedAnswer === null || isSubmitting}
+              onClick={() => {
+                if (selectedAnswer !== null) {
+                  onConfirm(selectedAnswer);
+                }
+              }}
             >
-              Confirmar Palpite (Enter)
+              {isSubmitting
+                ? "Validando resposta..."
+                : selectedAnswer === null
+                ? "Selecione uma opção acima"
+                : "Confirmar Análise (Enter)"}
             </button>
           </div>
         ) : (
-          /* FASE 2: Revelação da Referência e Feedback */
+          /* FASE 2: Revelação da Resposta e Explicação da API */
           <div className="feedback-reveal">
             {result && (
-              <div className={`verdict-banner ${result.isCorrect ? "verdict-hit" : "verdict-miss"}`}>
-                <div className="verdict-icon">{result.isCorrect ? "🎯" : "⚠️"}</div>
+              <div
+                className={`verdict-banner ${
+                  result.is_correct ? "verdict-hit" : "verdict-miss"
+                }`}
+              >
+                <div className="verdict-icon">
+                  {result.is_correct ? "🎯" : "⚠️"}
+                </div>
                 <div className="verdict-details">
                   <h3 className="verdict-title">
-                    {result.isCorrect ? "Mandou bem! Palpite no alvo!" : "Você ficou longe da referência!"}
+                    {result.is_correct
+                      ? "Mandou bem! Análise correta!"
+                      : "Atenção! Análise incorreta!"}
                   </h3>
                   <p className="verdict-points">
-                    {result.isCorrect
-                      ? `+${result.points} pontos! (Diferença de apenas ${result.distance}%)`
-                      : `0 pontos (Diferença de ${result.distance}% > 15). A cobrinha cresceu!`}
+                    {result.is_correct
+                      ? `+10 pontos! A cobrinha manteve seu tamanho.`
+                      : `0 pontos. A cobrinha cresceu +1 bloco!`}
                   </p>
                 </div>
               </div>
             )}
 
-            {/* Trilha visual com os 2 marcadores: Você e Referência */}
-            <div className="reveal-track-wrapper">
-              <div className="reveal-track">
-                {/* Marcador do Jogador */}
-                <div
-                  className="marker marker-you"
-                  style={{ left: `${guess}%` }}
-                  title={`Seu palpite: ${guess}%`}
-                >
-                  <div className="marker-pin marker-pin-you" />
-                  <span className="marker-label marker-label-top">Você: {guess}%</span>
-                </div>
-
-                {/* Marcador da Referência Oficial */}
-                <div
-                  className="marker marker-ref"
-                  style={{ left: `${question.confiabilidade_referencia}%` }}
-                  title={`Referência: ${question.confiabilidade_referencia}%`}
-                >
-                  <div className="marker-pin marker-pin-ref" />
-                  <span className="marker-label marker-label-bottom">
-                    Referência: {question.confiabilidade_referencia}%
-                  </span>
-                </div>
-              </div>
-
-              <div className="scale-extremes">
-                <span>0% Falsa / Nada Confiável</span>
-                <span>100% Fato Comprovado</span>
-              </div>
+            {/* Veredito Oficial do Backend */}
+            <div className="official-status-box">
+              <span className="official-label">Classificação Oficial:</span>
+              <span
+                className={`official-badge ${
+                  result?.correct_answer ? "badge-confiavel" : "badge-nao-confiavel"
+                }`}
+              >
+                {result?.correct_answer ? "🛡️ Confiável" : "⚠️ Não Confiável"}
+              </span>
             </div>
 
-            {/* Explicação pedagógica e fonte */}
+            {/* Explicação pedagógica e fonte da API */}
             <div className="explanation-card">
               <h4 className="explanation-title">💡 Por que essa referência?</h4>
-              <p className="explanation-text">{question.explicacao}</p>
-              {question.fonte && (
+              <p className="explanation-text">{result?.explanation || question.explicacao}</p>
+              {(result?.source || question.fonte) && (
                 <div className="source-row">
                   <span className="source-label">Fonte de validação:</span>
-                  <span className="source-text">{question.fonte}</span>
+                  <span className="source-text">{result?.source || question.fonte}</span>
                 </div>
               )}
             </div>

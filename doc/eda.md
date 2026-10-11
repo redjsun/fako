@@ -3,7 +3,7 @@
 Resumo da primeira análise, que comparou o Fake.br e o Fakepedia e levou ao descarte do
 Fakepedia. O notebook dela (`notebooks/eda.ipynb`) saiu do repositório porque o Fakepedia
 não é mais baixado; ele continua no histórico do Git. A EDA da base atual está em
-`notebooks/eda_1_datasets.ipynb` e `notebooks/eda_2_conjunto.ipynb`.
+`pesquisa/notebooks/eda_1_datasets.ipynb` e `pesquisa/notebooks/eda_2_conjunto.ipynb`.
 
 ## As bases
 
@@ -14,7 +14,7 @@ não é mais baixado; ele continua no histórico do Git. A EDA da base atual est
 | Período | 2016–2018 (cauda até 2009) | sem data; entidades indicam até pelo menos 2020 (Covid-19) |
 | Categorias | 58% política; economia, religião e ciência somam < 3% | política, brasil, saúde, mundo, tecnologia, entretenimento… |
 
-`data/processed/dataset.jsonl` junta as duas bases num esquema único: `id`, `base`,
+`pesquisa/data/processed/dataset.jsonl` junta as duas bases num esquema único: `id`, `base`,
 `rotulo`, `titulo`, `texto`, `categoria`, `data`, `autor`, `url`, `par_id` e `metricas`.
 
 ## Qualidade
@@ -29,7 +29,8 @@ não é mais baixado; ele continua no histórico do Git. A EDA da base atual est
 ## Atalhos que um classificador aprenderia
 
 1. **Tamanho.** A verdadeira é mais longa que a falsa em 98% dos pares (mediana de 918
-   × 157 palavras). O próprio corpus oferece `size_normalized_texts/` para contornar isso.
+   × 157 palavras). O próprio corpus oferece `size_normalized_texts/` para contornar isso,
+   e é a versão que `preparar_dados.py` lê.
 2. **Fonte.** 93% das falsas vêm de diariodobrasil.org; as verdadeiras, de G1 (64%) e
    Estadão (33%). Só as verdadeiras têm autor (98% × 2%). "G1", horários ("14h") e
    URLs no texto (3,2% × 0,1%) vazam a fonte.

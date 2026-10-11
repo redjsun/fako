@@ -8,6 +8,7 @@ interface HeaderProps {
   applesInLevel: number;
   maxApplesPerLevel: number;
   maxLevels: number;
+  matchTimeLeft?: number;
   isMuted: boolean;
   onToggleMute: () => void;
   theme: "light" | "dark";
@@ -22,6 +23,7 @@ export const Header: React.FC<HeaderProps> = ({
   applesInLevel,
   maxApplesPerLevel,
   maxLevels,
+  matchTimeLeft,
   isMuted,
   onToggleMute,
   theme,
@@ -77,6 +79,13 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       <div className="stats-bar">
+        {matchTimeLeft !== undefined && (
+          <div className={`stat-pill time-pill ${matchTimeLeft <= 20 ? "pill-time-alert" : ""}`}>
+            <span className="stat-label">Tempo</span>
+            <span className="stat-value">{matchTimeLeft}s</span>
+          </div>
+        )}
+
         <div className="stat-pill score-pill">
           <span className="stat-label">Pontos</span>
           <span className="stat-value" id="score-display">{score}</span>

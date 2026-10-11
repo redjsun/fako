@@ -1,0 +1,7 @@
+# Treino (container ml): as leves + PyTorch CPU e transformers. Fora do CI, pelo tamanho.
+-r requirements.txt
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch>=2.4
+transformers>=4.44
+sentence-transformers>=3.0
+matplotlib>=3.8  # diagrama de confiabilidade do avaliar.py

@@ -61,8 +61,13 @@ As views não chamam `fetch` diretamente; toda chamada HTTP passa pelo
 
 A documentação interativa fica em `http://localhost:8000/docs`. Os services levantam
 exceções de `core/exceptions.py`, convertidas em respostas HTTP pelo handler de `main.py`.
-A IA fica atrás da interface `integrations/ai_client.py` (`AI_PROVIDER=fake` por padrão)
-e tudo o que ela gera entra como rascunho, publicado só depois da revisão em
+A IA fica atrás da interface `integrations/ai_client.py` (`AI_PROVIDER=fake` por padrão).
+O classificador de veracidade fica atrás de `integrations/classificador_client.py`
+(`CLASSIFICADOR_PROVIDER=fake` por padrão): cada modelo treinado é um adaptador que devolve as
+duas fronteiras ordinais, e `analise_das_fronteiras()` aplica a mesma regra de decisão a todos.
+Os modelos publicados são lidos de `MODELS_DIR/atual` (a pasta `models/`, montada só para
+leitura); sem modelo, o cliente lança `ClassificadorIndisponivel` e a API continua de pé.
+Tudo o que a IA gera entra como rascunho, publicado só depois da revisão em
 `/admin/questions/{id}/review`. Para criar um administrador: `make admin u=usuario p=senha`.
 
 ## Qualidade e CI
