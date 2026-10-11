@@ -41,6 +41,8 @@ services:
     build: ./web
     container_name: fakenews-web
     restart: unless-stopped
+    environment:
+      API_URL: http://api:8000   # destino do proxy /api do Vite
     ports:
       - "5173:5173"
     volumes:
