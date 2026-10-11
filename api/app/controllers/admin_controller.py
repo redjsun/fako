@@ -7,7 +7,7 @@ from app.core.database import get_db
 from app.core.deps import get_current_admin
 from app.integrations.ai_client import AIClient, get_ai_client
 from app.integrations.classificador_client import ClassificadorClient, get_classificador
-from app.integrations.noticias_client import NoticiasClient, get_noticias_client
+from app.integrations.noticias_client import NoticiasClient, get_noticias_clients
 from app.models.question import QuestionStatus
 from app.schemas.admin_schema import (
     AIClassifyRequest,
@@ -85,7 +85,7 @@ def classify_statement(
 
 def get_noticias_service(
     db: Session = Depends(get_db),
-    noticias: NoticiasClient = Depends(get_noticias_client),
+    noticias: list[NoticiasClient] = Depends(get_noticias_clients),
     classificador: ClassificadorClient = Depends(get_classificador),
 ) -> NoticiasService:
     return NoticiasService(db, noticias, classificador)

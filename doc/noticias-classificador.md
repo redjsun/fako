@@ -7,27 +7,44 @@ Como manchetes de uma API de notícias viram afirmações do jogo, e como a refe
 
 ```
 provedor de notícias ──► normalização ──► filtros ──► deduplicação ──► classificador ──► rascunho
- (GNews ou fake)        (igual ao treino)                              (limiar admin)    (draft)
+(GNews, Fact Check     (igual ao treino)                               (limiar admin)    (draft)
+ ou fake)
                                                                                            │
                                        jogo ◄── validated ◄── revisão humana ◄─────────────┘
                                          │
                                          └─ depois da resposta: palpite do modelo (limiar jogador)
 ```
 
-1. `POST /admin/news/import` (`{"category": "saude", "quantity": 5}`) busca as manchetes no
-   provedor (`integrations/noticias_client.py`).
+1. `POST /admin/news/import` (`{"quantity": 5}`) busca os textos nos provedores
+   (`integrations/noticias_client.py`), de todos os assuntos. Com mais de um provedor
+   (`NOTICIAS_PROVIDER=factcheck,gnews`), a quantidade é dividida entre eles, para equilibrar
+   as falsas das checagens com as verdadeiras das manchetes; um provedor fora do ar não derruba
+   os outros, e o que ele não trouxe passa para os seguintes. O `category` é opcional
+   (padrão `conhecimentos-gerais`): o jogo não separa por categoria, mas a questão exige uma.
 2. Cada manchete é normalizada para o formato do `texto_curto` do treino
    (`integrations/normalizacao.py`): entidades HTML, sufixo " - Veículo" do agregador e a mesma
    `limpar()` de `pesquisa/ml/dados.py` (URLs e créditos de veículo nas pontas; caixa e
    pontuação mantidas).
-3. Saem as que não servem como afirmação verdadeira, com os mesmos filtros das matérias de
-   portal no treino (`motivo_filtro_portal()` de `pesquisa/dados/preparar_dados.py`): opinião,
-   vídeo, ao vivo, pergunta, fala relatada e aspas; e as fora da faixa de tamanho.
+3. Saem as manchetes que não servem como afirmação verdadeira, com os mesmos filtros das
+   matérias de portal no treino (`motivo_filtro_portal()` de `pesquisa/dados/preparar_dados.py`):
+   opinião, vídeo, ao vivo, pergunta, fala relatada e aspas; e as fora da faixa de tamanho. As
+   alegações checadas não passam pelos filtros de portal (pergunta e fala fazem parte do boato),
+   mas saem as de veredito sem lado no jogo (enganoso, fora de contexto, exagerado, ambíguo) e
+   as que não se sustentam sem revisão: fora da faixa de tamanho, que dependem de mídia ("foto
+   mostra", "vídeo", "áudio"), que já trazem a conclusão ("é deepfake", "é falso"), falas em
+   primeira pessoa e trechos com colchetes da agência. Com `NOTICIAS_SEM_POLITICA=true`, saem
+   também as de política e eleição.
 4. Saem as repetidas (mesma URL ou mesmo texto, no lote ou no banco).
 5. O classificador analisa com o limiar do admin; categoria, nota, confiança e versão do modelo
    ficam na questão (`model_*`) para apoiar a revisão.
-6. A questão entra como rascunho (`status=draft`, `origin=news`), verdadeira, com a URL como
-   fonte. Só chega ao jogador depois de aprovada em `PATCH /admin/questions/{id}/review`.
+6. A questão entra como rascunho (`status=draft`, `origin=news`), com a URL como fonte. A
+   manchete entra verdadeira; a alegação checada entra com o lado do veredito (`falso`,
+   `montagem`... → falsa; `verdadeiro`, `comprovado`, `fato` → verdadeira), e a explicação cita
+   a agência e o veredito. Com `NOTICIAS_PUBLICAR_DIRETO=true`, manchetes e checagens já
+   entram validadas (vão direto ao jogo): o rótulo é o da agência ou o da publicação, nunca o
+   do classificador.
+7. A importação examina até 100 candidatos e para ao chegar na quantidade pedida: com os
+   filtros, só uma parte pequena das checagens passa. Só chega ao jogador depois de aprovada em `PATCH /admin/questions/{id}/review`.
 
 A resposta do import lista as importadas e as descartadas, com o motivo.
 
@@ -62,16 +79,29 @@ de um modelo melhor.
 |---|---|
 | `CLASSIFICADOR_PROVIDER` | `fake` (sem modelo) ou `referencia` |
 | `CLASSIFICADOR_NO_JOGO` | `false` (padrão) ou `true` |
-| `NOTICIAS_PROVIDER` | `fake` (manchetes inventadas, sem chave) ou `gnews` |
+| `NOTICIAS_PROVIDER` | `fake` (manchetes inventadas, sem chave), `gnews`, `factcheck` ou vários separados por vírgula (`factcheck,gnews`) |
 | `NOTICIAS_API_KEY` | chave gratuita do GNews (https://gnews.io, 100 pedidos por dia) |
+| `FACTCHECK_API_KEY` | chave da Google Fact Check Tools API, a mesma da coleta da pesquisa |
+| `NOTICIAS_PUBLICAR_DIRETO` | `false` (padrão, rascunho) ou `true` (já validadas) |
+| `NOTICIAS_SEM_POLITICA` | `false` (padrão) ou `true` (descarta checagens de política) |
 
-No GNews, as categorias do jogo viram tópicos: `saude` → `health`, `tecnologia` →
-`technology`, `conhecimentos-gerais` → `science`; manchetes do Brasil, em português.
+No GNews, as manchetes do dia do Brasil, em português, só dos tópicos `health`, `science` e
+`technology` (um pedido por tópico, intercalados): o `general` é quase só futebol e TV, que o
+jogador acerta sem pensar. Manchetes de serviço ("onde assistir", horário, sorteio, "confira")
+e explicativas ("Por que...", "O que se sabe...", "...: entenda", com "?" no meio) também saem. Na Fact Check
+API, as checagens mais recentes das agências brasileiras (a mesma lista de
+`pesquisa/dados/coletar_factcheck.py`): um pedido por agência, juntando as mais recentes.
 
 ## Limites conhecidos
 
-- Toda notícia importada entra como verdadeira: a API de notícias só traz matérias publicadas.
-  As falsas do jogo continuam vindo da curadoria humana.
+- O GNews só traz matérias publicadas (verdadeiras), e a Fact Check API traz quase só falsas
+  (as agências checam o que circula): para ter os dois lados, use os dois provedores. Na
+  publicação direta, a manchete entra verdadeira por ter sido publicada, a mesma suposição que
+  o treino evita (`origem_rotulo=portal`); os filtros de portal tiram opinião e fala relatada.
+- O texto da alegação às vezes só faz sentido com a imagem ou o vídeo que circulou. Na
+  publicação direta, os filtros cuidam disso por palavras; o que escapar vai ao jogo. Em época
+  de eleição, quase tudo que as agências checam é política: com `NOTICIAS_SEM_POLITICA=true`,
+  sobram poucas (cerca de 6 em 100 checagens em outubro de 2026).
 - Cada classe do treino tem uma "cara" própria (manchete, ponto final, minúsculas); o modelo
   pode puxar uma manchete para `confere` só pela forma (`pesquisa/ml/atalho.py`). A nota do
   modelo na curadoria é apoio à revisão, não um veredito.

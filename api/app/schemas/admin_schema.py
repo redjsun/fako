@@ -52,7 +52,8 @@ class AIClassifyResponse(BaseModel):
 
 
 class NewsImportRequest(BaseModel):
-    category: str  # Slug da categoria
+    # As notícias vêm de todos os assuntos; a categoria só existe porque a questão exige uma.
+    category: str = "conhecimentos-gerais"  # Slug da categoria
     quantity: int = Field(default=5, ge=1, le=10)
 
 
