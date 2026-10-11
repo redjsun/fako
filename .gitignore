@@ -14,6 +14,7 @@ data/
 # Modelos treinados (pesquisa/ml/), lidos pela API; versionados em models/AAAA-MM/
 models/
 .ipynb_checkpoints/
+
 # Saídas dos diagnósticos de pesquisa/ml/ (atalho.json etc.), geradas a cada rodada
 pesquisa/ml/saidas/
 
