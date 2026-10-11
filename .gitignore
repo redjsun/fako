@@ -17,3 +17,7 @@ models/
 
 # Saídas dos diagnósticos de pesquisa/ml/ (atalho.json etc.), geradas a cada rodada
 pesquisa/ml/saidas/
+
+# Planilhas de trabalho da anotação (têm o texto das matérias) e cópias de segurança
+pesquisa/anotacoes/*_trabalho*
+pesquisa/anotacoes/*.bak
