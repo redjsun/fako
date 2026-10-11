@@ -26,6 +26,13 @@ class Settings(BaseSettings):
     # os modelos publicados ficam em models_dir/atual.
     classificador_provider: str = "fake"
     models_dir: str = "/app/models"
+    # Mostra ao jogador, no feedback da resposta, o palpite do classificador (limiar do jogador).
+    classificador_no_jogo: bool = False
+
+    # Notícias externas (integrations/noticias_client.py): "fake" roda sem chave; "gnews" usa
+    # a API do GNews (gnews.io, plano gratuito de 100 pedidos por dia).
+    noticias_provider: str = "fake"
+    noticias_api_key: str = ""
     # Dispositivo do motor BERTimbau Y1/Y2 (integrations/bertimbau_engine.py)
     ai_device: str = "cpu"
 

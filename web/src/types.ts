@@ -13,12 +13,21 @@ export interface Question {
   fonte?: string;
 }
 
+// Palpite do classificador, mostrado depois da resposta (só quando a API está configurada).
+export interface ModelGuess {
+  category: "falso" | "enganoso" | "confere" | "incerto";
+  score: number | null;
+  confidence: number;
+  model_version: string;
+}
+
 export interface AnswerResult {
   is_correct: boolean;
   correct_answer: boolean;
   explanation: string;
   source: string;
   score: number;
+  model_guess?: ModelGuess | null;
 }
 
 export interface QuestionResult {

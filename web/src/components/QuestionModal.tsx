@@ -1,6 +1,15 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Question, AnswerResult } from "../types";
+import { Question, AnswerResult, ModelGuess } from "../types";
 import { soundEffects } from "../services/audioService";
+
+const ROTULO_PALPITE: Record<ModelGuess["category"], string> = {
+  falso: "Parece falsa",
+  enganoso: "Parece enganosa",
+  confere: "Parece confiável",
+  incerto: "Não teve certeza",
+};
+
+const ehLink = (fonte: string) => /^https?:\/\//.test(fonte);
 
 interface QuestionModalProps {
   question: Question;
@@ -240,10 +249,36 @@ export const QuestionModal: React.FC<QuestionModalProps> = ({
               {(result?.source || question.fonte) && (
                 <div className="source-row">
                   <span className="source-label">Fonte de validação:</span>
-                  <span className="source-text">{result?.source || question.fonte}</span>
+                  {ehLink(result?.source || "") ? (
+                    <a
+                      className="source-text"
+                      href={result?.source}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Ler a notícia original
+                    </a>
+                  ) : (
+                    <span className="source-text">{result?.source || question.fonte}</span>
+                  )}
                 </div>
               )}
             </div>
+
+            {/* Palpite do classificador: estimativa estatística, pode errar */}
+            {result?.model_guess && (
+              <div className="model-guess-card">
+                <span className="model-guess-label">🤖 Palpite do modelo FAKO:</span>
+                <span className={`model-guess-badge model-guess-${result.model_guess.category}`}>
+                  {ROTULO_PALPITE[result.model_guess.category]}
+                  {result.model_guess.score !== null &&
+                    ` · nota ${Math.round(result.model_guess.score)}/100`}
+                </span>
+                <p className="model-guess-note">
+                  Estimativa estatística pelo jeito do texto, não uma checagem. O modelo também erra.
+                </p>
+              </div>
+            )}
 
             <button
               type="button"

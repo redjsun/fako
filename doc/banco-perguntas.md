@@ -1,7 +1,9 @@
 # Banco de perguntas do jogo
 
-> **Status:** decisões tomadas; nada implementado. Faltam escolher a API de notícias e
-> ajustar o modelo `Question` da API e o mock do web (ver "Pendências").
+> **Status:** importação de notícias implementada com o GNews e a referência TF-IDF
+> (`doc/noticias-classificador.md`). A afirmação ainda é a manchete normalizada, não a
+> extraída pela LLM: o modelo publicado foi treinado com o texto original. Falta o resto das
+> "Pendências".
 
 ## A pergunta é a afirmação
 
@@ -83,7 +85,10 @@ Cuidados por a referência das notícias vir do modelo:
 
 ## Pendências
 
-- Escolher a API de notícias (termos de uso, limite de requisições, cobertura brasileira).
+- ~~Escolher a API de notícias~~: GNews (plano gratuito, 100 pedidos por dia, `lang=pt`,
+  `country=br`), atrás de `NoticiasClient` para trocar de provedor sem mudar o resto.
+- Com um modelo treinado no texto padronizado, a importação precisa extrair a afirmação com
+  o prompt da #19 antes de classificar.
 - API: `Question` guarda `is_true` e uma categoria obrigatória; precisa da referência de 0 a
   100 (ou da veracidade em três classes), da data e de deixar a categoria de lado.
 - Web: o mock (`web/src/services/questionService.ts`) ainda tem categorias e perguntas fixas.

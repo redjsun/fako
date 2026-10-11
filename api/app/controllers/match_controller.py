@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.deps import get_current_user
+from app.integrations.classificador_client import ClassificadorClient, get_classificador
 from app.models.user import User
 from app.schemas.match_schema import (
     AnswerRequest,
@@ -19,8 +20,11 @@ from app.services.match_service import MatchService
 router = APIRouter(prefix="/matches", tags=["matches"])
 
 
-def get_service(db: Session = Depends(get_db)) -> MatchService:
-    return MatchService(db)
+def get_service(
+    db: Session = Depends(get_db),
+    classificador: ClassificadorClient = Depends(get_classificador),
+) -> MatchService:
+    return MatchService(db, classificador)
 
 
 @router.post("", response_model=MatchResponse, status_code=status.HTTP_201_CREATED)

@@ -847,6 +847,52 @@ body {
   color: var(--brand-green);
 }
 
+/* Palpite do classificador */
+.model-guess-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  padding: 10px 14px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+}
+
+.model-guess-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.model-guess-badge {
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--bg-card-subtle);
+  color: var(--text-muted);
+}
+
+.model-guess-falso {
+  color: var(--accent-red);
+}
+
+.model-guess-enganoso {
+  color: var(--accent-gold);
+}
+
+.model-guess-confere {
+  color: var(--brand-green);
+  background: var(--brand-green-light);
+}
+
+.model-guess-note {
+  flex-basis: 100%;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
 /* Botões de Ação */
 .action-button {
   font-family: var(--font-display);

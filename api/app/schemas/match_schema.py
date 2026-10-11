@@ -30,12 +30,22 @@ class AnswerRequest(BaseModel):
     answer: bool
 
 
+class ModelGuess(BaseModel):
+    """Palpite do classificador sobre a afirmação, mostrado depois da resposta do jogador."""
+
+    category: str  # falso, enganoso, confere ou incerto (confiança abaixo do limiar)
+    score: float | None  # 0 a 100; sem nota quando incerto
+    confidence: float
+    model_version: str
+
+
 class AnswerResultResponse(BaseModel):
     is_correct: bool
     correct_answer: bool
     explanation: str
     source: str
     score: int
+    model_guess: ModelGuess | None = None
 
 
 class MatchResultResponse(BaseModel):

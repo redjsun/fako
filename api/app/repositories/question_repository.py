@@ -1,6 +1,6 @@
 """Acesso aos dados do banco de questões."""
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 
 from app.models.question import Question, QuestionStatus
 from app.repositories.base_repository import BaseRepository
@@ -21,3 +21,10 @@ class QuestionRepository(BaseRepository[Question]):
         if status is not None:
             query = query.where(Question.status == status)
         return list(self.db.scalars(query))
+
+    def exists_by_statement_or_source(self, statement: str, source: str) -> bool:
+        """Já existe questão com o mesmo texto (sem diferenciar caixa) ou a mesma fonte."""
+        query = select(Question.id).where(
+            or_(func.lower(Question.statement) == statement.lower(), Question.source == source)
+        )
+        return self.db.scalar(query.limit(1)) is not None
