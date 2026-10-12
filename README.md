@@ -46,9 +46,13 @@ make test      # testes da API (ruff + pytest num banco fako_test separado)
 make lint      # lint e formatação da API
 make format    # formata o código da API
 make test-ml   # lint e testes de pesquisa/ml/
+make test-web  # tipos, lint e testes do frontend
 ```
 
-O CI (`.github/workflows/ci.yml`) roda os mesmos comandos a cada push.
+O CI (`.github/workflows/ci.yml`) roda os mesmos comandos a cada push, com cobertura mínima
+na API (80%) e em `pesquisa/ml/` (75%), além do build estrito dos docs (`mkdocs build --strict`)
+e do build das imagens. A auditoria de dependências e a checagem de links externos dos docs
+só avisam, sem bloquear.
 
 ## Dados
 
