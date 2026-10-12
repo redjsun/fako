@@ -39,6 +39,13 @@ plugins:
 
 nav:
   - Visão geral: index.md
+  - Requisitos:
+      - Visão do produto: requisitos/visao-do-produto.md
+      - Decisões de produto: requisitos/decisoes-de-produto.md
+      - Técnicas de elicitação: requisitos/tecnicas-elicitacao.md
+      - Perguntas norteadoras: requisitos/perguntas-norteadoras.md
+      - Requisitos funcionais: requisitos/requisitos-funcionais.md
+      - Requisitos não funcionais: requisitos/requisitos-nao-funcionais.md
   - Produto:
       - Arquitetura: arquitetura.md
       - Banco de perguntas do jogo: banco-perguntas.md
