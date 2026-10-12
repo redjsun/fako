@@ -1,9 +1,9 @@
-"""Questão de verdadeiro ou falso do banco de conteúdo."""
+"""Questão do banco de conteúdo, com a confiabilidade de referência da afirmação."""
 
 import enum
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, Float, ForeignKey, String, Text
+from sqlalchemy import Boolean, DateTime, Enum, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Entity, enum_values
@@ -29,6 +29,8 @@ class Question(Entity):
 
     statement: Mapped[str] = mapped_column(Text)
     is_true: Mapped[bool] = mapped_column(Boolean)
+    # Confiabilidade de referência (0 a 100) usada na barra do jogo.
+    reliability_reference: Mapped[int] = mapped_column(Integer)
     explanation: Mapped[str] = mapped_column(Text)
     # Origem da informação usada na validação.
     source: Mapped[str] = mapped_column(String(500))

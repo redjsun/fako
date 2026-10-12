@@ -14,6 +14,7 @@ from app.schemas.admin_schema import (
     QuestionCreateRequest,
     QuestionReviewRequest,
 )
+from app.services import game_rules
 
 
 def to_admin_response(question: Question) -> QuestionAdminResponse:
@@ -21,6 +22,7 @@ def to_admin_response(question: Question) -> QuestionAdminResponse:
         id=question.id,
         statement=question.statement,
         is_true=question.is_true,
+        reliability_reference=question.reliability_reference,
         explanation=question.explanation,
         source=question.source,
         category=question.category.slug,
@@ -54,6 +56,11 @@ class ContentService:
             Question(
                 statement=data.statement,
                 is_true=data.is_true,
+                reliability_reference=(
+                    data.reliability_reference
+                    if data.reliability_reference is not None
+                    else game_rules.default_reliability_reference(data.is_true)
+                ),
                 explanation=data.explanation,
                 source=data.source,
                 category=self.get_category(data.category),

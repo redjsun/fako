@@ -39,6 +39,7 @@ def seed_questions(db: Session, categories: dict[str, Category]) -> None:
             Question(
                 statement=data["statement"],
                 is_true=data["is_true"],
+                reliability_reference=data["reliability_reference"],
                 explanation=data["explanation"],
                 source=data["source"],
                 category_id=categories[data["category"]].id,
