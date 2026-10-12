@@ -19,7 +19,7 @@ um classificador de veracidade treinado com bases brasileiras de fake news. Todo
 | `pesquisa/notebooks/` | EDA (`eda_1_datasets.ipynb`, `eda_2_conjunto.ipynb`) |
 | `pesquisa/data/` | Fora do Git. `raw/` (bases e coletas, com cache) e `processed/` (`dataset.jsonl`) |
 | `models/` | Fora do Git. Modelos treinados, lidos pela API |
-| `doc/` | Todos os docs do projeto, inclusive os de pesquisa; índice em `doc/docs.yaml` (registrar ali cada doc novo) |
+| `doc/` | Todos os docs do projeto, inclusive os de pesquisa; site gerado com MkDocs (`mkdocs.yml`, registrar ali cada doc novo) |
 
 ## Comandos
 

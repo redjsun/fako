@@ -112,5 +112,15 @@ services:
       - ./anotacoes:/work/anotacoes
       - ./models:/work/models
 
+  # Documentação do projeto (MkDocs + Material), servida com live-reload.
+  docs:
+    image: squidfunk/mkdocs-material
+    container_name: fakenews-docs
+    profiles: ["docs"]
+    ports:
+      - "8001:8000"
+    volumes:
+      - .:/docs
+
 volumes:
   db_data:

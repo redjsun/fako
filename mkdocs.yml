@@ -1,0 +1,53 @@
+site_name: FAKO — Documentação
+site_description: Jogo educativo de avaliação de confiabilidade e classificador de veracidade treinado com bases brasileiras de fake news.
+docs_dir: doc
+
+theme:
+  name: material
+  language: pt-BR
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Modo escuro
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Modo claro
+  features:
+    - navigation.tabs
+    - navigation.top
+    - content.code.copy
+    - toc.follow
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+
+plugins:
+  - search
+
+nav:
+  - Visão geral: index.md
+  - Produto:
+      - Arquitetura: arquitetura.md
+      - Banco de perguntas do jogo: banco-perguntas.md
+      - Notícias externas e classificador: noticias-classificador.md
+  - Pesquisa e dados:
+      - Análise exploratória dos dados: eda.md
+      - Dataset de verdadeiros confiáveis: dataset-verdadeiras.md
+      - Guia de classificação e anotação: guia-classificacao.md
+      - Padronização do texto curto pela LLM: padronizacao.md
+      - Planejamento de coleta e retreino: planejamento-retreino.md
+  - Modelo:
+      - Relatório técnico do classificador: relatorio-tecnico.md
