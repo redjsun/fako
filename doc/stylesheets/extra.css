@@ -1,0 +1,17 @@
+/* Cores da marca FAKO (web/src/index.css: --brand-primary, --brand-strong, --brand-vivid). */
+
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: #257a3e;
+  --md-primary-fg-color--light: #2f9e44;
+  --md-primary-fg-color--dark: #17532a;
+  --md-accent-fg-color: #2f9e44;
+  --md-typeset-a-color: #15803d;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #17532a;
+  --md-primary-fg-color--light: #257a3e;
+  --md-primary-fg-color--dark: #0b4d2c;
+  --md-accent-fg-color: #4ade80;
+  --md-typeset-a-color: #4ade80;
+}

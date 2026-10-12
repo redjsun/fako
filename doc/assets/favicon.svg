@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="FAKO">
+  <rect x="0" y="0" width="64" height="64" rx="14" fill="#17532a"/>
+  <circle cx="32" cy="36" r="14" fill="#dc2626"/>
+  <path d="M32 22 q7 -5 12 0 q-5 5 -12 0 z" fill="#2f9e44"/>
+</svg>

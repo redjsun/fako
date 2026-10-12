@@ -1,0 +1,44 @@
+# Requisitos não funcionais
+
+Catálogo oficial do Documento de Requisitos do grupo (v1), levantado e priorizado da mesma
+forma que os [requisitos funcionais](requisitos-funcionais.md): workshop e entrevista,
+priorização MoSCoW, coluna de origem para rastreabilidade; ver
+[Técnicas de elicitação](tecnicas-elicitacao.md).
+
+| ID | Requisito | Descrição | Prioridade (MoSCoW) | Origem |
+|----|---|---|---|---|
+| RNF01 | Usabilidade | O sistema deve apresentar uma interface simples de compreender e utilizar, permitindo que o jogador identifique facilmente as ações disponíveis durante a partida. | Must have | Entrevista |
+| RNF02 | Acessibilidade | O sistema deve utilizar elementos visuais e textuais que favoreçam a leitura e compreensão das informações apresentadas. | Should have | Entrevista |
+| RNF03 | Responsividade | O sistema deve adaptar sua interface aos diferentes tamanhos de tela suportados. | Should have | Workshop e Entrevista |
+| RNF04 | Desempenho | O sistema deve responder aos comandos do jogador sem atrasos perceptíveis durante a execução da partida. | Must have | Workshop |
+| RNF05 | Tempo de carregamento | O sistema deve carregar as telas e elementos necessários para a execução do jogo dentro de tempo adequado para a utilização. | Should have | Workshop |
+| RNF06 | Disponibilidade | O sistema deve permanecer disponível para utilização durante os períodos previstos para execução do jogo. | Should have | Workshop |
+| RNF07 | Segurança da autenticação | O sistema deve proteger as credenciais dos jogadores durante o cadastro e o processo de autenticação. | Must have | Workshop |
+| RNF08 | Proteção de senhas | O sistema não deve armazenar senhas em formato de texto puro. | Must have | Workshop |
+| RNF09 | Controle de acesso | O sistema deve permitir que cada jogador acesse somente os dados e o progresso associados à sua própria conta. | Must have | Workshop |
+| RNF10 | Integridade e consistência dos dados | O sistema deve preservar a integridade dos dados relacionados às contas, respostas, pontuação, níveis e progresso dos jogadores, mantendo o estado da partida e as informações exibidas (respostas corretas, explicações, pontuação, regras) consistentes durante toda a utilização. | Must have | Workshop |
+| RNF11 | Persistência e recuperação entre sessões | Os dados necessários para a continuidade da jornada do jogador devem permanecer armazenados de forma consistente entre sessões e ser recuperados quando ele realizar uma nova autenticação. | Must have | Workshop |
+| RNF13 | Compatibilidade | O sistema deve funcionar nos navegadores e ambientes definidos para a aplicação. | Must have | Workshop e Entrevista |
+| RNF14 | Manutenibilidade | O sistema deve possuir uma estrutura que permita a manutenção e evolução das funcionalidades do jogo. | Should have | Workshop |
+| RNF15 | Modularidade | Os componentes responsáveis por autenticação, jogo, níveis, pontuação, conteúdo e persistência devem possuir organização que facilite sua evolução. | Should have | Workshop |
+| RNF16 | Escalabilidade | O sistema deve permitir a inclusão de novos conteúdos, afirmações e níveis sem exigir alterações estruturais em toda a aplicação. | Should have | Workshop |
+| RNF19 | Privacidade | O sistema deve tratar os dados pessoais utilizados no cadastro e na autenticação de acordo com as regras de privacidade aplicáveis. | Should have | Workshop |
+| RNF20 | Clareza das mensagens | As mensagens de erro, acerto, orientação e resultado devem ser apresentadas de forma clara e compreensível para o jogador. | Should have | Entrevista |
+| RNF21 | Segurança da aplicação | O sistema deve adotar mecanismos de segurança destinados a reduzir riscos relacionados a acesso indevido, manipulação de dados e vulnerabilidades da aplicação. | Should have | Workshop |
+| RNF22 | Auditabilidade | O sistema deve possibilitar o registro das informações necessárias para acompanhamento de eventos relevantes relacionados à utilização e à manutenção da aplicação. | Could have | Workshop |
+| RNF23 | Explicabilidade do classificador | Toda classificação exibida ao jogador ou ao admin deve poder expor os sinais que a embasaram, não só o resultado. | Should have | Workshop e Entrevista |
+| RNF24 | Portão de qualidade do modelo | Nenhum modelo novo substitui o publicado sem comparação de métricas com o modelo em produção. | Must have | Workshop e Entrevista |
+| RNF25 | Resistência a atalhos | O classificador não deve aprender fonte, autor ou data como atributo; medido pelo teste de atalho a cada modelo novo. | Must have | Workshop e Entrevista |
+| RNF26 | Desempenho da classificação | A geração diária de questões e a classificação sob demanda devem responder dentro de um tempo compatível com os jobs agendados. | Should have | Workshop e Entrevista |
+| RNF27 | Reprodutibilidade dos experimentos | Cada modelo publicado deve ser rastreável até a versão exata dos dados, da configuração de treino e do código que o gerou. | Should have | Workshop e Entrevista |
+
+## Resumo da priorização
+
+| Categoria | RF | RNF | Total |
+|---|---|---|---|
+| Must have | 20 | 10 | 30 |
+| Should have | 7 | 13 | 20 |
+| Could have | 2 | 1 | 3 |
+
+Won't have (fora do escopo atual) não consta nesta documentação: são requisitos
+explicitamente postergados para iterações pós-MVP, delimitando o foco atual da equipe.

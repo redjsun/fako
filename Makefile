@@ -1,6 +1,6 @@
 COMPOSE := docker compose
 
-.PHONY: help build up down restart logs ps shell-api shell-web shell-db migrate makemigration seed admin test lint format dados padronizar atalho contagens referencia bert avaliar classificar test-ml shell-ml eda ml-legado clean
+.PHONY: help build up down restart logs ps shell-api shell-web shell-db migrate makemigration seed admin test lint format dados padronizar atalho contagens referencia bert avaliar classificar test-ml shell-ml eda ml-legado docs clean
 
 help: ## Lista os comandos disponíveis
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -106,6 +106,9 @@ eda: ## Sobe o Jupyter Lab da EDA em http://localhost:8888
 
 ml-legado: ## Ambiente do ml/ antigo (BERTimbau Y1/Y2 da API): carregamento e verificação dos dados
 	$(COMPOSE) --profile ml-legado run --rm ml-legado python -m ml.dados
+
+docs: ## Sobe a documentação (MkDocs) em http://localhost:8001
+	$(COMPOSE) --profile docs up docs
 
 clean: ## Remove containers, volumes e imagens do projeto
 	$(COMPOSE) down -v --rmi local
