@@ -51,8 +51,15 @@ jobs:
       - name: Formatação
         run: ruff format --check .
 
+      - name: Migrações
+        run: alembic upgrade head
+
       - name: Testes
-        run: pytest -v
+        run: pytest -v --cov=app --cov-report=term-missing --cov-fail-under=80
+
+      - name: Auditoria de dependências
+        run: pip-audit -r requirements.txt
+        continue-on-error: true
 
   ml:
     name: ML (lint e testes)
@@ -79,10 +86,14 @@ jobs:
         run: ruff format --check .
 
       - name: Testes
-        run: pytest -v
+        run: pytest -v --cov=. --cov-report=term-missing --cov-fail-under=80
+
+      - name: Auditoria de dependências
+        run: pip-audit -r requirements.txt
+        continue-on-error: true
 
   web:
-    name: Web (lint e build)
+    name: Web (tipos, lint, testes e build)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -97,11 +108,21 @@ jobs:
       - name: Instalar dependências
         run: npm install
 
+      - name: Verificação de tipos
+        run: npm run typecheck
+
       - name: Lint
         run: npm run lint
 
+      - name: Testes
+        run: npm run test
+
       - name: Build
         run: npm run build
+
+      - name: Auditoria de dependências
+        run: npm audit --audit-level=high
+        continue-on-error: true
 
   docs:
     name: Docs (build)
@@ -119,12 +140,22 @@ jobs:
       - name: Build
         run: mkdocs build --strict
 
+      - name: Verificar links externos
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: --no-progress "doc/**/*.md" README.md
+        continue-on-error: true
+
   docker:
     name: Docker (build das imagens)
     runs-on: ubuntu-latest
     needs: [api, web]
+    env:
+      COMPOSE_BAKE: "true"
     steps:
       - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
 
       - name: Build
         run: docker compose build
