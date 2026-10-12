@@ -41,29 +41,42 @@ segurança).
 
 ## Entrevista
 
-Entrevistas individuais, por videochamada (Google Meet), com jogadores em potencial fora da
-equipe. Roteiro: hábito de uso de aplicativos de aprendizagem gamificados (Duolingo e
-afins), o que funciona e o que afasta nesse formato.
+**Objetivo.** Validar, na perspectiva de potenciais jogadores externos à equipe, hipóteses
+do brainstorming sobre hábito de uso e permanência em aplicativos de aprendizagem
+gamificados, antes de consolidar as mecânicas de progresso e recompensa do FAKO.
 
-**Entrevistada 1, 21 anos, estudante de Engenharia de Software.** Não é usuária assídua
-desse tipo de aplicativo: não consegue manter a constância diária que eles cobram. A
-mecânica do FAKO, sem exigir uma sequência de dias jogados para não perder o progresso,
-encaixaria melhor na rotina dela do que um aplicativo como o Duolingo.
+**Método.** Entrevistas individuais semiestruturadas, conduzidas por videochamada (Google
+Meet), com roteiro voltado ao hábito de uso de aplicativos de aprendizagem gamificados
+(Duolingo e similares): o que sustenta o uso contínuo desses aplicativos e o que leva ao
+abandono.
 
-**Entrevistado 2, 24 anos, usuário frequente de Duolingo.** Destacou gostar especificamente
-da abordagem de aprendizagem por reforço do aplicativo: o acerto é recompensado na hora, e o
-item errado volta a aparecer depois.
+**Participantes.**
 
-**Impacto no requisito.** A constância sem sequência obrigatória (achado da entrevistada 1)
-apoia o controle de progresso por nível e por partida avulsa (RF19), em vez de por
-sequência de dias jogados; a aprendizagem por reforço (achado do entrevistado 2) apoia a
-pontuação imediata por acerto (RF18) e o feedback logo após a resposta (RF10).
+| Participante | Perfil | Relação com apps de aprendizagem gamificada |
+|---|---|---|
+| Entrevistada 1 | 21 anos, estudante de Engenharia de Software | Uso pouco frequente; relata dificuldade em manter o uso diário exigido por esse tipo de aplicativo |
+| Entrevistado 2 | 24 anos | Usuário frequente e assíduo do Duolingo |
 
-Essas duas entrevistas fazem parte de uma rodada maior; as notas dos demais participantes
-ainda não estão consolidadas neste documento. Os requisitos marcados com a origem Entrevista
-na [tabela de funcionais](requisitos-funcionais.md) e na
-[tabela de não funcionais](requisitos-nao-funcionais.md) incluem tanto o que essas conversas
-já confirmaram quanto o que falta detalhar aqui conforme a consolidação avança.
+**Achados.**
+
+- A entrevistada 1 não sustenta o uso regular desse tipo de aplicativo por não conseguir
+  manter a constância diária exigida por eles. Avaliou que a proposta do FAKO se adequaria
+  melhor à sua rotina por não depender de uma sequência consecutiva de dias jogados para a
+  manutenção do progresso.
+- O entrevistado 2 destacou, como fator determinante de sua permanência no Duolingo, a
+  abordagem de aprendizagem por reforço do aplicativo: o acerto é recompensado
+  imediatamente, e o item errado é reapresentado posteriormente.
+
+**Impacto nos requisitos.** O achado da entrevistada 1 fundamenta o controle de progresso
+por nível e por partida avulsa (RF19), em vez de por sequência de dias consecutivos. O
+achado do entrevistado 2 fundamenta a pontuação imediata por acerto (RF18) e o feedback
+apresentado logo após a resposta (RF10).
+
+**Limitações.** As duas entrevistas relatadas fazem parte de uma rodada mais ampla; as
+notas dos demais participantes ainda não foram consolidadas neste documento. Os requisitos
+que carregam a origem Entrevista nas tabelas de [requisitos funcionais](requisitos-funcionais.md)
+e de [requisitos não funcionais](requisitos-nao-funcionais.md) refletem tanto os achados já
+registrados acima quanto os que ainda serão detalhados conforme a consolidação avança.
 
 ## Benchmark (apoio à definição do produto)
 
