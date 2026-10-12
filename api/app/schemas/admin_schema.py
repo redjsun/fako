@@ -10,6 +10,8 @@ from app.models.question import QuestionOrigin, QuestionStatus
 class QuestionCreateRequest(BaseModel):
     statement: str = Field(min_length=5)
     is_true: bool
+    # Se omitida, deriva de is_true (90 ou 10).
+    reliability_reference: int | None = Field(default=None, ge=0, le=100)
     explanation: str = Field(min_length=5)
     source: str = Field(min_length=2, max_length=500)
     category: str  # Slug da categoria
@@ -23,6 +25,7 @@ class QuestionAdminResponse(BaseModel):
     id: int
     statement: str
     is_true: bool
+    reliability_reference: int
     explanation: str
     source: str
     category: str

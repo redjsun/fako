@@ -1,42 +1,28 @@
-export type QuestionCategory = "Saúde" | "Tecnologia" | "Conhecimentos Gerais";
-export type CategoryFilter = QuestionCategory | "Misto";
-
 export interface Question {
-  id: number | string;
-  statement?: string;
+  id: number;
+  statement: string;
   category?: string;
-  // Campos opcionais de compatibilidade
-  afirmacao?: string;
-  categoria?: QuestionCategory;
-  confiabilidade_referencia?: number;
-  explicacao?: string;
-  fonte?: string;
 }
 
-// Palpite do classificador, mostrado depois da resposta (só quando a API está configurada).
-export interface ModelGuess {
-  category: "falso" | "enganoso" | "confere" | "incerto";
-  score: number | null;
-  confidence: number;
-  model_version: string;
-}
-
+// Resultado da resposta na barra de confiabilidade (0 a 100).
 export interface AnswerResult {
   is_correct: boolean;
   correct_answer: boolean;
+  reliability: number;
+  reliability_reference: number;
+  tolerance: number;
+  distance: number;
   explanation: string;
   source: string;
   score: number;
-  model_guess?: ModelGuess | null;
 }
 
-export interface QuestionResult {
-  question: Question;
+// Afirmação já respondida, para o feedback, o resumo da partida e o histórico.
+export interface AnsweredQuestion {
+  statement: string;
+  reliability: number;
+  reference: number;
   isCorrect: boolean;
-  correctAnswer: boolean;
-  explanation: string;
-  source: string;
-  points: number;
 }
 
 export interface Level {
@@ -78,27 +64,30 @@ export interface Position {
   y: number;
 }
 
-export type GameStatus =
-  | "START"
-  | "PLAYING"
-  | "QUESTION"
-  | "FEEDBACK"
-  | "GAMEOVER"
-  | "VICTORY"
-  | "TIMEOUT";
+/**
+ * Estados da partida:
+ * PLAYING (cobra andando), PAUSED (Esc ou modal de sair), QUESTION (popup da afirmação),
+ * FEEDBACK (popup do resultado), COUNTDOWN (3 s antes de retomar) e FINISHED.
+ */
+export type GameStatus = "PLAYING" | "PAUSED" | "QUESTION" | "FEEDBACK" | "COUNTDOWN" | "FINISHED";
 
-export interface GameStats {
-  score: number;
+// EXIT: o jogador saiu pelo "Sair e salvar".
+export type MatchEndReason = "TIMEOUT" | "GAMEOVER" | "EXIT";
+
+// Partida encerrada, guardada no histórico local do jogador.
+export interface MatchRecord {
+  finishedAt: number;
   level: number;
-  applesInLevel: number;
-  totalApples: number;
+  score: number;
   acertos: number;
   erros: number;
-  category: CategoryFilter;
-  advanced?: boolean;
+  snakeLength: number;
+  secondsPlayed: number;
+  endReason: MatchEndReason;
+  answers: AnsweredQuestion[];
 }
 
-export type AppScreen = "login" | "home" | "categories" | "tutorial" | "journey" | "game";
+export type AppScreen = "login" | "home" | "tutorial" | "journey" | "game";
 
 export interface User {
   id?: number;
@@ -111,7 +100,6 @@ export interface Achievement {
   id: string;
   title: string;
   description: string;
-  icon: string;
   unlocked: boolean;
   unlockedAt?: number;
 }
@@ -122,12 +110,8 @@ export interface UserStats {
   gamesPlayed: number;
   totalAcertos: number;
   totalErros: number;
-  streakDays: number;
+  bestStreak: number;
   hasSeenTutorial: boolean;
-  categoryStats: {
-    saude: { acertos: number; total: number };
-    tecnologia: { acertos: number; total: number };
-    gerais: { acertos: number; total: number };
-  };
   achievements: Achievement[];
+  history: MatchRecord[];
 }

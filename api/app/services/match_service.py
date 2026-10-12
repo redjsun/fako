@@ -77,7 +77,9 @@ class MatchService:
         if question.id in self.matches.answered_question_ids(match.id):
             raise BusinessRuleError("Questão já respondida nesta partida")
 
-        is_correct = data.answer == question.is_true
+        is_correct = game_rules.is_within_tolerance(
+            data.reliability, question.reliability_reference
+        )
         match.score += (
             game_rules.POINTS_PER_CORRECT_ANSWER
             if is_correct
@@ -87,7 +89,8 @@ class MatchService:
             MatchAnswer(
                 match_id=match.id,
                 question_id=question.id,
-                answer=data.answer,
+                answer=data.reliability >= 50,
+                reliability=data.reliability,
                 is_correct=is_correct,
             )
         )
@@ -95,6 +98,10 @@ class MatchService:
         return AnswerResultResponse(
             is_correct=is_correct,
             correct_answer=question.is_true,
+            reliability=data.reliability,
+            reliability_reference=question.reliability_reference,
+            tolerance=game_rules.RELIABILITY_TOLERANCE,
+            distance=abs(data.reliability - question.reliability_reference),
             explanation=question.explanation,
             source=question.source,
             score=match.score,
@@ -140,10 +147,8 @@ class MatchService:
         if match.status != MatchStatus.IN_PROGRESS:
             raise BusinessRuleError("Partida já encerrada")
 
-        # Depois dos 120 s não se aceita mais pergunta nem resposta.
-        deadline = match.started_at + timedelta(
-            seconds=match.duration_seconds + game_rules.ANSWER_GRACE_SECONDS
-        )
+        # O tempo de jogo é controlado no front; aqui só o teto de partida aberta.
+        deadline = match.started_at + timedelta(seconds=game_rules.MATCH_MAX_OPEN_SECONDS)
         if datetime.now(timezone.utc) > deadline:
             raise BusinessRuleError("Tempo da partida esgotado")
         return match

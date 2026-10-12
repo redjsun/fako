@@ -89,8 +89,10 @@ Cuidados por a referência das notícias vir do modelo:
   `country=br`), atrás de `NoticiasClient` para trocar de provedor sem mudar o resto.
 - Com um modelo treinado no texto padronizado, a importação precisa extrair a afirmação com
   o prompt da #19 antes de classificar.
-- API: `Question` guarda `is_true` e uma categoria obrigatória; precisa da referência de 0 a
-  100 (ou da veracidade em três classes), da data e de deixar a categoria de lado.
-- Web: o mock (`web/src/services/questionService.ts`) ainda tem categorias e perguntas fixas.
+- API: `Question` já guarda a referência de 0 a 100 (`reliability_reference`; as questões
+  antigas e as notícias importadas recebem 90 ou 10 a partir de `is_true`). Ainda falta a
+  data e deixar a categoria obrigatória de lado.
+- O seed tem só 6 questões: numa partida boa elas acabam e o front passa a usar o banco
+  local de `web/src/services/matchService.ts`.
 - A explicação das notícias não tem checagem por trás: escrever só o que a notícia diz
   (quem, onde, quando) e a nota do modelo, sem afirmar que foi verificada.

@@ -11,6 +11,7 @@ from app.schemas.admin_schema import (
     AIGenerateRequest,
     QuestionAdminResponse,
 )
+from app.services import game_rules
 from app.services.content_service import ContentService, to_admin_response
 
 
@@ -29,6 +30,7 @@ class AIService:
                 Question(
                     statement=item.statement,
                     is_true=item.is_true,
+                    reliability_reference=game_rules.default_reliability_reference(item.is_true),
                     explanation=item.explanation,
                     source=item.source,
                     category=category,

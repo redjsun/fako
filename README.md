@@ -1,6 +1,6 @@
 # FAKO — Jogo Educativo de Checagem de Fatos (Snake)
 
-O **FAKO** transforma a clássica mecânica do Snake (jogo da cobrinha) em uma ferramenta educativa para treinar a análise crítica e o combate à desinformação. O jogador guia a cobrinha pelo tabuleiro, coleta maçãs e avalia a confiabilidade de afirmações reais sobre Saúde, Tecnologia e Conhecimentos Gerais.
+O **FAKO** transforma a clássica mecânica do Snake (jogo da cobrinha) em uma ferramenta educativa para treinar a análise crítica e o combate à desinformação. O jogador guia a cobrinha pelo tabuleiro, coleta maçãs e avalia, numa barra de 0% a 100%, a confiabilidade de afirmações reais.
 
 ---
 
@@ -12,54 +12,43 @@ O **FAKO** transforma a clássica mecânica do Snake (jogo da cobrinha) em uma f
 - **A Maçã Pausa o Jogo:** Ao comer a maçã, o jogo pausa e abre um balão de pergunta/afirmação sobre o tabuleiro.
 - **Crescimento Apenas no Erro:** A cobrinha **não** cresce ao comer a maçã! Ela só cresce 1 segmento quando o jogador erra a avaliação da pergunta (> 15 pontos de distância da referência).
 - **Fim de Jogo:** Quando a cobrinha colide com o próprio corpo.
-- **Progressão em 6 Níveis:** A cada 10 maçãs coletadas e respondidas, o jogador avança de nível. A subida de nível é silenciosa (apenas atualiza o placar no cabeçalho). Completar o nível 6 é a condição de vitória.
+- **Progressão em 6 Níveis:** cada nível tem uma meta de pontos numa partida (30 no nível 1); bater a meta libera o próximo nível, com a cobra mais rápida. A Jornada mostra os níveis, as conquistas e as últimas partidas.
 
 ---
 
 ## ⚖️ Sistema de Perguntas e Avaliação
 
-1. **Afirmação e Categoria:** Cada maçã traz uma afirmação categorizada (*Saúde*, *Tecnologia* ou *Conhecimentos Gerais*).
-2. **Tempo Limite de 15 Segundos:** Cronômetro regressivo com alerta visual e sonoro nos últimos 5 segundos. Caso o tempo se esgote, o palpite atual é confirmado automaticamente.
-3. **Barra Deslizante (0% a 100%):** Passo de 5%, começando em 50% ("Nada confiável" a "Totalmente confiável").
-4. **Revelação e Comparação:** Ao confirmar, a barra revela dois marcadores visuais:
-   - **Você:** O palpite selecionado pelo jogador.
-   - **Referência:** A taxa oficial calculada por especialistas/ciência.
-5. **Critério de Pontuação:**
-   - **Distância ≤ 15 pontos (Acerto):** Pontuação cheia (+100 pontos, com bônus de 120 para acerto exato). A cobrinha **não** cresce.
-   - **Distância > 15 pontos (Erro):** 0 pontos. A cobrinha cresce 1 quadrado no próximo passo.
-6. **Explicação e Fontes:** Apresenta justificativa pedagógica e fontes de órgãos oficiais (OMS, Fiocruz, Cochrane, EFF, NIST, NASA, etc.).
+1. **Partida de 120 segundos:** o cronômetro só corre com a cobra andando; ele pausa durante a pergunta, o resultado e as pausas (Esc).
+2. **45 segundos por afirmação:** ao fim do tempo vale o valor marcado na barra.
+3. **Barra de confiabilidade (0% a 100%):** passos de 5%, começando em 50%, com leitura em palavras ("70% = Provavelmente confiável").
+4. **Resultado:** a barra mostra a resposta do jogador, a referência oficial e a faixa de acerto (±15 pontos).
+5. **Pontuação** (regras em `api/app/services/game_rules.py`):
+   - **Distância ≤ 15 pontos (acerto):** +10 pontos. A cobrinha **não** cresce.
+   - **Distância > 15 pontos (erro):** 0 ponto. A cobrinha cresce 1 bloco.
+6. **Explicação e fonte** aparecem logo abaixo do resultado.
+7. **Retomada:** contagem de 3 segundos antes de a cobra voltar a andar.
 
 ---
 
 ## 🎮 Controles
 
-- **Teclado:** Setas direcionais ou teclas `W`, `A`, `S`, `D`.
-- **Atalhos de Ação:** Tecla `Enter` confirma o palpite e avança as telas; barra de `Espaço` também retoma o jogo.
-- **Celular / Toque:**
-  - Botões virtuais na tela (D-pad direcional).
-  - Gestos de deslize (*swipe*) diretamente sobre o tabuleiro.
-- **Tema:** Alternância automática (claro/escuro) conforme o sistema operacional ou manual via botão `☀️ / 🌙 / 🌓`.
-- **Efeitos Sonoros:** Sintetizados diretamente via Web Audio API (sem dependências externas de áudio ou rede), com botão para mutar/desmutar (`🔊 / 🔇`).
+- **Teclado:** setas ou `W`, `A`, `S`, `D` movem a cobrinha; `Esc` pausa e retoma.
+- **Na pergunta:** `←` `→` ajustam a barra em 5%; `Enter` confirma e continua.
+- **Fim da partida:** `Enter` joga de novo.
+- **Celular / toque:** teclas do card "Controles" ou deslize o dedo no tabuleiro.
+- **Tema claro/escuro e som:** botões "Tema" e "Som" no header.
 
 ---
 
 ## 🏗️ Arquitetura e Modelo de Dados
 
-### Modelo de Cada Pergunta
-```typescript
-interface Question {
-  categoria: "Saúde" | "Tecnologia" | "Conhecimentos Gerais";
-  afirmacao: string;
-  confiabilidade_referencia: number; // 0 a 100
-  explicacao: string;
-  fonte?: string;
-}
-```
+### Pergunta e resposta na API
 
-### Isolamento da Função `nextQuestion()`
-A busca pela próxima pergunta está isolada em `src/services/questionService.ts`. No futuro, essa função pode ser substituída diretamente por uma chamada a uma API REST (`GET /api/questions/next`) ou banco de dados, sem alterar nenhuma lógica do jogo.
-
----
+A questão guarda `reliability_reference` (0 a 100). O jogador responde com
+`POST /matches/{id}/answers` e `{"question_id": 1, "reliability": 70}`; a API devolve
+`is_correct`, `reliability`, `reliability_reference`, `tolerance`, `distance`, `explanation`,
+`source` e o `score` da partida. Sem a API, `web/src/services/matchService.ts` usa um banco
+local com as mesmas regras.
 
 ## 🚀 Como Executar
 

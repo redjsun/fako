@@ -232,7 +232,7 @@ def test_palpite_do_modelo_no_feedback_da_resposta(
         questao = client.get(f"/matches/{partida['id']}/next-question", headers=auth_headers)
         resposta = client.post(
             f"/matches/{partida['id']}/answers",
-            json={"question_id": questao.json()["id"], "answer": True},
+            json={"question_id": questao.json()["id"], "reliability": 50},
             headers=auth_headers,
         )
         palpite = resposta.json()["model_guess"]

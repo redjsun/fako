@@ -35,13 +35,15 @@ class Match(Entity):
 
 
 class MatchAnswer(Entity):
-    """Classificação V/F dada pelo jogador a uma questão durante a partida."""
+    """Confiabilidade (0 a 100) dada pelo jogador a uma questão durante a partida."""
 
     __tablename__ = "match_answers"
 
     match_id: Mapped[int] = mapped_column(ForeignKey("matches.id"), index=True)
     question_id: Mapped[int] = mapped_column(ForeignKey("questions.id"))
+    # Leitura binária da resposta (confiabilidade >= 50), mantida para relatórios.
     answer: Mapped[bool] = mapped_column(Boolean)
+    reliability: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_correct: Mapped[bool] = mapped_column(Boolean)
 
     match: Mapped[Match] = relationship(back_populates="answers")

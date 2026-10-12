@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.match import MatchStatus
 from app.schemas.level_schema import LevelResponse
@@ -27,7 +27,8 @@ class MatchResponse(BaseModel):
 
 class AnswerRequest(BaseModel):
     question_id: int
-    answer: bool
+    # Barra de confiabilidade do jogo: 0 = nada confiável, 100 = totalmente confiável.
+    reliability: int = Field(ge=0, le=100)
 
 
 class ModelGuess(BaseModel):
@@ -42,6 +43,10 @@ class ModelGuess(BaseModel):
 class AnswerResultResponse(BaseModel):
     is_correct: bool
     correct_answer: bool
+    reliability: int
+    reliability_reference: int
+    tolerance: int
+    distance: int
     explanation: str
     source: str
     score: int

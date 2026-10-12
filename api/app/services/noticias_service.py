@@ -30,6 +30,7 @@ from app.models.category import Category
 from app.models.question import Question, QuestionOrigin, QuestionStatus
 from app.repositories.question_repository import QuestionRepository
 from app.schemas.admin_schema import NewsDiscarded, NewsImportRequest, NewsImportResponse
+from app.services import game_rules
 from app.services.content_service import ContentService, to_admin_response
 
 # Os filtros descartam boa parte das alegações checadas (a maioria é política ou depende de
@@ -120,6 +121,9 @@ class NoticiasService:
         question = Question(
             statement=manchete,
             is_true=bool(noticia.verdadeira),
+            reliability_reference=game_rules.default_reliability_reference(
+                bool(noticia.verdadeira)
+            ),
             explanation=explicacao(noticia),
             source=noticia.url[:500],
             category=category,

@@ -1,35 +1,27 @@
 import React from "react";
 
 export interface FakoLogoProps {
-  size?: "small" | "medium" | "large";
-  textColor?: string;
+  size?: "medium" | "large";
+  // "inverse" para fundos escuros (painel do login).
+  variant?: "default" | "inverse";
   className?: string;
-  subtitle?: string;
 }
 
+/** Logo do FAKO: três blocos da cobrinha, a maçã e o nome. */
 export const FakoLogo: React.FC<FakoLogoProps> = ({
   size = "medium",
-  textColor,
+  variant = "default",
   className = "",
-  subtitle,
 }) => {
   return (
-    <div className={`fako-logo-wrapper size-${size} ${className}`} aria-label="FAKO">
-      <div className="fako-logo-segments" aria-hidden="true">
-        <span className="logo-seg seg-light-1" />
-        <span className="logo-seg seg-light-2" />
-        <span className="logo-seg seg-dark" />
-        <span className="logo-apple-dot" />
-      </div>
-      <div className="fako-logo-text-col">
-        <span
-          className="fako-logo-text"
-          style={textColor ? { color: textColor } : undefined}
-        >
-          FAKO
-        </span>
-        {subtitle && <span className="fako-logo-subtitle">{subtitle}</span>}
-      </div>
+    <div className={`fako-logo fako-logo--${size} fako-logo--${variant} ${className}`} aria-label="FAKO">
+      <span className="fako-logo__blocks" aria-hidden="true">
+        <span className="fako-logo__block" />
+        <span className="fako-logo__block" />
+        <span className="fako-logo__block fako-logo__block--head" />
+        <span className="fako-logo__apple" />
+      </span>
+      <span className="fako-logo__text">FAKO</span>
     </div>
   );
 };

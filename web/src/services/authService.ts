@@ -1,46 +1,68 @@
-import { User, UserStats, GameStats, Achievement } from "../types";
+import { Achievement, AnsweredQuestion, MatchRecord, User, UserStats } from "../types";
 import { httpGet, httpPost, setAuthToken, getAuthToken } from "./httpClient";
 
 const SESSION_STORAGE_KEY = "fako_active_session";
 const STATS_STORAGE_KEY_PREFIX = "fako_stats_";
 
+const HISTORY_LIMIT = 10;
+
 const DEFAULT_ACHIEVEMENTS: Achievement[] = [
   {
     id: "first_check",
     title: "Primeira Checagem",
-    description: "Completou a avaliação da sua primeira maçã no FAKO.",
-    icon: "🍏",
+    description: "Avaliou a primeira afirmação no FAKO.",
     unlocked: false,
   },
   {
     id: "bullseye",
     title: "Na Mosca!",
-    description: "Acertou a confiabilidade com 100% de exatidão.",
-    icon: "🎯",
+    description: "Acertou a referência exata de uma afirmação.",
     unlocked: false,
   },
   {
     id: "level_up",
     title: "Subindo de Nível",
-    description: "Alcançou o Nível 2 ou superior no jogo da cobrinha.",
-    icon: "⚡",
+    description: "Alcançou o nível 2.",
     unlocked: false,
   },
   {
     id: "imune",
     title: "Muralha Antifake",
-    description: "Acertou 5 perguntas sem errar nenhuma na mesma partida.",
-    icon: "🛡️",
+    description: "Acertou 5 afirmações seguidas na mesma partida.",
     unlocked: false,
   },
   {
     id: "master",
     title: "Mestre dos Fatos",
-    description: "Concluiu com maestria todos os 6 níveis do FAKO!",
-    icon: "👑",
+    description: "Chegou ao nível 6.",
     unlocked: false,
   },
 ];
+
+function defaultStats(): UserStats {
+  return {
+    highScore: 0,
+    maxLevel: 1,
+    gamesPlayed: 0,
+    totalAcertos: 0,
+    totalErros: 0,
+    bestStreak: 0,
+    hasSeenTutorial: false,
+    achievements: DEFAULT_ACHIEVEMENTS.map((achievement) => ({ ...achievement })),
+    history: [],
+  };
+}
+
+// Maior sequência de acertos seguidos numa lista de respostas.
+function longestStreak(answers: AnsweredQuestion[]): number {
+  let best = 0;
+  let current = 0;
+  for (const answer of answers) {
+    current = answer.isCorrect ? current + 1 : 0;
+    best = Math.max(best, current);
+  }
+  return best;
+}
 
 const USERS_DB_STORAGE_KEY = "fako_local_users";
 
@@ -285,81 +307,72 @@ class AuthService {
     try {
       const data = localStorage.getItem(STATS_STORAGE_KEY_PREFIX + username.toLowerCase());
       if (data) {
-        const parsed = JSON.parse(data);
-        if (!parsed.achievements) parsed.achievements = DEFAULT_ACHIEVEMENTS;
-        if (!parsed.categoryStats) {
-          parsed.categoryStats = {
-            saude: { acertos: 0, total: 0 },
-            tecnologia: { acertos: 0, total: 0 },
-            gerais: { acertos: 0, total: 0 },
-          };
-        }
-        if (!parsed.streakDays) parsed.streakDays = 1;
-        return parsed;
+        const saved = JSON.parse(data) as Partial<UserStats>;
+        const base = defaultStats();
+        // Mantém o estado das conquistas conhecidas e descarta campos antigos (ex.: categorias).
+        const achievements = base.achievements.map((achievement) => {
+          const stored = saved.achievements?.find((item) => item.id === achievement.id);
+          return stored ? { ...achievement, unlocked: stored.unlocked, unlockedAt: stored.unlockedAt } : achievement;
+        });
+        return {
+          ...base,
+          highScore: saved.highScore ?? 0,
+          maxLevel: saved.maxLevel ?? 1,
+          gamesPlayed: saved.gamesPlayed ?? 0,
+          totalAcertos: saved.totalAcertos ?? 0,
+          totalErros: saved.totalErros ?? 0,
+          bestStreak: saved.bestStreak ?? 0,
+          hasSeenTutorial: saved.hasSeenTutorial ?? false,
+          achievements,
+          history: Array.isArray(saved.history) ? saved.history : [],
+        };
       }
     } catch {
-      // Ignora erro
+      // Ignora erro de leitura e segue com os valores iniciais
     }
-    return {
-      highScore: 0,
-      maxLevel: 1,
-      gamesPlayed: 0,
-      totalAcertos: 0,
-      totalErros: 0,
-      streakDays: 1,
-      hasSeenTutorial: false,
-      categoryStats: {
-        saude: { acertos: 0, total: 0 },
-        tecnologia: { acertos: 0, total: 0 },
-        gerais: { acertos: 0, total: 0 },
-      },
-      achievements: DEFAULT_ACHIEVEMENTS,
-    };
+    return defaultStats();
   }
 
   public saveUserStats(username: string, stats: UserStats): void {
-    localStorage.setItem(STATS_STORAGE_KEY_PREFIX + username.toLowerCase(), JSON.stringify(stats));
+    try {
+      localStorage.setItem(STATS_STORAGE_KEY_PREFIX + username.toLowerCase(), JSON.stringify(stats));
+    } catch {
+      // Sem armazenamento local, o progresso fica só na API
+    }
   }
 
-  public recordGameFinished(username: string, gameStats: GameStats): void {
+  // unlockedLevel: nível atual depois da partida (sobe quando o jogador bate a meta).
+  public recordMatchFinished(username: string, record: MatchRecord, unlockedLevel: number): UserStats {
     const current = this.getUserStats(username);
-    const newAchievements = [...current.achievements];
-
+    const achievements = current.achievements.map((achievement) => ({ ...achievement }));
     const unlock = (id: string) => {
-      const ach = newAchievements.find((a) => a.id === id);
-      if (ach && !ach.unlocked) {
-        ach.unlocked = true;
-        ach.unlockedAt = Date.now();
+      const achievement = achievements.find((item) => item.id === id);
+      if (achievement && !achievement.unlocked) {
+        achievement.unlocked = true;
+        achievement.unlockedAt = Date.now();
       }
     };
 
-    if (gameStats.totalApples > 0) unlock("first_check");
-    if (gameStats.level >= 2) unlock("level_up");
-    if (gameStats.acertos >= 5) unlock("imune");
-    if (gameStats.level >= 6) unlock("master");
+    const streak = longestStreak(record.answers);
+    if (record.answers.length > 0) unlock("first_check");
+    if (record.answers.some((answer) => answer.reliability === answer.reference)) unlock("bullseye");
+    if (Math.max(record.level, unlockedLevel) >= 2) unlock("level_up");
+    if (streak >= 5) unlock("imune");
+    if (Math.max(record.level, unlockedLevel) >= 6) unlock("master");
 
     const updated: UserStats = {
-      highScore: Math.max(current.highScore, gameStats.score),
-      maxLevel: Math.max(current.maxLevel, gameStats.level),
+      highScore: Math.max(current.highScore, record.score),
+      maxLevel: Math.max(current.maxLevel, record.level, unlockedLevel),
       gamesPlayed: current.gamesPlayed + 1,
-      totalAcertos: current.totalAcertos + gameStats.acertos,
-      totalErros: current.totalErros + gameStats.erros,
-      streakDays: Math.max(1, current.streakDays),
+      totalAcertos: current.totalAcertos + record.acertos,
+      totalErros: current.totalErros + record.erros,
+      bestStreak: Math.max(current.bestStreak, streak),
       hasSeenTutorial: true,
-      categoryStats: current.categoryStats,
-      achievements: newAchievements,
+      achievements,
+      history: [record, ...current.history].slice(0, HISTORY_LIMIT),
     };
     this.saveUserStats(username, updated);
-  }
-
-  public recordBullseye(username: string): void {
-    const current = this.getUserStats(username);
-    const ach = current.achievements.find((a) => a.id === "bullseye");
-    if (ach && !ach.unlocked) {
-      ach.unlocked = true;
-      ach.unlockedAt = Date.now();
-      this.saveUserStats(username, current);
-    }
+    return updated;
   }
 
   public hasSeenTutorial(username: string): boolean {

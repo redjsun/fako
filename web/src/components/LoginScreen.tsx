@@ -38,6 +38,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       setError("Por favor, digite sua senha.");
       return;
     }
+    if (tab === "register" && !/^[A-Za-z0-9._-]{3,}$/.test(username.trim())) {
+      setError("O usuário precisa de pelo menos 3 caracteres: letras, números, . - _");
+      return;
+    }
     if (tab === "register" && password.trim().length < 6) {
       setError("A senha deve ter pelo menos 6 caracteres.");
       return;
@@ -100,7 +104,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         <section className="fako-brand-panel" aria-label="Identidade FAKO">
           {/* Topo: Logo FAKO (3 quadrados da cobrinha + 1 maçã circular + texto FAKO em branco) */}
           <header className="fako-brand-header">
-            <FakoLogo size="large" textColor="#ffffff" />
+            <FakoLogo size="large" variant="inverse" />
           </header>
 
           {/* Título Principal com hierarquia estrita */}
@@ -224,7 +228,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           {/* Saudação e Boas-Vindas */}
           <div className="fako-greeting-block">
             <h2 className="greeting-title">
-              {tab === "login" ? "Bem-vindo ao FAKO! 👋" : "Crie sua conta no FAKO! 🚀"}
+              {tab === "login" ? "Bem-vindo ao FAKO!" : "Crie sua conta no FAKO!"}
             </h2>
             <p className="greeting-subtitle">
               {tab === "login"
@@ -287,9 +291,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                     if (error) setError(null);
                   }}
                   autoComplete="username"
+                  aria-describedby={tab === "register" ? "fako-username-hint" : undefined}
                   required
                 />
               </div>
+              {tab === "register" && (
+                <p id="fako-username-hint" className="fako-field-hint">
+                  Mínimo de 3 caracteres (letras, números, . - _).
+                </p>
+              )}
             </div>
 
             {/* Campo: Senha */}
@@ -315,6 +325,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                     if (error) setError(null);
                   }}
                   autoComplete={tab === "login" ? "current-password" : "new-password"}
+                  aria-describedby={tab === "register" ? "fako-password-hint" : undefined}
                   required
                 />
                 <button
@@ -336,6 +347,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   )}
                 </button>
               </div>
+              {tab === "register" && (
+                <p id="fako-password-hint" className="fako-field-hint">
+                  Mínimo de 6 caracteres.
+                </p>
+              )}
             </div>
 
             {/* Linha Auxiliar: Lembrar de mim e Esqueceu sua senha? */}
@@ -369,7 +385,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               {isLoading ? (
                 <span className="fako-btn-spinner-wrap">
                   <span className="fako-btn-spinner" aria-hidden="true" />
-                  <span>Carregando...</span>
+                  <span>{tab === "login" ? "Entrando…" : "Criando sua conta…"}</span>
                 </span>
               ) : tab === "login" ? (
                 "Entrar"
