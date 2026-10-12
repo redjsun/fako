@@ -23,6 +23,21 @@ export function setAuthToken(token: string | null): void {
   }
 }
 
+// Resposta da API com status de erro; falha de rede chega como TypeError do fetch.
+export class HttpError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number
+  ) {
+    super(message);
+  }
+}
+
+// API fora do ar: sem resposta, ou erro do proxy/servidor (5xx).
+export function isApiUnavailable(error: unknown): boolean {
+  return !(error instanceof HttpError) || error.status >= 500;
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers || {});
 
@@ -54,7 +69,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     } catch {
       // Ignora erro ao ler JSON
     }
-    throw new Error(errorMessage);
+    throw new HttpError(errorMessage, response.status);
   }
 
   if (response.status === 204) {

@@ -29,6 +29,10 @@ class Match(Entity):
     )
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Pergunta servida e ainda sem resposta: a única que a partida aceita responder.
+    current_question_id: Mapped[int | None] = mapped_column(
+        ForeignKey("questions.id"), nullable=True
+    )
 
     level: Mapped[Level] = relationship()
     answers: Mapped[list["MatchAnswer"]] = relationship(back_populates="match")

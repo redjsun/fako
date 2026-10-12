@@ -1,5 +1,7 @@
 from fastapi.testclient import TestClient
 
+from app.services import game_rules
+
 
 def start_match(client: TestClient, headers: dict[str, str]) -> int:
     response = client.post("/matches", json={}, headers=headers)
@@ -53,24 +55,53 @@ def test_answer_returns_feedback(client: TestClient, auth_headers: dict[str, str
     assert body["score"] == (10 if body["is_correct"] else 0)
 
 
-def test_answer_at_reference_is_correct(client: TestClient, auth_headers: dict[str, str]) -> None:
+def test_tolerance_boundaries() -> None:
+    assert game_rules.is_within_tolerance(40, 40)
+    assert game_rules.is_within_tolerance(55, 40)
+    assert not game_rules.is_within_tolerance(56, 40)
+    assert not game_rules.is_within_tolerance(24, 40)
+
+
+def test_only_the_served_question_can_be_answered(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    other_match = start_match(client, auth_headers)
+    question = client.get(f"/matches/{other_match}/next-question", headers=auth_headers).json()
     match_id = start_match(client, auth_headers)
-    question = client.get(f"/matches/{match_id}/next-question", headers=auth_headers).json()
-    first = client.post(
-        f"/matches/{match_id}/answers",
-        json={"question_id": question["id"], "reliability": 0},
-        headers=auth_headers,
-    ).json()
-    second_match = start_match(client, auth_headers)
 
     response = client.post(
-        f"/matches/{second_match}/answers",
-        json={"question_id": question["id"], "reliability": first["reliability_reference"]},
+        f"/matches/{match_id}/answers",
+        json={"question_id": question["id"], "reliability": 50},
         headers=auth_headers,
     )
 
-    assert response.json()["is_correct"] is True
-    assert response.json()["distance"] == 0
+    assert response.status_code == 422
+
+
+def test_pending_question_is_served_again(client: TestClient, auth_headers: dict[str, str]) -> None:
+    match_id = start_match(client, auth_headers)
+    url = f"/matches/{match_id}/next-question"
+
+    first = client.get(url, headers=auth_headers).json()
+    second = client.get(url, headers=auth_headers).json()
+
+    assert first == second
+
+
+def test_answer_limit_per_match(
+    client: TestClient, auth_headers: dict[str, str], monkeypatch
+) -> None:
+    monkeypatch.setattr(game_rules, "MAX_ANSWERS_PER_MATCH", 1)
+    match_id = start_match(client, auth_headers)
+    url = f"/matches/{match_id}/next-question"
+    question = client.get(url, headers=auth_headers).json()
+    client.post(
+        f"/matches/{match_id}/answers",
+        json={"question_id": question["id"], "reliability": 50},
+        headers=auth_headers,
+    )
+
+    assert client.get(url, headers=auth_headers).status_code == 422
 
 
 def test_reliability_out_of_range(client: TestClient, auth_headers: dict[str, str]) -> None:

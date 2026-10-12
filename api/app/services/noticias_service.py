@@ -47,6 +47,11 @@ def explicacao(noticia: Noticia) -> str:
     return f"Manchete publicada por {veiculo}{quando}."
 
 
+def fonte(noticia: Noticia) -> str:
+    """URL gravada em Question.source (String(500)); a deduplicação compara com esta."""
+    return noticia.url[:500]
+
+
 def motivo(noticia: Noticia, texto: str) -> str | None:
     if noticia.veredito is None:
         return motivo_descarte(texto, noticia.url)
@@ -108,7 +113,7 @@ class NoticiasService:
             descarte = motivo(noticia, manchete)
             if descarte is None and (
                 manchete.casefold() in vistas
-                or self.questions.exists_by_statement_or_source(manchete, noticia.url)
+                or self.questions.exists_by_statement_or_source(manchete, fonte(noticia))
             ):
                 descarte = "já importada"
             if descarte:
@@ -125,7 +130,7 @@ class NoticiasService:
                 bool(noticia.verdadeira)
             ),
             explanation=explicacao(noticia),
-            source=noticia.url[:500],
+            source=fonte(noticia),
             category=category,
             status=QuestionStatus.DRAFT,
             origin=QuestionOrigin.NEWS,

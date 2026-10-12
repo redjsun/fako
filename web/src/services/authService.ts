@@ -1,5 +1,5 @@
 import { Achievement, AnsweredQuestion, MatchRecord, User, UserStats } from "../types";
-import { httpGet, httpPost, setAuthToken, getAuthToken } from "./httpClient";
+import { httpGet, httpPost, setAuthToken, getAuthToken, isApiUnavailable } from "./httpClient";
 
 const SESSION_STORAGE_KEY = "fako_active_session";
 const STATS_STORAGE_KEY_PREFIX = "fako_stats_";
@@ -64,41 +64,32 @@ function longestStreak(answers: AnsweredQuestion[]): number {
   return best;
 }
 
-const USERS_DB_STORAGE_KEY = "fako_local_users";
+const OFFLINE_ERROR =
+  "Servidor indisponível no momento. Entre como visitante para jogar sem conta.";
 
-interface LocalUserRecord {
-  id: number;
-  username: string;
-  password?: string;
-  is_admin?: boolean;
-  createdAt?: number;
+// Versões anteriores guardavam aqui as contas com a senha em texto puro.
+try {
+  localStorage.removeItem("fako_local_users");
+} catch {
+  // Sem armazenamento local, não há o que limpar
+}
+
+function authError(error: unknown, fallback: string): string {
+  if (isApiUnavailable(error)) return OFFLINE_ERROR;
+  return error instanceof Error && error.message ? error.message : fallback;
 }
 
 class AuthService {
-  private getLocalUsers(): LocalUserRecord[] {
-    try {
-      const data = localStorage.getItem(USERS_DB_STORAGE_KEY);
-      return data ? JSON.parse(data) : [];
-    } catch {
-      return [];
-    }
-  }
-
-  private saveLocalUser(user: LocalUserRecord): void {
-    try {
-      const list = this.getLocalUsers();
-      const existingIdx = list.findIndex(
-        (u) => u.username.toLowerCase() === user.username.toLowerCase()
-      );
-      if (existingIdx >= 0) {
-        list[existingIdx] = { ...list[existingIdx], ...user };
-      } else {
-        list.push(user);
-      }
-      localStorage.setItem(USERS_DB_STORAGE_KEY, JSON.stringify(list));
-    } catch {
-      // Ignora erro de localStorage
-    }
+  private async startSession(): Promise<User> {
+    const userResp = await httpGet<User>("/users/me");
+    const sessionUser: User = {
+      id: userResp.id,
+      username: userResp.username,
+      is_admin: userResp.is_admin,
+      createdAt: Date.now(),
+    };
+    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionUser));
+    return sessionUser;
   }
 
   public async login(
@@ -116,63 +107,10 @@ class AuthService {
         password,
       });
       setAuthToken(tokenResp.access_token);
-
-      const userResp = await httpGet<User>("/users/me");
-      const sessionUser: User = {
-        id: userResp.id,
-        username: userResp.username,
-        is_admin: userResp.is_admin,
-        createdAt: Date.now(),
-      };
-
-      // Salva também no banco local para permitir acesso offline posterior
-      this.saveLocalUser({
-        id: sessionUser.id || Date.now(),
-        username: sessionUser.username,
-        password,
-        is_admin: sessionUser.is_admin,
-        createdAt: sessionUser.createdAt,
-      });
-
-      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionUser));
-      return { success: true, user: sessionUser };
-    } catch (apiErr) {
-      // Fallback: se a API estiver offline ou inacessível, valida localmente
-      const localUsers = this.getLocalUsers();
-      const existing = localUsers.find(
-        (u) => u.username.toLowerCase() === cleanUser.toLowerCase()
-      );
-
-      if (existing) {
-        if (!existing.password || existing.password === password) {
-          const sessionUser: User = {
-            id: existing.id,
-            username: existing.username,
-            is_admin: existing.is_admin,
-            createdAt: existing.createdAt || Date.now(),
-          };
-          setAuthToken(`local-token-${existing.id}`);
-          localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionUser));
-          return { success: true, user: sessionUser };
-        } else {
-          return { success: false, error: "Senha incorreta. Verifique e tente novamente." };
-        }
-      }
-
-      // Se a API retornou mensagem explícita de credenciais inválidas
-      const msg = apiErr instanceof Error ? apiErr.message : "";
-      if (
-        msg.toLowerCase().includes("incorret") ||
-        msg.toLowerCase().includes("inválid") ||
-        msg.toLowerCase().includes("invalid")
-      ) {
-        return { success: false, error: msg };
-      }
-
-      return {
-        success: false,
-        error: "Usuário não encontrado. Se ainda não tem cadastro, acesse a aba 'Criar conta' ou entre como visitante.",
-      };
+      return { success: true, user: await this.startSession() };
+    } catch (error) {
+      setAuthToken(null);
+      return { success: false, error: authError(error, "Usuário ou senha incorretos.") };
     }
   }
 
@@ -194,60 +132,10 @@ class AuthService {
         password,
       });
       setAuthToken(tokenResp.access_token);
-
-      const userResp = await httpGet<User>("/users/me");
-      const sessionUser: User = {
-        id: userResp.id,
-        username: userResp.username,
-        is_admin: userResp.is_admin,
-        createdAt: Date.now(),
-      };
-
-      this.saveLocalUser({
-        id: sessionUser.id || Date.now(),
-        username: sessionUser.username,
-        password,
-        is_admin: sessionUser.is_admin,
-        createdAt: sessionUser.createdAt,
-      });
-
-      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionUser));
-      return { success: true, user: sessionUser };
-    } catch (apiErr) {
-      // Se a API estiver indisponível ou retornar erro de rede, realiza o cadastro local
-      const localUsers = this.getLocalUsers();
-      const alreadyExists = localUsers.some(
-        (u) => u.username.toLowerCase() === cleanUser.toLowerCase()
-      );
-
-      if (alreadyExists) {
-        return { success: false, error: "Este nome de usuário já está em uso. Escolha outro ou faça login." };
-      }
-
-      const msg = apiErr instanceof Error ? apiErr.message : "";
-      if (msg.toLowerCase().includes("já existe") || msg.toLowerCase().includes("already registered")) {
-        return { success: false, error: msg };
-      }
-
-      const newLocalUser: LocalUserRecord = {
-        id: Date.now(),
-        username: cleanUser,
-        password,
-        is_admin: false,
-        createdAt: Date.now(),
-      };
-      this.saveLocalUser(newLocalUser);
-
-      const sessionUser: User = {
-        id: newLocalUser.id,
-        username: newLocalUser.username,
-        is_admin: false,
-        createdAt: newLocalUser.createdAt,
-      };
-
-      setAuthToken(`local-token-${newLocalUser.id}`);
-      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionUser));
-      return { success: true, user: sessionUser };
+      return { success: true, user: await this.startSession() };
+    } catch (error) {
+      setAuthToken(null);
+      return { success: false, error: authError(error, "Não foi possível criar a conta.") };
     }
   }
 

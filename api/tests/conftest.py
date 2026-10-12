@@ -10,19 +10,24 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import OperationalError
 
+from app.core.database import engine
 from app.main import app
 from app.seeds.run import main as seed
 
 
 @pytest.fixture(scope="session", autouse=True)
 def database() -> None:
+    # Sem PostgreSQL ainda rodam os testes unitários (ex.: inferência); com ele, uma falha de
+    # migração ou de seed derruba a suíte em vez de aparecer como erro em outro teste.
     try:
-        command.upgrade(Config("alembic.ini"), "head")
-        seed()
-    except Exception:
-        # Permite executar testes unitários (ex: inferência) mesmo sem PostgreSQL ativo localmente
-        pass
+        with engine.connect():
+            pass
+    except OperationalError:
+        return
+    command.upgrade(Config("alembic.ini"), "head")
+    seed()
 
 
 @pytest.fixture

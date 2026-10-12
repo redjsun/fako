@@ -448,11 +448,14 @@ export default function App() {
       }
       changeStatus("FEEDBACK");
     } catch (error) {
+      // Sem a correção da API não há como avaliar: a pergunta sai sem pontuar nem penalizar.
       console.error("Erro ao enviar a resposta:", error);
+      setCurrentQuestion(null);
+      resumeWithCountdown();
     } finally {
       setIsSubmittingAnswer(false);
     }
-  }, [currentQuestion, isSubmittingAnswer, reliability, changeStatus]);
+  }, [currentQuestion, isSubmittingAnswer, reliability, changeStatus, resumeWithCountdown]);
 
   // 45 s por pergunta; no fim do tempo vale o valor marcado na barra
   useEffect(() => {
