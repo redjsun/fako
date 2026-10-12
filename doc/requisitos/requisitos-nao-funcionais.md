@@ -34,8 +34,6 @@ priorização MoSCoW, coluna de origem para rastreabilidade; ver
 
 ## Resumo da priorização
 
-Contagem após a revisão v1 → v2 descrita abaixo.
-
 | Categoria | RF | RNF | Total |
 |---|---|---|---|
 | Must have | 20 | 10 | 30 |
@@ -44,21 +42,3 @@ Contagem após a revisão v1 → v2 descrita abaixo.
 
 Won't have (fora do escopo atual) não consta nesta documentação: são requisitos
 explicitamente postergados para iterações pós-MVP, delimitando o foco atual da equipe.
-
-## Revisão v1 → v2
-
-Três requisitos descreviam a mesma propriedade do sistema com o mesmo conteúdo em ordem
-diferente. RNF10 (Integridade dos dados), RNF12 (Consistência das informações) e RNF17
-(Confiabilidade) diziam, cada um à sua maneira, que os dados e o estado do jogo devem
-permanecer corretos e consistentes durante o uso; foram fundidos no RNF10 (Integridade e
-consistência dos dados), que soma as entidades citadas nos três: contas, respostas,
-pontuação, níveis, progresso, estado da partida, explicações e regras. RNF18 (Recuperação de
-sessão) descrevia a mesma relação de persistência do RNF11 (Persistência de dados), só
-invertendo a ênfase (RNF11 partia do armazenamento, RNF18 partia da recuperação); foi
-fundido no RNF11, renomeado para Persistência e recuperação entre sessões.
-
-RNF23 a RNF27 são acréscimos ao catálogo v1: requisitos não funcionais específicos de um
-produto com um classificador de aprendizado de máquina no centro, categoria que só se aplica
-desde que `pesquisa/ml/` entrou no projeto. Cobrem requisitos de dados, de modelo e de
-confiabilidade/explicabilidade, apoiados em `doc/planejamento-retreino.md` e
-`pesquisa/ml/atalho.py`.
