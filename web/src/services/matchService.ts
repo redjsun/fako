@@ -222,14 +222,11 @@ export const matchService = {
     reliability: number
   ): Promise<AnswerResult> {
     if (questionId < 0) return answerLocally(questionId, reliability);
-    try {
-      return await httpPost<AnswerResult>(`/matches/${matchId}/answers`, {
-        question_id: questionId,
-        reliability,
-      });
-    } catch {
-      return answerLocally(questionId, reliability);
-    }
+    // Questão do banco: só a API sabe a referência; uma falha aqui sobe para o jogo.
+    return httpPost<AnswerResult>(`/matches/${matchId}/answers`, {
+      question_id: questionId,
+      reliability,
+    });
   },
 
   async finishMatch(matchId: number): Promise<MatchResult> {
