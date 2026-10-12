@@ -68,9 +68,9 @@ abandono.
   imediatamente, e o item errado é reapresentado posteriormente.
 
 **Impacto nos requisitos.** O achado da entrevistada 1 fundamenta o controle de progresso
-por nível e por partida avulsa (RF19), em vez de por sequência de dias consecutivos. O
-achado do entrevistado 2 fundamenta a pontuação imediata por acerto (RF18) e o feedback
-apresentado logo após a resposta (RF10).
+por nível e por partida avulsa, em vez de por sequência de dias consecutivos. O achado do
+entrevistado 2 fundamenta a pontuação imediata por acerto e o feedback apresentado logo após
+a resposta.
 
 **Limitações.** As duas entrevistas relatadas fazem parte de uma rodada mais ampla; as
 notas dos demais participantes ainda não foram consolidadas neste documento. Os requisitos
