@@ -8,12 +8,15 @@ interface LoginScreenProps {
   onLoginSuccess: (user: User) => void;
   theme: "light" | "dark";
   onToggleTheme: () => void;
+  // Aviso vindo do app, ex.: sessão expirada.
+  notice?: string | null;
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({
   onLoginSuccess,
   theme,
   onToggleTheme,
+  notice = null,
 }) => {
   const [tab, setTab] = useState<"login" | "register">("login");
   const [username, setUsername] = useState("");
@@ -22,7 +25,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   const [rememberMe, setRememberMe] = useState(false);
   const [isAccordionOpen, setIsAccordionOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [infoNotice, setInfoNotice] = useState<string | null>(null);
+  const [infoNotice, setInfoNotice] = useState<string | null>(notice);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {

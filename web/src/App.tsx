@@ -17,6 +17,7 @@ import {
 } from "./types";
 import { soundEffects } from "./services/audioService";
 import { authService } from "./services/authService";
+import { HttpError } from "./services/httpClient";
 import { matchService } from "./services/matchService";
 import { progressService } from "./services/progressService";
 import { LOCAL_LEVELS, levelService } from "./services/levelService";
@@ -104,7 +105,19 @@ export default function App() {
     if (!user) return "login";
     return authService.hasSeenTutorial(user.username) ? "home" : "tutorial";
   });
+  const [loginNotice, setLoginNotice] = useState<string | null>(null);
   const [theme, setTheme] = useState<"light" | "dark">(readSavedTheme);
+
+  // Registrado antes dos efeitos que chamam a API, para pegar o 401 do token vencido.
+  useEffect(
+    () =>
+      authService.onSessionExpired(() => {
+        setCurrentUser(null);
+        setCurrentScreen("login");
+        setLoginNotice("Sua sessão expirou. Entre novamente para salvar o seu progresso.");
+      }),
+    []
+  );
   const [isMuted, setIsMuted] = useState<boolean>(soundEffects.getMuted());
 
   // Progresso: estatísticas locais (histórico, conquistas) e progresso oficial da API
@@ -277,6 +290,7 @@ export default function App() {
       } catch (error) {
         console.error("Erro ao iniciar a partida na API:", error);
       }
+      if (!authService.getCurrentUser()) return; // a sessão expirou durante o pedido
 
       const matchLevel = match?.level.number ?? levelNumber ?? 1;
       const duration = match?.duration_seconds ?? MATCH_SECONDS;
@@ -308,6 +322,11 @@ export default function App() {
     [progress.current_level, changeStatus]
   );
 
+  const resumeWithCountdown = useCallback(() => {
+    setCountdownLeft(COUNTDOWN_SECONDS);
+    changeStatus("COUNTDOWN");
+  }, [changeStatus]);
+
   const openQuestion = useCallback(async () => {
     changeStatus("QUESTION");
     setCurrentQuestion(null);
@@ -317,9 +336,14 @@ export default function App() {
     try {
       setCurrentQuestion(await matchService.getNextQuestion(matchIdRef.current ?? 0));
     } catch (error) {
+      if (error instanceof HttpError && error.status === 404) {
+        finishMatch("NO_QUESTIONS");
+        return;
+      }
       console.error("Erro ao buscar a próxima afirmação:", error);
+      resumeWithCountdown();
     }
-  }, [changeStatus]);
+  }, [changeStatus, finishMatch, resumeWithCountdown]);
 
   // Um passo da cobrinha
   const step = useCallback(() => {
@@ -411,11 +435,6 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, [currentScreen, status, countdownLeft, changeStatus]);
 
-  const resumeWithCountdown = useCallback(() => {
-    setCountdownLeft(COUNTDOWN_SECONDS);
-    changeStatus("COUNTDOWN");
-  }, [changeStatus]);
-
   // ---------------------------------------------------------------- pergunta
 
   const confirmAnswer = useCallback(async () => {
@@ -428,9 +447,7 @@ export default function App() {
       setLastResult(result);
       // A API devolve o placar oficial; se ela cair no meio da partida, a pergunta local
       // ainda soma os pontos do acerto.
-      setScore((previous) =>
-        result.is_correct ? Math.max(result.score, previous + POINTS_PER_CORRECT) : Math.max(result.score, previous)
-      );
+      setScore(result.score);
       setAnswers((previous) => [
         ...previous,
         {
@@ -561,6 +578,7 @@ export default function App() {
   // ---------------------------------------------------------------- navegação
 
   const handleLoginSuccess = (user: User) => {
+    setLoginNotice(null);
     setCurrentUser(user);
     setCurrentScreen(authService.hasSeenTutorial(user.username) ? "home" : "tutorial");
   };
@@ -592,7 +610,12 @@ export default function App() {
   if (currentScreen === "login" || !currentUser) {
     return (
       <div className="fako-app screen-login">
-        <LoginScreen onLoginSuccess={handleLoginSuccess} theme={theme} onToggleTheme={handleToggleTheme} />
+        <LoginScreen
+          onLoginSuccess={handleLoginSuccess}
+          theme={theme}
+          onToggleTheme={handleToggleTheme}
+          notice={loginNotice}
+        />
       </div>
     );
   }

@@ -9,3 +9,7 @@ ignore = ["E501"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+
+[tool.coverage.run]
+# treinar_bert.py e classificar.py exigem requirements-treino.txt (PyTorch), fora do job "ML" do CI.
+omit = ["tests/*", "treinar_bert.py", "classificar.py"]

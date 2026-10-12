@@ -7,6 +7,10 @@ node_modules/
 .DS_Store
 dist/
 *.tsbuildinfo
+site/
+coverage/
+.coverage
+htmlcov/
 
 # Dados brutos e processados: gerados por pesquisa/dados/baixar_dados.sh e preparar_dados.py
 data/

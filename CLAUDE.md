@@ -28,6 +28,7 @@ Tudo roda por Docker Compose (o Docker Desktop precisa estar aberto). `make help
 - `make up` / `make down`: API em `:8000` (docs em `/docs`), web em `:5173`, banco em `:5432`
 - `make test`, `make lint`, `make format`: API (ruff + pytest num banco `fako_test` separado)
 - `make test-ml`: lint e testes de `pesquisa/ml/`
+- `make test-web`: tipos, lint (ESLint) e testes (Vitest) do frontend
 - `make dados`: baixa as bases para `pesquisa/data/raw/` e gera `pesquisa/data/processed/dataset.jsonl`.
   Os coletores (`pesquisa/dados/coletar_*.py`) rodam à parte e são lentos (~1 req/s, com cache)
 - `make padronizar`, `make atalho`, `make contagens`, `make shell-ml`: experimentos de `pesquisa/ml/`

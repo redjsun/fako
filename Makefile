@@ -1,6 +1,6 @@
 COMPOSE := docker compose
 
-.PHONY: help build up down restart logs ps shell-api shell-web shell-db migrate makemigration seed admin test lint format dados padronizar atalho contagens referencia bert avaliar classificar test-ml shell-ml eda ml-legado docs clean
+.PHONY: help build up down restart logs ps shell-api shell-web shell-db migrate makemigration seed admin test lint format dados padronizar atalho contagens referencia bert avaliar classificar publicar test-web test-ml shell-ml eda ml-legado docs clean
 
 help: ## Lista os comandos disponíveis
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -97,6 +97,9 @@ publicar: ## Publica um modelo para a API em models/atual (uso: make publicar [M
 
 shell-ml: ## Abre um shell no container de treino
 	$(ML) bash
+
+test-web: ## Roda tipos, lint e testes do frontend
+	$(COMPOSE) run --rm --no-deps web sh -c "npm install --no-audit --no-fund && npm run typecheck && npm run lint && npm run test"
 
 test-ml: ## Roda lint e testes de pesquisa/ml/
 	$(COMPOSE) --profile pesquisa run --rm --no-deps -w /work/pesquisa/ml pesquisa sh -c "pip install -q -r requirements-dev.txt && ruff check . && ruff format --check . && pytest -v"

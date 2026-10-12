@@ -18,7 +18,13 @@ services:
       retries: 10
 
   api:
-    build: ./api
+    build:
+      context: ./api
+      x-bake:
+        cache-from:
+          - type=gha,scope=api
+        cache-to:
+          - type=gha,scope=api,mode=max
     container_name: fakenews-api
     restart: unless-stopped
     env_file:
@@ -38,7 +44,13 @@ services:
         condition: service_healthy
 
   web:
-    build: ./web
+    build:
+      context: ./web
+      x-bake:
+        cache-from:
+          - type=gha,scope=web
+        cache-to:
+          - type=gha,scope=web,mode=max
     container_name: fakenews-web
     restart: unless-stopped
     environment:
@@ -53,7 +65,13 @@ services:
 
   # Pesquisa: EDA, preparo dos dados e experimentos de ML (pasta pesquisa/).
   pesquisa:
-    build: ./pesquisa
+    build:
+      context: ./pesquisa
+      x-bake:
+        cache-from:
+          - type=gha,scope=pesquisa
+        cache-to:
+          - type=gha,scope=pesquisa,mode=max
     container_name: fakenews-pesquisa
     profiles: ["pesquisa"]
     env_file:
@@ -70,7 +88,13 @@ services:
 
   # Coleta diária e preparo dos dados nos horários de pesquisa/crontab (supercronic).
   agendador:
-    build: ./pesquisa
+    build:
+      context: ./pesquisa
+      x-bake:
+        cache-from:
+          - type=gha,scope=pesquisa
+        cache-to:
+          - type=gha,scope=pesquisa,mode=max
     container_name: fakenews-agendador
     restart: unless-stopped
     env_file:

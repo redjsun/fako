@@ -38,6 +38,18 @@ export function isApiUnavailable(error: unknown): boolean {
   return !(error instanceof HttpError) || error.status >= 500;
 }
 
+let unauthorizedHandler: (() => void) | null = null;
+
+// Chamado quando a API recusa um token de conta (expirado ou inválido).
+export function setUnauthorizedHandler(handler: (() => void) | null): void {
+  unauthorizedHandler = handler;
+}
+
+// Visitantes usam um token só do front, que a API sempre recusa.
+function isAccountToken(token: string | null): boolean {
+  return !!token && !token.startsWith("guest-") && !token.startsWith("local-");
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers || {});
 
@@ -54,6 +66,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     ...options,
     headers,
   });
+
+  if (response.status === 401 && isAccountToken(token) && !path.startsWith("/auth/")) {
+    unauthorizedHandler?.();
+  }
 
   if (!response.ok) {
     let errorMessage = `Falha na requisição: ${response.status}`;
