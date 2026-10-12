@@ -39,6 +39,17 @@ make up
 
 `make help` lista todos os comandos disponíveis.
 
+## Desenvolvimento
+
+```bash
+make test      # testes da API (ruff + pytest num banco fako_test separado)
+make lint      # lint e formatação da API
+make format    # formata o código da API
+make test-ml   # lint e testes de pesquisa/ml/
+```
+
+O CI (`.github/workflows/ci.yml`) roda os mesmos comandos a cada push.
+
 ## Dados
 
 As bases não ficam no Git: `pesquisa/data/` está no `.gitignore`. Para baixá-las e gerar a
