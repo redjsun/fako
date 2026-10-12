@@ -8,7 +8,7 @@ um classificador de veracidade treinado com bases brasileiras de fake news. Todo
 
 | Pasta | O que é |
 |---|---|
-| `api/` | FastAPI + SQLAlchemy 2 + Alembic + PostgreSQL. Camadas `controller → service → repository → model` (`doc/arquitetura.md`) |
+| `api/` | FastAPI + SQLAlchemy 2 + Alembic + PostgreSQL. Camadas `controller → service → repository → model` (`doc/arquitetura/visao-geral.md`) |
 | `web/` | React 18 + Vite + TypeScript. `view → controller (hook) → service → API`; HTTP só via `services/httpClient.ts` |
 | `pesquisa/` | Tudo de dados e treinamento. Imagem e serviço `pesquisa` no compose (`Dockerfile`, `requirements.txt`) |
 | `pesquisa/dados/` | Download, coleta (scrapers e Fact Check API) e preparo dos dados |

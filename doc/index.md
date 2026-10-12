@@ -3,9 +3,9 @@
 Jogo educativo (Snake) em que o jogador avalia a confiabilidade de afirmações, mais um
 classificador de veracidade treinado com bases brasileiras de fake news.
 
-Esta documentação cobre o produto (arquitetura, banco de perguntas, notícias externas),
-a pesquisa e preparo dos dados, e o relatório técnico do classificador. Use as abas no
-topo para navegar, ou veja o índice completo abaixo.
+Esta documentação cobre os requisitos, a arquitetura, o produto (banco de perguntas,
+notícias externas), a pesquisa e preparo dos dados, e o relatório técnico do classificador.
+Use as abas no topo para navegar, ou veja o índice completo abaixo.
 
 ## Requisitos
 
@@ -20,11 +20,18 @@ topo para navegar, ou veja o índice completo abaixo.
 | [Histórias de usuário](requisitos/historias-usuario.md) | Os requisitos funcionais reescritos como histórias de usuário |
 | [Matriz de rastreabilidade](requisitos/matriz-rastreabilidade.md) | Cada requisito ligado à issue, ao artefato de código e ao status real |
 
+## Arquitetura
+
+| Documento | Conteúdo |
+|---|---|
+| [Visão geral](arquitetura/visao-geral.md) | Organização em camadas + MVC no backend e no frontend, rotas da API, CI |
+| [Decisões de arquitetura](arquitetura/decisoes.md) | Escolhas técnicas já implementadas: autenticação, banco, containers, interfaces de IA |
+| [Esquema do banco](arquitetura/schema.md) | Tabelas, colunas e relações do PostgreSQL |
+
 ## Produto
 
 | Documento | Conteúdo |
 |---|---|
-| [Arquitetura](arquitetura.md) | Organização em camadas + MVC no backend e no frontend |
 | [Banco de perguntas do jogo](banco-perguntas.md) | Afirmação, contexto, notícias de API externa rotuladas, checagens e revisão humana |
 | [Notícias externas e classificador](noticias-classificador.md) | Importação de manchetes (GNews), referência TF-IDF e rascunhos para revisão |
 
