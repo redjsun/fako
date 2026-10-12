@@ -6,17 +6,25 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.deps import get_current_admin
 from app.integrations.ai_client import AIClient, get_ai_client
+from app.integrations.classificador_client import ClassificadorClient, get_classificador
+from app.integrations.noticias_client import NoticiasClient, get_noticias_clients
 from app.models.question import QuestionStatus
 from app.schemas.admin_schema import (
     AIClassifyRequest,
     AIClassifyResponse,
     AIGenerateRequest,
+    ClassifierAnalyzeRequest,
+    ClassifierAnalyzeResponse,
+    NewsImportRequest,
+    NewsImportResponse,
     QuestionAdminResponse,
     QuestionCreateRequest,
     QuestionReviewRequest,
 )
 from app.services.ai_service import AIService
+from app.services.classificador_service import ClassificadorService
 from app.services.content_service import ContentService
+from app.services.noticias_service import NoticiasService
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(get_current_admin)])
 
@@ -73,3 +81,28 @@ def classify_statement(
     data: AIClassifyRequest, service: AIService = Depends(get_ai_service)
 ) -> AIClassifyResponse:
     return service.classify(data)
+
+
+def get_noticias_service(
+    db: Session = Depends(get_db),
+    noticias: list[NoticiasClient] = Depends(get_noticias_clients),
+    classificador: ClassificadorClient = Depends(get_classificador),
+) -> NoticiasService:
+    return NoticiasService(db, noticias, classificador)
+
+
+@router.post("/news/import", response_model=NewsImportResponse, status_code=status.HTTP_201_CREATED)
+def import_news(
+    data: NewsImportRequest, service: NoticiasService = Depends(get_noticias_service)
+) -> NewsImportResponse:
+    """Busca manchetes no provedor de notícias e grava as que servem como rascunhos."""
+    return service.importar(data)
+
+
+@router.post("/classifier/analyze", response_model=ClassifierAnalyzeResponse)
+def analyze_with_classifier(
+    data: ClassifierAnalyzeRequest,
+    classificador: ClassificadorClient = Depends(get_classificador),
+) -> ClassifierAnalyzeResponse:
+    """Análise do classificador publicado em models/atual, com os termos que mais pesaram."""
+    return ClassificadorService(classificador).analisar(data.statement)

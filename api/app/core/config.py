@@ -26,6 +26,22 @@ class Settings(BaseSettings):
     # os modelos publicados ficam em models_dir/atual.
     classificador_provider: str = "fake"
     models_dir: str = "/app/models"
+    # Mostra ao jogador, no feedback da resposta, o palpite do classificador (limiar do jogador).
+    classificador_no_jogo: bool = False
+
+    # Notícias externas (integrations/noticias_client.py): "fake" roda sem chave; "gnews" usa
+    # a API do GNews (gnews.io, plano gratuito de 100 pedidos por dia), com noticias_api_key;
+    # "factcheck" usa a Google Fact Check Tools API (checagens de agências), com
+    # factcheck_api_key, a mesma chave da coleta da pesquisa.
+    # Mais de um, separados por vírgula ("factcheck,gnews"): a quantidade é dividida entre eles.
+    noticias_provider: str = "fake"
+    noticias_api_key: str = ""
+    factcheck_api_key: str = ""
+    # Notícias entram já validadas, sem revisão humana: as checagens com o rótulo do veredito
+    # da agência, as manchetes como verdadeiras.
+    noticias_publicar_direto: bool = False
+    # Descarta alegações checadas sobre política e eleição.
+    noticias_sem_politica: bool = False
     # Dispositivo do motor BERTimbau Y1/Y2 (integrations/bertimbau_engine.py)
     ai_device: str = "cpu"
 

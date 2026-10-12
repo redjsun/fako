@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import BusinessRuleError, NotFoundError
+from app.integrations.classificador_client import ClassificadorClient, FakeClassificador
 from app.models.match import Match, MatchAnswer, MatchStatus
 from app.models.question import QuestionStatus
 from app.models.user import User
@@ -20,11 +21,13 @@ from app.schemas.match_schema import (
 )
 from app.schemas.question_schema import QuestionResponse
 from app.services import game_rules
+from app.services.classificador_service import ClassificadorService
 from app.services.progress_service import ProgressService
 
 
 class MatchService:
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: Session, classificador: ClassificadorClient | None = None) -> None:
+        self.classificador = ClassificadorService(classificador or FakeClassificador())
         self.matches = MatchRepository(db)
         self.levels = LevelRepository(db)
         self.questions = QuestionRepository(db)
@@ -95,6 +98,7 @@ class MatchService:
             explanation=question.explanation,
             source=question.source,
             score=match.score,
+            model_guess=self.classificador.palpite_do_jogo(question.statement),
         )
 
     def finish(self, user: User, match_id: int) -> MatchResultResponse:

@@ -34,3 +34,7 @@ docs:
     titulo: Relatório técnico do classificador
     arquivo: doc/relatorio-tecnico.md
     descricao: Preparação dos dados, treino, critério de escolha, métricas e análise (referência TF-IDF e BERTimbau), desafios e aprendizados.
+  - id: noticias-classificador
+    titulo: Notícias externas e classificador no jogo
+    arquivo: doc/noticias-classificador.md
+    descricao: Importação de manchetes (GNews) normalizadas como no treino, análise pela referência TF-IDF, rascunhos para revisão e palpite do modelo no feedback do jogo.

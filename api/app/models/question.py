@@ -3,7 +3,7 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String, Text
+from sqlalchemy import Boolean, DateTime, Enum, Float, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Entity, enum_values
@@ -21,6 +21,7 @@ class QuestionStatus(str, enum.Enum):
 class QuestionOrigin(str, enum.Enum):
     HUMAN = "human"
     AI = "ai"
+    NEWS = "news"  # manchete de notícia externa (services/noticias_service.py)
 
 
 class Question(Entity):
@@ -42,5 +43,10 @@ class Question(Entity):
         default=QuestionOrigin.HUMAN,
     )
     validated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Análise do classificador na curadoria (limiar do admin), para apoiar a revisão humana.
+    model_category: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    model_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    model_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    model_version: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     category: Mapped[Category] = relationship()

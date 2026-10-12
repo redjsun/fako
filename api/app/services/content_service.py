@@ -27,6 +27,10 @@ def to_admin_response(question: Question) -> QuestionAdminResponse:
         status=question.status,
         origin=question.origin,
         validated_at=question.validated_at,
+        model_category=question.model_category,
+        model_score=question.model_score,
+        model_confidence=question.model_confidence,
+        model_version=question.model_version,
     )
 
 

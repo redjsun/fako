@@ -29,6 +29,11 @@ class QuestionAdminResponse(BaseModel):
     status: QuestionStatus
     origin: QuestionOrigin
     validated_at: datetime | None
+    # Análise do classificador na curadoria; vazia nas questões cadastradas sem ele.
+    model_category: str | None = None
+    model_score: float | None = None
+    model_confidence: float | None = None
+    model_version: str | None = None
 
 
 class AIGenerateRequest(BaseModel):
@@ -44,3 +49,35 @@ class AIClassifyResponse(BaseModel):
     suggested_is_true: bool
     confidence: float
     rationale: str
+
+
+class NewsImportRequest(BaseModel):
+    # As notícias vêm de todos os assuntos; a categoria só existe porque a questão exige uma.
+    category: str = "conhecimentos-gerais"  # Slug da categoria
+    quantity: int = Field(default=5, ge=1, le=10)
+
+
+class NewsDiscarded(BaseModel):
+    title: str
+    reason: str
+
+
+class NewsImportResponse(BaseModel):
+    imported: list[QuestionAdminResponse]
+    discarded: list[NewsDiscarded]
+
+
+class ClassifierAnalyzeRequest(BaseModel):
+    statement: str = Field(min_length=5, max_length=1000)
+
+
+class ClassifierAnalyzeResponse(BaseModel):
+    statement: str
+    normalized_statement: str
+    category: str
+    score: float | None
+    confidence: float
+    probabilities: dict[str, float]
+    model_version: str
+    # Termos que mais pesaram (negativo puxa para falso); só o admin vê.
+    contributions: list[tuple[str, float]]

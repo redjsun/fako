@@ -92,6 +92,9 @@ classificar: ## Teste manual do modelo (uso: make classificar [ARGS='"uma frase"
 avaliar: ## Avalia modelo(s) na validação (uso: make avaliar [MODELO="models/2026-11/referencia models/2026-11/bert"] [ARGS=--teste])
 	$(ML) python pesquisa/ml/avaliar.py --modelo $(MODELO) $(ARGS)
 
+publicar: ## Publica um modelo para a API em models/atual (uso: make publicar [MODELO=models/2026-11/referencia])
+	rm -rf models/atual && cp -r $(MODELO) models/atual
+
 shell-ml: ## Abre um shell no container de treino
 	$(ML) bash
 
