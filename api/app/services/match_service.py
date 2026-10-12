@@ -58,24 +58,34 @@ class MatchService:
     def next_question(self, user: User, match_id: int) -> QuestionResponse:
         """Chamado pelo front quando a cobra come a maçã."""
         match = self._get_active_match(user, match_id)
-        # TODO: filtrar as categorias liberadas para o nível da partida.
-        question = self.questions.random_validated(
-            exclude_ids=self.matches.answered_question_ids(match.id)
+        # Enquanto a pergunta servida não é respondida, ela é devolvida de novo: sortear outra
+        # deixaria escolher só as afirmações cuja referência o jogador já conhece.
+        question = (
+            self.questions.get(match.current_question_id) if match.current_question_id else None
         )
         if question is None:
-            raise NotFoundError("Não há mais questões disponíveis")
+            answered = self.matches.answered_question_ids(match.id)
+            if len(answered) >= game_rules.MAX_ANSWERS_PER_MATCH:
+                raise BusinessRuleError("Limite de respostas da partida atingido")
+            # TODO: filtrar as categorias liberadas para o nível da partida.
+            question = self.questions.random_validated(exclude_ids=answered)
+            if question is None:
+                raise NotFoundError("Não há mais questões disponíveis")
+            match.current_question_id = question.id
         return QuestionResponse(
             id=question.id, statement=question.statement, category=question.category.name
         )
 
     def answer(self, user: User, match_id: int, data: AnswerRequest) -> AnswerResultResponse:
         match = self._get_active_match(user, match_id)
+        # Só a pergunta servida e pendente; isso também impede responder a mesma duas vezes.
+        if data.question_id != match.current_question_id:
+            raise BusinessRuleError("Questão não é a pergunta atual desta partida")
 
         question = self.questions.get(data.question_id)
         if question is None or question.status != QuestionStatus.VALIDATED:
             raise NotFoundError("Questão não encontrada")
-        if question.id in self.matches.answered_question_ids(match.id):
-            raise BusinessRuleError("Questão já respondida nesta partida")
+        match.current_question_id = None
 
         is_correct = game_rules.is_within_tolerance(
             data.reliability, question.reliability_reference

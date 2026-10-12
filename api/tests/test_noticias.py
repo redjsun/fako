@@ -88,6 +88,24 @@ def test_importa_noticias_como_rascunho_normalizado_com_analise(admin_client: Te
     assert resposta.json()["imported"] == []
 
 
+def test_url_longa_reimportada_com_manchete_editada(admin_client: TestClient):
+    marca = uuid.uuid4().hex[:6]
+    url = f"https://jornal.teste/{marca}/{'a' * 600}"
+    original = noticia(f"Prefeitura abre {marca} vagas em creches municipais")
+    editada = noticia(f"Prefeitura amplia para {marca} as vagas em creches")
+    original.url = editada.url = url
+
+    for lote in ([original], [editada]):
+        app.dependency_overrides[get_noticias_clients] = lambda lote=lote: [NoticiasDeTeste(lote)]
+        resposta = admin_client.post(
+            "/admin/news/import", json={"category": "saude", "quantity": 1}
+        )
+
+    corpo = resposta.json()
+    assert corpo["imported"] == []
+    assert [d["reason"] for d in corpo["discarded"]] == ["já importada"]
+
+
 def test_importa_checagens_com_o_lado_do_veredito(admin_client: TestClient):
     marca = uuid.uuid4().hex[:6]
     checagens = [
