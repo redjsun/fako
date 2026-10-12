@@ -201,19 +201,15 @@ export const matchService = {
   },
 
   async getNextQuestion(matchId: number): Promise<Question> {
-    try {
-      return await httpGet<Question>(`/matches/${matchId}/next-question`);
-    } catch {
-      let question: LocalQuestionSeed;
-      if (activeLocalMatch) {
-        const { questionIndices, cursor } = activeLocalMatch;
-        question = LOCAL_QUESTIONS[questionIndices[cursor % questionIndices.length]];
-        activeLocalMatch.cursor += 1;
-      } else {
-        question = LOCAL_QUESTIONS[Math.floor(Math.random() * LOCAL_QUESTIONS.length)];
-      }
+    if (activeLocalMatch && activeLocalMatch.match.id === matchId) {
+      const { questionIndices, cursor } = activeLocalMatch;
+      const question = LOCAL_QUESTIONS[questionIndices[cursor % questionIndices.length]];
+      activeLocalMatch.cursor += 1;
       return { id: question.id, statement: question.statement };
     }
+    // Partida da API: as perguntas e o placar são só os dela; um erro (inclusive o 404 de
+    // questões esgotadas) sobe para o jogo.
+    return httpGet<Question>(`/matches/${matchId}/next-question`);
   },
 
   async answerQuestion(

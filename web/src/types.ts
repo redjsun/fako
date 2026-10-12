@@ -72,7 +72,8 @@ export interface Position {
 export type GameStatus = "PLAYING" | "PAUSED" | "QUESTION" | "FEEDBACK" | "COUNTDOWN" | "FINISHED";
 
 // EXIT: o jogador saiu pelo "Sair e salvar".
-export type MatchEndReason = "TIMEOUT" | "GAMEOVER" | "EXIT";
+// NO_QUESTIONS: o banco não tem mais afirmações inéditas para esta partida.
+export type MatchEndReason = "TIMEOUT" | "GAMEOVER" | "EXIT" | "NO_QUESTIONS";
 
 // Partida encerrada, guardada no histórico local do jogador.
 export interface MatchRecord {

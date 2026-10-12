@@ -1,5 +1,12 @@
 import { Achievement, AnsweredQuestion, MatchRecord, User, UserStats } from "../types";
-import { httpGet, httpPost, setAuthToken, getAuthToken, isApiUnavailable } from "./httpClient";
+import {
+  httpGet,
+  httpPost,
+  setAuthToken,
+  getAuthToken,
+  isApiUnavailable,
+  setUnauthorizedHandler,
+} from "./httpClient";
 
 const SESSION_STORAGE_KEY = "fako_active_session";
 const STATS_STORAGE_KEY_PREFIX = "fako_stats_";
@@ -184,6 +191,15 @@ class AuthService {
     } catch {
       return this.getCurrentUser();
     }
+  }
+
+  // Encerra a sessão e avisa quando a API recusa o token da conta.
+  public onSessionExpired(callback: () => void): () => void {
+    setUnauthorizedHandler(() => {
+      this.logout();
+      callback();
+    });
+    return () => setUnauthorizedHandler(null);
   }
 
   public logout(): void {

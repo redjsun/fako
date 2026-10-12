@@ -24,6 +24,7 @@ const END_REASON_TEXT: Record<MatchEndReason, string> = {
   TIMEOUT: "Tempo esgotado · Partida encerrada",
   GAMEOVER: "A cobrinha se mordeu · Partida encerrada",
   EXIT: "Você saiu · Partida encerrada",
+  NO_QUESTIONS: "Você respondeu todas as afirmações · Partida encerrada",
 };
 
 /** Fim da partida: pontuação, números da rodada, próximo objetivo e o que foi analisado. */
