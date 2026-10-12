@@ -55,7 +55,7 @@ abandono.
 | Participante | Perfil | Relação com apps de aprendizagem gamificada |
 |---|---|---|
 | Entrevistada 1 | 21 anos, estudante de Engenharia de Software | Uso pouco frequente; relata dificuldade em manter o uso diário exigido por esse tipo de aplicativo |
-| Entrevistado 2 | 24 anos | Usuário frequente e assíduo do Duolingo |
+| Entrevistado 2 | 24 anos, trabalha em um aeroporto | Usuário frequente e assíduo do Duolingo |
 
 **Achados.**
 
