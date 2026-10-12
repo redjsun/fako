@@ -54,6 +54,7 @@ nav:
       - Requisitos funcionais: requisitos/requisitos-funcionais.md
       - Requisitos não funcionais: requisitos/requisitos-nao-funcionais.md
       - Histórias de usuário: requisitos/historias-usuario.md
+      - Matriz de rastreabilidade: requisitos/matriz-rastreabilidade.md
   - Produto:
       - Arquitetura: arquitetura.md
       - Banco de perguntas do jogo: banco-perguntas.md
