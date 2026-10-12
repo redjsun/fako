@@ -1,20 +1,24 @@
-site_name: FAKO — Documentação
+site_name: Documentação do FAKO
 site_description: Jogo educativo de avaliação de confiabilidade e classificador de veracidade treinado com bases brasileiras de fake news.
 docs_dir: doc
 
 theme:
   name: material
   language: pt-BR
+  logo: assets/logo.svg
+  favicon: assets/favicon.svg
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: indigo
+      primary: custom
+      accent: custom
       toggle:
         icon: material/brightness-7
         name: Modo escuro
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: indigo
+      primary: custom
+      accent: custom
       toggle:
         icon: material/brightness-4
         name: Modo claro
@@ -23,6 +27,9 @@ theme:
     - navigation.top
     - content.code.copy
     - toc.follow
+
+extra_css:
+  - stylesheets/extra.css
 
 markdown_extensions:
   - admonition
