@@ -72,12 +72,6 @@ por nível e por partida avulsa, em vez de por sequência de dias consecutivos. 
 entrevistado 2 fundamenta a pontuação imediata por acerto e o feedback apresentado logo após
 a resposta.
 
-**Limitações.** As duas entrevistas relatadas fazem parte de uma rodada mais ampla; as
-notas dos demais participantes ainda não foram consolidadas neste documento. Os requisitos
-que carregam a origem Entrevista nas tabelas de [requisitos funcionais](requisitos-funcionais.md)
-e de [requisitos não funcionais](requisitos-nao-funcionais.md) refletem tanto os achados já
-registrados acima quanto os que ainda serão detalhados conforme a consolidação avança.
-
 ## Benchmark (apoio à definição do produto)
 
 Teste direto de jogos e ferramentas de educação midiática e combate à desinformação, para
