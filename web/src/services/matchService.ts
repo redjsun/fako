@@ -1,20 +1,16 @@
 import { httpGet, httpPost } from "./httpClient";
-import { Match, Question, AnswerResult, MatchResult, Level } from "../types";
+import { LOCAL_LEVELS } from "./levelService";
+import { AnswerResult, Match, MatchResult, Question } from "../types";
 
-const LOCAL_LEVELS: Level[] = [
-  { number: 1, board_size: 16, tick_ms: 160, min_score_to_advance: 30 },
-  { number: 2, board_size: 16, tick_ms: 146, min_score_to_advance: 40 },
-  { number: 3, board_size: 16, tick_ms: 132, min_score_to_advance: 50 },
-  { number: 4, board_size: 16, tick_ms: 118, min_score_to_advance: 50 },
-  { number: 5, board_size: 16, tick_ms: 104, min_score_to_advance: 60 },
-  { number: 6, board_size: 16, tick_ms: 90, min_score_to_advance: 70 },
-];
+// Mesmas regras da API (api/app/services/game_rules.py), usadas quando ela está fora do ar.
+const RELIABILITY_TOLERANCE = 15;
+const POINTS_PER_CORRECT_ANSWER = 10;
 
 interface LocalQuestionSeed {
   id: number;
-  category: string;
   statement: string;
   is_true: boolean;
+  reliability_reference: number;
   explanation: string;
   source: string;
 }
@@ -22,99 +18,99 @@ interface LocalQuestionSeed {
 const LOCAL_QUESTIONS: LocalQuestionSeed[] = [
   {
     id: 1,
-    category: "Saúde",
     statement: "Vacinas causam autismo.",
     is_true: false,
+    reliability_reference: 5,
     explanation:
       "O estudo de 1998 que sugeriu essa relação foi retratado por fraude, e pesquisas com milhões de crianças não encontraram ligação entre vacinas e autismo.",
     source: "Organização Mundial da Saúde (OMS)",
   },
   {
     id: 2,
-    category: "Saúde",
     statement: "Lavar as mãos com água e sabão reduz a transmissão de doenças infecciosas.",
     is_true: true,
+    reliability_reference: 95,
     explanation:
       "A higiene das mãos remove microrganismos e é uma das medidas mais eficazes para prevenir infecções.",
     source: "Organização Mundial da Saúde (OMS)",
   },
   {
     id: 3,
-    category: "Tecnologia",
     statement: "O modo anônimo do navegador impede que o provedor de internet veja os sites acessados.",
     is_true: false,
+    reliability_reference: 10,
     explanation:
       "O modo anônimo apenas não salva histórico e cookies no aparelho; o provedor, a rede da escola ou do trabalho e os próprios sites ainda podem ver o acesso.",
     source: "Central de Ajuda do Google Chrome",
   },
   {
     id: 4,
-    category: "Tecnologia",
     statement: "Senhas longas são mais difíceis de descobrir por tentativa e erro do que senhas curtas.",
     is_true: true,
+    reliability_reference: 90,
     explanation:
       "Cada caractere a mais multiplica o número de combinações possíveis, por isso o comprimento é um dos fatores mais importantes de uma senha forte.",
     source: "NIST SP 800-63B — Digital Identity Guidelines",
   },
   {
     id: 5,
-    category: "Conhecimentos Gerais",
     statement: "A Grande Muralha da China pode ser vista a olho nu da Lua.",
     is_true: false,
+    reliability_reference: 5,
     explanation:
       "A muralha é longa, mas estreita demais para ser vista da Lua; nem da órbita baixa da Terra ela é facilmente visível sem auxílio.",
     source: "NASA",
   },
   {
     id: 6,
-    category: "Conhecimentos Gerais",
     statement: "O Brasil é o maior país da América do Sul em área territorial.",
     is_true: true,
+    reliability_reference: 100,
     explanation:
       "Com cerca de 8,5 milhões de km², o Brasil ocupa quase metade do território da América do Sul.",
     source: "IBGE",
   },
   {
     id: 7,
-    category: "Saúde",
     statement: "Chá de boldo cura qualquer infecção viral imediatamente.",
     is_true: false,
+    reliability_reference: 5,
     explanation:
       "Embora ervas tenham propriedades digestivas, não há comprovação científica de que o boldo elimine infecções virais sistêmicas.",
     source: "Ministério da Saúde",
   },
   {
     id: 8,
-    category: "Tecnologia",
     statement: "Autenticação em dois fatores (2FA) adiciona uma camada extra de proteção mesmo se sua senha vazar.",
     is_true: true,
+    reliability_reference: 90,
     explanation:
       "Mesmo que criminosos tenham a senha, eles ainda precisarão do segundo fator (código gerado no celular ou chave física) para acessar a conta.",
     source: "CERT.br / CGI.br",
   },
   {
     id: 9,
-    category: "Conhecimentos Gerais",
     statement: "Checar a data de publicação de uma notícia ajuda a evitar o compartilhamento de fatos descontextualizados.",
     is_true: true,
+    reliability_reference: 90,
     explanation:
       "Muitos boatos reutilizam notícias antigas fora de contexto para criar alarmismo ou desinformação sobre eventos atuais.",
     source: "Projeto Comprova",
   },
   {
     id: 10,
-    category: "Saúde",
     statement: "Antibióticos são eficazes contra infecções virais comuns como a gripe.",
     is_true: false,
+    reliability_reference: 5,
     explanation:
       "Antibióticos atuam exclusivamente contra bactérias. Seu uso indevido contra vírus não cura a doença e pode selecionar bactérias resistentes.",
     source: "ANVISA / OMS",
   },
   {
     id: 11,
-    category: "Tecnologia",
     statement: "Mensagens com tom de urgência e links encurtados costumam ser táticas de phishing para roubo de dados.",
     is_true: true,
+    reliability_reference: 85,
     explanation:
       "Criminosos usam o senso de urgência (bloqueio de conta, prêmios imediatos) para levar a vítima a clicar sem verificar a autenticidade.",
     source: "FEBRABAN",
@@ -182,63 +178,51 @@ export const matchService = {
     try {
       return await httpGet<Question>(`/matches/${matchId}/next-question`);
     } catch {
+      let question: LocalQuestionSeed;
       if (activeLocalMatch) {
-        const idx = activeLocalMatch.questionIndices[activeLocalMatch.cursor % activeLocalMatch.questionIndices.length];
+        const { questionIndices, cursor } = activeLocalMatch;
+        question = LOCAL_QUESTIONS[questionIndices[cursor % questionIndices.length]];
         activeLocalMatch.cursor += 1;
-        const q = LOCAL_QUESTIONS[idx];
-        return {
-          id: q.id,
-          statement: q.statement,
-          category: q.category,
-          afirmacao: q.statement,
-          categoria: q.category as any,
-          explicacao: q.explanation,
-          fonte: q.source,
-        };
+      } else {
+        question = LOCAL_QUESTIONS[Math.floor(Math.random() * LOCAL_QUESTIONS.length)];
       }
-
-      const randomIdx = Math.floor(Math.random() * LOCAL_QUESTIONS.length);
-      const fallbackQ = LOCAL_QUESTIONS[randomIdx];
-      return {
-        id: fallbackQ.id,
-        statement: fallbackQ.statement,
-        category: fallbackQ.category,
-        afirmacao: fallbackQ.statement,
-        categoria: fallbackQ.category as any,
-        explicacao: fallbackQ.explanation,
-        fonte: fallbackQ.source,
-      };
+      return { id: question.id, statement: question.statement };
     }
   },
 
   async answerQuestion(
     matchId: number,
-    questionId: number | string,
-    answer: boolean
+    questionId: number,
+    reliability: number
   ): Promise<AnswerResult> {
     try {
       return await httpPost<AnswerResult>(`/matches/${matchId}/answers`, {
-        question_id: Number(questionId),
-        answer,
+        question_id: questionId,
+        reliability,
       });
     } catch {
-      const q =
-        LOCAL_QUESTIONS.find((item) => item.id === Number(questionId)) ||
-        LOCAL_QUESTIONS[0];
-      const isCorrect = answer === q.is_true;
+      const question = LOCAL_QUESTIONS.find((item) => item.id === questionId) || LOCAL_QUESTIONS[0];
+      const distance = Math.abs(reliability - question.reliability_reference);
+      const isCorrect = distance <= RELIABILITY_TOLERANCE;
 
-      if (activeLocalMatch) {
-        if (isCorrect) {
-          activeLocalMatch.match.score += 10;
-        }
+      if (activeLocalMatch && isCorrect) {
+        activeLocalMatch.match.score += POINTS_PER_CORRECT_ANSWER;
       }
 
       return {
         is_correct: isCorrect,
-        correct_answer: q.is_true,
-        explanation: q.explanation,
-        source: q.source,
-        score: activeLocalMatch ? activeLocalMatch.match.score : isCorrect ? 10 : 0,
+        correct_answer: question.is_true,
+        reliability,
+        reliability_reference: question.reliability_reference,
+        tolerance: RELIABILITY_TOLERANCE,
+        distance,
+        explanation: question.explanation,
+        source: question.source,
+        score: activeLocalMatch
+          ? activeLocalMatch.match.score
+          : isCorrect
+            ? POINTS_PER_CORRECT_ANSWER
+            : 0,
       };
     }
   },

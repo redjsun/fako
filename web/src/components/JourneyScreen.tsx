@@ -1,153 +1,203 @@
 import React from "react";
-import { User, UserStats } from "../types";
+import { Level, UserStats } from "../types";
+import { formatMatchDate } from "../utils/formatters";
+import { Icon } from "./Icon";
 
 interface JourneyScreenProps {
-  user: User;
+  levels: Level[];
+  currentLevel: number;
+  highestLevel: number;
+  totalScore: number;
+  matchesPlayed: number;
+  bestScoreInLevel: number;
   stats: UserStats;
-  onBack: () => void;
-  onPlay: () => void;
+  onPlayLevel: (level: number) => void;
 }
 
-export const JourneyScreen: React.FC<JourneyScreenProps> = ({
-  user,
-  stats,
-  onBack,
-  onPlay,
-}) => {
-  const totalQuestions = stats.totalAcertos + stats.totalErros;
-  const overallAccuracy =
-    totalQuestions > 0 ? Math.round((stats.totalAcertos / totalQuestions) * 100) : 0;
+const LEVEL_DESCRIPTIONS = [
+  "Cobra lenta",
+  "Um pouco mais rápida",
+  "Velocidade média",
+  "Rápida",
+  "Muito rápida",
+  "Desafio final",
+];
 
-  // Precisão estimada por categoria para o relatório do Figma
-  const saudePct = 85;
-  const tecPct = 90;
-  const geraisPct = 80;
+const MURALHA_STREAK = 5;
+
+const MiniBoard: React.FC = () => (
+  <span className="mini-board" aria-hidden="true">
+    {Array.from({ length: 36 }, (_, index) => (
+      <span key={index} className={(Math.floor(index / 6) + index) % 2 === 0 ? "" : "is-dark"} />
+    ))}
+  </span>
+);
+
+/** Jornada: os 6 níveis, totais, conquistas e últimas partidas. */
+export const JourneyScreen: React.FC<JourneyScreenProps> = ({
+  levels,
+  currentLevel,
+  highestLevel,
+  totalScore,
+  matchesPlayed,
+  bestScoreInLevel,
+  stats,
+  onPlayLevel,
+}) => {
+  const answered = stats.totalAcertos + stats.totalErros;
+  const accuracy = answered > 0 ? `${Math.round((stats.totalAcertos / answered) * 100)}%` : "—";
+  const current = levels.find((level) => level.number === currentLevel);
+  const goal = current?.min_score_to_advance ?? 0;
+  const levelPercent = goal > 0 ? Math.min(100, Math.round((bestScoreInLevel / goal) * 100)) : 0;
+  const streakPercent = Math.min(100, Math.round((stats.bestStreak / MURALHA_STREAK) * 100));
+  const missing = Math.max(0, goal - bestScoreInLevel);
+  const isLastLevel = currentLevel >= levels.length;
+  const unlockedCount = stats.achievements.filter((achievement) => achievement.unlocked).length;
+  const achievement = (id: string) => stats.achievements.find((item) => item.id === id);
+
+  const achievementRows = [
+    {
+      title: "Primeira Checagem",
+      percent: achievement("first_check")?.unlocked ? 100 : 0,
+    },
+    {
+      title: isLastLevel ? `Mestre dos Fatos (${bestScoreInLevel} / ${goal} pts)` : `Subindo de Nível (${bestScoreInLevel} / ${goal} pts)`,
+      percent: achievement(isLastLevel ? "master" : "level_up")?.unlocked ? 100 : levelPercent,
+    },
+    {
+      title: `Muralha Antifake (${Math.min(stats.bestStreak, MURALHA_STREAK)} / ${MURALHA_STREAK} seguidas)`,
+      percent: achievement("imune")?.unlocked ? 100 : streakPercent,
+    },
+  ];
 
   return (
-    <div className="journey-page">
-      <div className="journey-container">
-        {/* Cabeçalho */}
-        <div className="journey-topbar">
-          <button type="button" className="secondary-button" onClick={onBack}>
-            ← Voltar
-          </button>
-          <span className="journey-badge">🧭 Minha Jornada & Conquistas</span>
-        </div>
+    <div className="journey-layout">
+      <section className="journey-layout__map" aria-labelledby="journey-heading">
+        <header className="page-heading">
+          <h1 id="journey-heading">Minha jornada</h1>
+          <p>Seu progresso fica salvo na sua conta. Continue de onde parou.</p>
+        </header>
 
-        {/* Card do Usuário (Figma Screen 5) */}
-        <div className="journey-user-card">
-          <div className="journey-avatar-large">
-            {user.username.charAt(0).toUpperCase()}
-          </div>
-          <div className="journey-user-info">
-            <h2 className="journey-user-name">{user.username}</h2>
-            <p className="journey-user-tagline">Checador Crítico de Informações</p>
-            <div className="user-streak-chip">
-              <span>🔥 Sequência de {stats.streakDays} {stats.streakDays === 1 ? "dia" : "dias"}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Estatísticas Numéricas Gerais */}
-        <div className="journey-stats-section">
-          <h3 className="section-title">Desempenho Geral</h3>
-          <div className="stats-grid">
-            <div className="stat-card">
-              <span className="stat-card-label">Maior Pontuação</span>
-              <span className="stat-card-value text-accent">{stats.highScore}</span>
-            </div>
-            <div className="stat-card">
-              <span className="stat-card-label">Nível Recorde</span>
-              <span className="stat-card-value">{stats.maxLevel} / 6</span>
-            </div>
-            <div className="stat-card">
-              <span className="stat-card-label">Partidas Jogadas</span>
-              <span className="stat-card-value">{stats.gamesPlayed}</span>
-            </div>
-            <div className="stat-card">
-              <span className="stat-card-label">Total de Acertos</span>
-              <span className="stat-card-value text-success">{stats.totalAcertos}</span>
-            </div>
-            <div className="stat-card full-width">
-              <span className="stat-card-label">Precisão Crítica Geral</span>
-              <span className="stat-card-value">{overallAccuracy}%</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Relatório de Precisão por Categoria (Barras Coloridas do Figma Screen 5) */}
-        <div className="journey-categories-report">
-          <h3 className="section-title">Precisão por Categoria</h3>
-          <div className="category-bars-card">
-            <div className="cat-bar-item">
-              <div className="cat-bar-header">
-                <span className="cat-bar-name">🌿 Saúde & Bem-Estar</span>
-                <span className="cat-bar-pct">{saudePct}%</span>
-              </div>
-              <div className="cat-bar-track">
-                <div className="cat-bar-fill fill-saude" style={{ width: `${saudePct}%` }} />
-              </div>
-            </div>
-
-            <div className="cat-bar-item">
-              <div className="cat-bar-header">
-                <span className="cat-bar-name">💻 Tecnologia & Segurança</span>
-                <span className="cat-bar-pct">{tecPct}%</span>
-              </div>
-              <div className="cat-bar-track">
-                <div className="cat-bar-fill fill-tec" style={{ width: `${tecPct}%` }} />
-              </div>
-            </div>
-
-            <div className="cat-bar-item">
-              <div className="cat-bar-header">
-                <span className="cat-bar-name">🌍 Conhecimentos Gerais</span>
-                <span className="cat-bar-pct">{geraisPct}%</span>
-              </div>
-              <div className="cat-bar-track">
-                <div className="cat-bar-fill fill-gerais" style={{ width: `${geraisPct}%` }} />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Galeria de Conquistas (Badges em Grid do Figma Screen 5) */}
-        <div className="journey-achievements-section">
-          <div className="achievements-header">
-            <h3 className="section-title">Galeria de Medalhas</h3>
-            <span className="achievements-count">
-              {stats.achievements.filter((a) => a.unlocked).length} / {stats.achievements.length}
-            </span>
-          </div>
-
-          <div className="achievements-grid">
-            {stats.achievements.map((ach) => (
-              <div
-                key={ach.id}
-                className={`achievement-card ${ach.unlocked ? "unlocked" : "locked"}`}
-              >
-                <div className="ach-icon-circle">{ach.unlocked ? ach.icon : "🔒"}</div>
-                <div className="ach-info">
-                  <h4 className="ach-title">{ach.title}</h4>
-                  <p className="ach-desc">{ach.description}</p>
+        <ol className="level-grid">
+          {levels.map((level, index) => {
+            const isCurrent = level.number === currentLevel;
+            const isUnlocked = level.number <= highestLevel;
+            const state = isCurrent ? "current" : isUnlocked ? "done" : "locked";
+            return (
+              <li key={level.number} className={`level-card is-${state}`}>
+                <div className="level-card__top">
+                  <span className="level-card__badge" aria-hidden="true">
+                    {state === "locked" ? <Icon name="lock" size={22} /> : level.number}
+                  </span>
+                  <span className="level-card__state">
+                    {state === "current" ? "Atual" : state === "done" ? "Liberado" : "Bloqueado"}
+                  </span>
                 </div>
-                <div className="ach-status">
-                  {ach.unlocked ? (
-                    <span className="ach-pill pill-unlocked">Conquistada ✅</span>
+                <MiniBoard />
+                <div className="level-card__text">
+                  <h2>Nível {level.number}</h2>
+                  <p>
+                    {LEVEL_DESCRIPTIONS[index] ?? ""}
+                    {isCurrent && ` · meta ${level.min_score_to_advance} pts`}
+                  </p>
+                </div>
+                <div className="level-card__footer">
+                  {state === "locked" ? (
+                    <span>Conclua o nível {level.number - 1}</span>
                   ) : (
-                    <span className="ach-pill pill-locked">Bloqueada</span>
+                    <>
+                      <span>
+                        {isCurrent ? `${bestScoreInLevel} / ${level.min_score_to_advance} pts` : "Jogar de novo"}
+                      </span>
+                      <button
+                        type="button"
+                        className={`button ${isCurrent ? "button--amber button--raised" : "button--subtle"}`}
+                        onClick={() => onPlayLevel(level.number)}
+                        aria-label={`Jogar o nível ${level.number}`}
+                      >
+                        Jogar →
+                      </button>
+                    </>
                   )}
                 </div>
-              </div>
-            ))}
+              </li>
+            );
+          })}
+        </ol>
+      </section>
+
+      <aside className="journey-layout__summary">
+        <div className="stat-grid stat-grid--large">
+          <div className="stat-tile">
+            <strong>{totalScore}</strong>
+            <span>pontos</span>
+          </div>
+          <div className="stat-tile">
+            <strong>{accuracy}</strong>
+            <span>acertos</span>
+          </div>
+          <div className="stat-tile">
+            <strong>{matchesPlayed}</strong>
+            <span>{matchesPlayed === 1 ? "partida" : "partidas"}</span>
           </div>
         </div>
 
-        {/* Ação */}
-        <button type="button" className="action-button" onClick={onPlay}>
-          Jogar Agora ➔
-        </button>
-      </div>
+        <section className="card card--roomy" aria-labelledby="achievements-title">
+          <h2 id="achievements-title" className="card__title card__title--large">
+            Conquistas · {unlockedCount} de {stats.achievements.length}
+          </h2>
+          <ul className="achievement-list">
+            {achievementRows.map((row) => (
+              <li key={row.title}>
+                <span className="achievement-list__row">
+                  <strong>{row.title}</strong>
+                  <span>{row.percent === 100 ? "Conquistada" : `${row.percent}%`}</span>
+                </span>
+                <span className="progress-track progress-track--thick" aria-hidden="true">
+                  <span style={{ width: `${row.percent}%` }} />
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="tip-box">
+            <Icon name="bulb" size={18} />
+            {isLastLevel
+              ? missing > 0
+                ? `Faltam ${missing} pontos para vencer o último nível.`
+                : "Você venceu o último nível. Tente bater sua melhor pontuação!"
+              : `Faltam ${missing} pontos para liberar o nível ${currentLevel + 1}. Uma partida boa já resolve!`}
+          </p>
+        </section>
+
+        <section className="card card--roomy" aria-labelledby="history-title">
+          <h2 id="history-title" className="card__title card__title--large">
+            Últimas partidas
+          </h2>
+          {stats.history.length > 0 && (
+            <ul className="history-list">
+              {stats.history.slice(0, 5).map((match) => (
+                <li key={match.finishedAt}>
+                  <span className="history-list__icon" aria-hidden="true">
+                    <Icon name="snake" size={18} />
+                  </span>
+                  <span className="history-list__text">
+                    <strong>
+                      Nível {match.level} · {match.acertos} de {match.acertos + match.erros} acertos
+                    </strong>
+                    <span>{formatMatchDate(match.finishedAt)}</span>
+                  </span>
+                  <span className="history-list__score">{match.score} pts</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="empty-text">
+            {stats.history.length > 0
+              ? "Suas próximas partidas aparecem aqui, com pontos e acertos de cada uma."
+              : "Nenhuma partida ainda. Jogue a primeira para ver seu histórico aqui."}
+          </p>
+        </section>
+      </aside>
     </div>
   );
 };

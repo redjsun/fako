@@ -25,16 +25,16 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Handle high-DPI (Retina) displays
+    // Tela de alta densidade (Retina)
     const dpr = window.devicePixelRatio || 1;
-    const displaySize = 480;
+    const displaySize = 620;
     canvas.width = displaySize * dpr;
     canvas.height = displaySize * dpr;
     ctx.scale(dpr, dpr);
 
     const cellSize = displaySize / gridSize;
 
-    // Obter cores do CSS computado
+    // Cores dos tokens do tabuleiro (index.css)
     const styles = getComputedStyle(document.documentElement);
     const cellA = styles.getPropertyValue("--board-cell-a").trim() || "#dfe8c8";
     const cellB = styles.getPropertyValue("--board-cell-b").trim() || "#d3dfb8";
@@ -43,7 +43,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     const appleColor = styles.getPropertyValue("--apple-body").trim() || "#dc3545";
     const leafColor = styles.getPropertyValue("--apple-leaf").trim() || "#2f6b3a";
 
-    // 1. Limpar e desenhar padrão xadrez verde moderno
+    // 1. Xadrez do tabuleiro
     for (let x = 0; x < gridSize; x++) {
       for (let y = 0; y < gridSize; y++) {
         ctx.fillStyle = (x + y) % 2 === 0 ? cellA : cellB;

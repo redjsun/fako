@@ -1,34 +1,44 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Direction,
-  Position,
-  GameStatus,
-  Question,
   AnswerResult,
-  GameStats,
+  AnsweredQuestion,
   AppScreen,
-  User,
-  UserStats,
-  CategoryFilter,
+  Direction,
+  GameStatus,
+  Level,
   Match,
+  MatchEndReason,
+  MatchRecord,
+  Position,
+  Question,
+  User,
+  UserProgress,
+  UserStats,
 } from "./types";
 import { soundEffects } from "./services/audioService";
 import { authService } from "./services/authService";
 import { matchService } from "./services/matchService";
 import { progressService } from "./services/progressService";
-import { Header } from "./components/Header";
-import { GameBoard } from "./components/GameBoard";
-import { QuestionModal } from "./components/QuestionModal";
-import { DpadControls } from "./components/DpadControls";
-import { OverlayScreen } from "./components/OverlayScreen";
-import { LoginScreen } from "./components/LoginScreen";
+import { LOCAL_LEVELS, levelService } from "./services/levelService";
+import { clampReliability } from "./utils/formatters";
+import { AppHeader, HeaderTab } from "./components/AppHeader";
+import { GameScreen } from "./components/GameScreen";
 import { HomeScreen } from "./components/HomeScreen";
-import { CategoriesScreen } from "./components/CategoriesScreen";
-import { TutorialScreen } from "./components/TutorialScreen";
 import { JourneyScreen } from "./components/JourneyScreen";
+import { LoginScreen } from "./components/LoginScreen";
+import { ExitMatchDialog, HowToPlayDialog } from "./components/MatchDialogs";
+import { MatchHud } from "./components/MatchHud";
+import { MatchSummary } from "./components/MatchSummary";
+import { QuestionPopup, ResultPopup } from "./components/QuestionModal";
+import { TutorialScreen } from "./components/TutorialScreen";
 
-const MAX_LEVELS = 6;
-const APPLES_PER_LEVEL = 10;
+// Regras da partida exibidas ao jogador (a pontuação oficial vem da API).
+const MATCH_SECONDS = 120;
+const QUESTION_SECONDS = 45;
+const COUNTDOWN_SECONDS = 3;
+const POINTS_PER_CORRECT = 10;
+const GRID_SIZE = 16;
+const INITIAL_RELIABILITY = 50;
 
 const OPPOSITE_DIRECTIONS: Record<Direction, Direction> = {
   UP: "DOWN",
@@ -37,93 +47,121 @@ const OPPOSITE_DIRECTIONS: Record<Direction, Direction> = {
   RIGHT: "LEFT",
 };
 
+const KEY_DIRECTIONS: Record<string, Direction> = {
+  ArrowUp: "UP",
+  ArrowDown: "DOWN",
+  ArrowLeft: "LEFT",
+  ArrowRight: "RIGHT",
+  w: "UP",
+  s: "DOWN",
+  a: "LEFT",
+  d: "RIGHT",
+};
+
+const tickForLevel = (level: number) => Math.max(75, 160 - (level - 1) * 14);
+
+const initialSnake = (): Position[] => {
+  const middle = Math.floor(GRID_SIZE / 2);
+  return [
+    { x: middle, y: middle },
+    { x: middle - 1, y: middle },
+    { x: middle - 2, y: middle },
+  ];
+};
+
+function placeRandomApple(snake: Position[]): Position {
+  const freeCells: Position[] = [];
+  for (let x = 0; x < GRID_SIZE; x++) {
+    for (let y = 0; y < GRID_SIZE; y++) {
+      if (!snake.some((segment) => segment.x === x && segment.y === y)) freeCells.push({ x, y });
+    }
+  }
+  return freeCells.length > 0 ? freeCells[Math.floor(Math.random() * freeCells.length)] : { x: 0, y: 0 };
+}
+
+function readSavedTheme(): "light" | "dark" {
+  try {
+    const saved = localStorage.getItem("fako_theme");
+    if (saved === "dark" || saved === "light") return saved;
+  } catch {
+    // Sem armazenamento local, segue no tema claro
+  }
+  return "light";
+}
+
+interface MatchEnding {
+  reason: MatchEndReason;
+  advanced: boolean;
+  secondsPlayed: number;
+  snakeLength: number;
+}
+
 export default function App() {
-  // Estado de Autenticação e Navegação
+  // Sessão, navegação e preferências
   const [currentUser, setCurrentUser] = useState<User | null>(() => authService.getCurrentUser());
   const [currentScreen, setCurrentScreen] = useState<AppScreen>(() => {
     const user = authService.getCurrentUser();
     if (!user) return "login";
     return authService.hasSeenTutorial(user.username) ? "home" : "tutorial";
   });
+  const [theme, setTheme] = useState<"light" | "dark">(readSavedTheme);
+  const [isMuted, setIsMuted] = useState<boolean>(soundEffects.getMuted());
 
+  // Progresso: estatísticas locais (histórico, conquistas) e progresso oficial da API
   const [userStats, setUserStats] = useState<UserStats>(() => {
     const user = authService.getCurrentUser();
-    return user
-      ? authService.getUserStats(user.username)
-      : {
-          highScore: 0,
-          maxLevel: 1,
-          gamesPlayed: 0,
-          totalAcertos: 0,
-          totalErros: 0,
-          streakDays: 1,
-          hasSeenTutorial: false,
-          categoryStats: {
-            saude: { acertos: 0, total: 0 },
-            tecnologia: { acertos: 0, total: 0 },
-            gerais: { acertos: 0, total: 0 },
-          },
-          achievements: [],
-        };
+    return authService.getUserStats(user?.username ?? "");
   });
+  const [progress, setProgress] = useState<UserProgress>({
+    current_level: 1,
+    highest_level: 1,
+    total_score: 0,
+    matches_played: 0,
+  });
+  const [levels, setLevels] = useState<Level[]>(LOCAL_LEVELS);
 
-  const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>("Misto");
-
-  // Estado do Jogo e da Partida
+  // Partida
   const [currentMatch, setCurrentMatch] = useState<Match | null>(null);
-  const matchIdRef = useRef<number | null>(null);
-  const [gridSize, setGridSize] = useState<number>(16);
-  const [tickMs, setTickMs] = useState<number>(160);
-  const [matchTimeLeft, setMatchTimeLeft] = useState<number>(120);
-  const [hasAdvanced, setHasAdvanced] = useState<boolean>(false);
-
-  const [status, setStatus] = useState<GameStatus>("START");
-  const [snake, setSnake] = useState<Position[]>([
-    { x: 8, y: 8 },
-    { x: 7, y: 8 },
-    { x: 6, y: 8 },
-  ]);
+  const [status, setStatus] = useState<GameStatus>("COUNTDOWN");
+  const [level, setLevel] = useState(1);
+  const [tickMs, setTickMs] = useState(tickForLevel(1));
+  const [matchDuration, setMatchDuration] = useState(MATCH_SECONDS);
+  const [timeLeft, setTimeLeft] = useState(MATCH_SECONDS);
+  const [countdownLeft, setCountdownLeft] = useState(COUNTDOWN_SECONDS);
+  const [snake, setSnake] = useState<Position[]>(initialSnake);
   const [direction, setDirection] = useState<Direction>("RIGHT");
   const [apple, setApple] = useState<Position | null>(null);
+  const [score, setScore] = useState(0);
+  const [answers, setAnswers] = useState<AnsweredQuestion[]>([]);
+  const [ending, setEnding] = useState<MatchEnding | null>(null);
 
-  // Estatísticas da Partida Atual
-  const [score, setScore] = useState<number>(0);
-  const [level, setLevel] = useState<number>(1);
-  const [applesInLevel, setApplesInLevel] = useState<number>(0);
-  const [totalApples, setTotalApples] = useState<number>(0);
-  const [acertos, setAcertos] = useState<number>(0);
-  const [erros, setErros] = useState<number>(0);
-
-  // Pergunta Corrente da API e Resposta
+  // Pergunta e resultado
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
-  const [isQuestionAnswered, setIsQuestionAnswered] = useState<boolean>(false);
+  const [reliability, setReliability] = useState(INITIAL_RELIABILITY);
+  const [questionSecondsLeft, setQuestionSecondsLeft] = useState(QUESTION_SECONDS);
   const [lastResult, setLastResult] = useState<AnswerResult | null>(null);
-  const [isSubmittingAnswer, setIsSubmittingAnswer] = useState<boolean>(false);
+  const [isSubmittingAnswer, setIsSubmittingAnswer] = useState(false);
 
-  // Configurações Globais
-  const [isMuted, setIsMuted] = useState<boolean>(soundEffects.getMuted());
-  const [theme, setTheme] = useState<"light" | "dark">(() => {
-    try {
-      const saved = localStorage.getItem("fako_theme");
-      if (saved === "dark" || saved === "light") return saved;
-    } catch {
-      // fallback
-    }
-    return "light";
-  });
+  // Janelas sobre a partida (pausam o jogo enquanto abertas)
+  const [dialog, setDialog] = useState<"exit" | "howto" | null>(null);
 
-  // Referências mutáveis para loop de jogo
-  const nextDirRef = useRef<Direction>("RIGHT");
-  const currentDirRef = useRef<Direction>("RIGHT");
+  // Referências lidas pelo loop do jogo sem recriar os intervalos
+  const statusRef = useRef<GameStatus>(status);
   const snakeRef = useRef<Position[]>(snake);
   const appleRef = useRef<Position | null>(apple);
-  const growPendingRef = useRef<number>(0);
-  const statusRef = useRef<GameStatus>(status);
-  const gridSizeRef = useRef<number>(gridSize);
-  const gameLoopTimerRef = useRef<number | null>(null);
-  const matchCountdownTimerRef = useRef<number | null>(null);
+  const nextDirectionRef = useRef<Direction>("RIGHT");
+  const currentDirectionRef = useRef<Direction>("RIGHT");
+  const growPendingRef = useRef(0);
+  const matchIdRef = useRef<number | null>(null);
+  const statusBeforeDialogRef = useRef<GameStatus>("PLAYING");
+  const finishingRef = useRef(false);
+  const remainingMsRef = useRef(MATCH_SECONDS * 1000);
 
-  // Sincronizar referências
+  const changeStatus = useCallback((next: GameStatus) => {
+    statusRef.current = next;
+    setStatus(next);
+  }, []);
+
   useEffect(() => {
     snakeRef.current = snake;
   }, [snake]);
@@ -133,377 +171,395 @@ export default function App() {
   }, [apple]);
 
   useEffect(() => {
-    currentDirRef.current = direction;
-  }, [direction]);
-
-  useEffect(() => {
-    statusRef.current = status;
-  }, [status]);
-
-  useEffect(() => {
-    gridSizeRef.current = gridSize;
-  }, [gridSize]);
-
-  // Aplicar tema no elemento raiz
-  useEffect(() => {
-    const root = document.documentElement;
-    root.setAttribute("data-theme", theme);
+    document.documentElement.setAttribute("data-theme", theme);
     try {
       localStorage.setItem("fako_theme", theme);
     } catch {
-      // Ignora erro
+      // Preferência fica só nesta sessão
     }
   }, [theme]);
 
-  // Sincronizar progresso com a API
-  const refreshUserProgress = useCallback(async () => {
+  const refreshProgress = useCallback(async () => {
     if (!currentUser) return;
-    try {
-      const prog = await progressService.getMyProgress();
-      setUserStats((prev) => ({
-        ...prev,
-        highScore: Math.max(prev.highScore, prog.total_score),
-        maxLevel: prog.highest_level,
-        gamesPlayed: prog.matches_played,
-      }));
-    } catch {
-      setUserStats(authService.getUserStats(currentUser.username));
-    }
+    setProgress(await progressService.getMyProgress());
   }, [currentUser]);
 
   useEffect(() => {
-    if (currentUser) {
-      refreshUserProgress();
-    }
-  }, [currentUser, refreshUserProgress]);
+    if (!currentUser) return;
+    setUserStats(authService.getUserStats(currentUser.username));
+    refreshProgress();
+    levelService.listLevels().then((list) => {
+      if (list.length > 0) setLevels([...list].sort((a, b) => a.number - b.number));
+    });
+  }, [currentUser, refreshProgress]);
 
-  // Posicionar maçã em célula livre
-  const placeRandomApple = useCallback((currentSnake: Position[], currentGridSize: number): Position => {
-    const freeCells: Position[] = [];
-    for (let x = 0; x < currentGridSize; x++) {
-      for (let y = 0; y < currentGridSize; y++) {
-        const isOccupied = currentSnake.some((seg) => seg.x === x && seg.y === y);
-        if (!isOccupied) {
-          freeCells.push({ x, y });
+  const maxLevels = levels.length;
+  const levelConfig = (number: number) => levels.find((item) => item.number === number);
+  const minScoreToAdvance = currentMatch?.level.min_score_to_advance ?? levelConfig(level)?.min_score_to_advance ?? 30;
+  const blocksFromErrors = answers.filter((answer) => !answer.isCorrect).length;
+  const acertos = answers.length - blocksFromErrors;
+
+  // Melhor partida no nível atual: base do "faltam X pts".
+  const bestScoreInCurrentLevel = useMemo(
+    () =>
+      userStats.history
+        .filter((match) => match.level === progress.current_level)
+        .reduce((best, match) => Math.max(best, match.score), 0),
+    [userStats.history, progress.current_level]
+  );
+  const missingPoints = Math.max(
+    0,
+    (levelConfig(progress.current_level)?.min_score_to_advance ?? 30) - bestScoreInCurrentLevel
+  );
+
+  // ---------------------------------------------------------------- partida
+
+  // Valores atuais para o encerramento, sem recriar o loop da cobra a cada segundo.
+  const latestRef = useRef({ level, matchDuration, timeLeft, score, answers, currentUser });
+  latestRef.current = { level, matchDuration, timeLeft, score, answers, currentUser };
+
+  const finishMatch = useCallback(
+    async (reason: MatchEndReason) => {
+      if (finishingRef.current) return;
+      finishingRef.current = true;
+      changeStatus("FINISHED");
+      setDialog(null);
+
+      const { level, matchDuration, timeLeft, score, answers, currentUser } = latestRef.current;
+      const erros = answers.filter((answer) => !answer.isCorrect).length;
+      const activeMatchId = matchIdRef.current;
+      matchIdRef.current = null;
+      let advanced = false;
+      let unlockedLevel = level;
+      if (activeMatchId) {
+        try {
+          const result = await matchService.finishMatch(activeMatchId);
+          advanced = result.advanced;
+          unlockedLevel = result.current_level;
+        } catch (error) {
+          console.error("Erro ao encerrar a partida na API:", error);
         }
       }
-    }
 
-    if (freeCells.length === 0) {
-      return { x: 0, y: 0 };
-    }
+      const secondsPlayed = matchDuration - timeLeft;
+      const snakeLength = snakeRef.current.length;
+      setEnding({ reason, advanced, secondsPlayed, snakeLength });
 
-    const randomIndex = Math.floor(Math.random() * freeCells.length);
-    return freeCells[randomIndex];
-  }, []);
-
-  // Mudança segura de direção
-  const changeDirection = useCallback((newDir: Direction) => {
-    if (statusRef.current !== "PLAYING") return;
-    if (OPPOSITE_DIRECTIONS[newDir] === currentDirRef.current) return;
-    nextDirRef.current = newDir;
-  }, []);
-
-  // Finalizar partida na API
-  const handleFinishMatch = useCallback(async (endStatus: GameStatus) => {
-    if (matchCountdownTimerRef.current) {
-      clearInterval(matchCountdownTimerRef.current);
-      matchCountdownTimerRef.current = null;
-    }
-    if (gameLoopTimerRef.current) {
-      clearInterval(gameLoopTimerRef.current);
-      gameLoopTimerRef.current = null;
-    }
-
-    const activeMatchId = matchIdRef.current;
-    matchIdRef.current = null;
-
-    if (activeMatchId) {
-      try {
-        const res = await matchService.finishMatch(activeMatchId);
-        setHasAdvanced(res.advanced);
-      } catch (err) {
-        console.error("Erro ao encerrar partida na API:", err);
+      if (currentUser) {
+        const record: MatchRecord = {
+          finishedAt: Date.now(),
+          level,
+          score,
+          acertos: answers.length - erros,
+          erros,
+          snakeLength,
+          secondsPlayed,
+          endReason: reason,
+          answers,
+        };
+        setUserStats(authService.recordMatchFinished(currentUser.username, record, unlockedLevel));
       }
+      await refreshProgress();
+    },
+    [changeStatus, refreshProgress]
+  );
+
+  const startGame = useCallback(
+    async (levelNumber?: number) => {
+      finishingRef.current = false;
+      growPendingRef.current = 0;
+      setDialog(null);
+      setEnding(null);
+
+      let match: Match | null = null;
+      try {
+        match = await matchService.startMatch(levelNumber ?? progress.current_level);
+      } catch (error) {
+        console.error("Erro ao iniciar a partida na API:", error);
+      }
+
+      const matchLevel = match?.level.number ?? levelNumber ?? 1;
+      const duration = match?.duration_seconds ?? MATCH_SECONDS;
+      const startSnake = initialSnake();
+
+      matchIdRef.current = match?.id ?? null;
+      setCurrentMatch(match);
+      setLevel(matchLevel);
+      setTickMs(tickForLevel(matchLevel));
+      setMatchDuration(duration);
+      setTimeLeft(duration);
+      remainingMsRef.current = duration * 1000;
+      setSnake(startSnake);
+      snakeRef.current = startSnake;
+      setDirection("RIGHT");
+      nextDirectionRef.current = "RIGHT";
+      currentDirectionRef.current = "RIGHT";
+      const firstApple = placeRandomApple(startSnake);
+      setApple(firstApple);
+      appleRef.current = firstApple;
+      setScore(0);
+      setAnswers([]);
+      setCurrentQuestion(null);
+      setLastResult(null);
+      setCountdownLeft(COUNTDOWN_SECONDS);
+      setCurrentScreen("game");
+      changeStatus("COUNTDOWN");
+    },
+    [progress.current_level, changeStatus]
+  );
+
+  const openQuestion = useCallback(async () => {
+    changeStatus("QUESTION");
+    setCurrentQuestion(null);
+    setLastResult(null);
+    setReliability(INITIAL_RELIABILITY);
+    setQuestionSecondsLeft(QUESTION_SECONDS);
+    try {
+      setCurrentQuestion(await matchService.getNextQuestion(matchIdRef.current ?? 0));
+    } catch (error) {
+      console.error("Erro ao buscar a próxima afirmação:", error);
     }
+  }, [changeStatus]);
 
-    setStatus(endStatus);
-    await refreshUserProgress();
-  }, [refreshUserProgress]);
-
-  // Passo único de movimentação da cobrinha
-  const step = useCallback(async () => {
+  // Um passo da cobrinha
+  const step = useCallback(() => {
     if (statusRef.current !== "PLAYING") return;
 
     const currentSnake = snakeRef.current;
-    const activeDir = nextDirRef.current;
-    const currentGrid = gridSizeRef.current;
-    setDirection(activeDir);
+    const activeDirection = nextDirectionRef.current;
+    currentDirectionRef.current = activeDirection;
+    setDirection(activeDirection);
 
-    let dx = 0;
-    let dy = 0;
-    switch (activeDir) {
-      case "UP":
-        dy = -1;
-        break;
-      case "DOWN":
-        dy = 1;
-        break;
-      case "LEFT":
-        dx = -1;
-        break;
-      case "RIGHT":
-        dx = 1;
-        break;
-    }
-
+    const delta = { UP: [0, -1], DOWN: [0, 1], LEFT: [-1, 0], RIGHT: [1, 0] }[activeDirection];
     const head = currentSnake[0];
     const newHead: Position = {
-      x: (head.x + dx + currentGrid) % currentGrid,
-      y: (head.y + dy + currentGrid) % currentGrid,
+      x: (head.x + delta[0] + GRID_SIZE) % GRID_SIZE,
+      y: (head.y + delta[1] + GRID_SIZE) % GRID_SIZE,
     };
 
-    // Colisão com o próprio corpo
-    const hitSelf = currentSnake.some((seg) => seg.x === newHead.x && seg.y === newHead.y);
-    if (hitSelf) {
+    if (currentSnake.some((segment) => segment.x === newHead.x && segment.y === newHead.y)) {
       soundEffects.playGameOver();
-      await handleFinishMatch("GAMEOVER");
+      finishMatch("GAMEOVER");
       return;
     }
 
     const newSnake = [newHead, ...currentSnake];
-
-    // Cobrinha só cresce se errou a pergunta
+    // A cobrinha só cresce depois de um erro
     if (growPendingRef.current > 0) {
       growPendingRef.current -= 1;
     } else {
       newSnake.pop();
     }
-
+    snakeRef.current = newSnake;
     setSnake(newSnake);
 
-    // Checagem de maçã comida
     const currentApple = appleRef.current;
     if (currentApple && newHead.x === currentApple.x && newHead.y === currentApple.y) {
       soundEffects.playEat();
-      setStatus("QUESTION");
-
-      const activeMatchId = matchIdRef.current || 1;
-      try {
-        const q = await matchService.getNextQuestion(activeMatchId);
-        setCurrentQuestion(q);
-      } catch (err) {
-        console.error("Erro ao obter próxima questão:", err);
-        // Fallback caso acabe o banco de perguntas
-        setCurrentQuestion({
-          id: 1,
-          statement: "Informações checadas e auditadas aumentam a segurança da comunidade.",
-          category: "Gerais",
-        });
-      }
-
-      setIsQuestionAnswered(false);
-      setLastResult(null);
-
-      const nextApplePos = placeRandomApple(newSnake, currentGrid);
-      setApple(nextApplePos);
+      const nextApple = placeRandomApple(newSnake);
+      appleRef.current = nextApple;
+      setApple(nextApple);
+      openQuestion();
     }
-  }, [placeRandomApple, handleFinishMatch]);
+  }, [finishMatch, openQuestion]);
 
-  // Loop de Jogo (Ticks da cobra)
+  const changeDirection = useCallback((next: Direction) => {
+    if (statusRef.current !== "PLAYING") return;
+    if (OPPOSITE_DIRECTIONS[next] === currentDirectionRef.current) return;
+    nextDirectionRef.current = next;
+  }, []);
+
+  // Loop da cobrinha
   useEffect(() => {
-    if (currentScreen === "game" && status === "PLAYING") {
-      gameLoopTimerRef.current = window.setInterval(step, tickMs);
-    } else {
-      if (gameLoopTimerRef.current) {
-        clearInterval(gameLoopTimerRef.current);
-        gameLoopTimerRef.current = null;
-      }
-    }
-
-    return () => {
-      if (gameLoopTimerRef.current) {
-        clearInterval(gameLoopTimerRef.current);
-        gameLoopTimerRef.current = null;
-      }
-    };
+    if (currentScreen !== "game" || status !== "PLAYING") return;
+    const timer = window.setInterval(step, tickMs);
+    return () => window.clearInterval(timer);
   }, [currentScreen, status, tickMs, step]);
 
-  // Contagem regressiva da partida (120 segundos)
+  // Cronômetro da partida: só corre com a cobra andando. Acumula o tempo real em ms
+  // para que trechos curtos entre uma pergunta e outra também descontem.
   useEffect(() => {
-    if (currentScreen === "game" && (status === "PLAYING" || status === "QUESTION")) {
-      matchCountdownTimerRef.current = window.setInterval(() => {
-        setMatchTimeLeft((prev) => {
-          if (prev <= 1) {
-            handleFinishMatch("TIMEOUT");
-            return 0;
-          }
-          if (prev <= 5) {
-            soundEffects.playTick();
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    } else {
-      if (matchCountdownTimerRef.current) {
-        clearInterval(matchCountdownTimerRef.current);
-        matchCountdownTimerRef.current = null;
-      }
-    }
-
-    return () => {
-      if (matchCountdownTimerRef.current) {
-        clearInterval(matchCountdownTimerRef.current);
-        matchCountdownTimerRef.current = null;
-      }
+    if (currentScreen !== "game" || status !== "PLAYING") return;
+    let last = performance.now();
+    const consume = () => {
+      const now = performance.now();
+      remainingMsRef.current = Math.max(0, remainingMsRef.current - (now - last));
+      last = now;
+      setTimeLeft(Math.ceil(remainingMsRef.current / 1000));
     };
-  }, [currentScreen, status, handleFinishMatch]);
+    const timer = window.setInterval(consume, 200);
+    return () => {
+      window.clearInterval(timer);
+      consume();
+    };
+  }, [currentScreen, status]);
 
-  // Iniciar Nova Partida com o Backend
-  const startGame = useCallback(
-    async (cat: CategoryFilter = "Misto") => {
-      growPendingRef.current = 0;
+  useEffect(() => {
+    if (status !== "PLAYING") return;
+    if (timeLeft <= 0) finishMatch("TIMEOUT");
+    else if (timeLeft <= 5) soundEffects.playTick();
+  }, [timeLeft, status, finishMatch]);
 
-      let startedMatch: Match | null = null;
-      try {
-        startedMatch = await matchService.startMatch(userStats.maxLevel || undefined);
-      } catch (err) {
-        console.error("Erro ao iniciar partida na API:", err);
+  // Contagem de 3 s antes de a cobra andar
+  useEffect(() => {
+    if (currentScreen !== "game" || status !== "COUNTDOWN") return;
+    if (countdownLeft <= 0) {
+      changeStatus("PLAYING");
+      return;
+    }
+    const timer = window.setTimeout(() => setCountdownLeft((previous) => previous - 1), 1000);
+    return () => window.clearTimeout(timer);
+  }, [currentScreen, status, countdownLeft, changeStatus]);
+
+  const resumeWithCountdown = useCallback(() => {
+    setCountdownLeft(COUNTDOWN_SECONDS);
+    changeStatus("COUNTDOWN");
+  }, [changeStatus]);
+
+  // ---------------------------------------------------------------- pergunta
+
+  const confirmAnswer = useCallback(async () => {
+    if (!currentQuestion || isSubmittingAnswer || statusRef.current !== "QUESTION") return;
+    setIsSubmittingAnswer(true);
+    const question = currentQuestion;
+    const value = clampReliability(reliability);
+    try {
+      const result = await matchService.answerQuestion(matchIdRef.current ?? 0, question.id, value);
+      setLastResult(result);
+      // A API devolve o placar oficial; se ela cair no meio da partida, a pergunta local
+      // ainda soma os pontos do acerto.
+      setScore((previous) =>
+        result.is_correct ? Math.max(result.score, previous + POINTS_PER_CORRECT) : Math.max(result.score, previous)
+      );
+      setAnswers((previous) => [
+        ...previous,
+        {
+          statement: question.statement,
+          reliability: result.reliability,
+          reference: result.reliability_reference,
+          isCorrect: result.is_correct,
+        },
+      ]);
+      if (result.is_correct) {
+        soundEffects.playCorrect();
+      } else {
+        soundEffects.playMistake();
+        growPendingRef.current += 1;
       }
+      changeStatus("FEEDBACK");
+    } catch (error) {
+      console.error("Erro ao enviar a resposta:", error);
+    } finally {
+      setIsSubmittingAnswer(false);
+    }
+  }, [currentQuestion, isSubmittingAnswer, reliability, changeStatus]);
 
-      const activeGrid = 16;
-      const activeLvl = startedMatch?.level?.number || 1;
-      const activeTick = Math.max(75, 160 - (activeLvl - 1) * 14);
-      const activeDuration = startedMatch?.duration_seconds || 120;
+  // 45 s por pergunta; no fim do tempo vale o valor marcado na barra
+  useEffect(() => {
+    if (status !== "QUESTION" || !currentQuestion || isSubmittingAnswer) return;
+    if (questionSecondsLeft <= 0) {
+      confirmAnswer();
+      return;
+    }
+    const timer = window.setTimeout(() => setQuestionSecondsLeft((previous) => previous - 1), 1000);
+    return () => window.clearTimeout(timer);
+  }, [status, currentQuestion, isSubmittingAnswer, questionSecondsLeft, confirmAnswer]);
 
-      matchIdRef.current = startedMatch?.id || null;
-      setCurrentMatch(startedMatch);
-      setGridSize(activeGrid);
-      setTickMs(activeTick);
-      setLevel(activeLvl);
-      setMatchTimeLeft(activeDuration);
-      setHasAdvanced(false);
+  const continueAfterFeedback = useCallback(() => {
+    setCurrentQuestion(null);
+    setLastResult(null);
+    resumeWithCountdown();
+  }, [resumeWithCountdown]);
 
-      const startX = Math.floor(activeGrid / 2);
-      const startY = Math.floor(activeGrid / 2);
-      const initialSnake: Position[] = [
-        { x: startX, y: startY },
-        { x: Math.max(0, startX - 1), y: startY },
-        { x: Math.max(0, startX - 2), y: startY },
-      ];
+  // ---------------------------------------------------------------- janelas e pausa
 
-      setSnake(initialSnake);
-      setDirection("RIGHT");
-      nextDirRef.current = "RIGHT";
-
-      setScore(0);
-      setApplesInLevel(0);
-      setTotalApples(0);
-      setAcertos(0);
-      setErros(0);
-      setCurrentQuestion(null);
-      setIsQuestionAnswered(false);
-      setLastResult(null);
-
-      const initialApple = placeRandomApple(initialSnake, activeGrid);
-      setApple(initialApple);
-
-      setStatus("PLAYING");
+  const openDialog = useCallback(
+    (which: "exit" | "howto") => {
+      if (statusRef.current === "FINISHED") return;
+      // Durante a contagem a janela volta direto para a cobra andando
+      statusBeforeDialogRef.current = statusRef.current === "COUNTDOWN" ? "PLAYING" : statusRef.current;
+      setDialog(which);
+      changeStatus("PAUSED");
     },
-    [userStats.maxLevel, placeRandomApple]
+    [changeStatus]
   );
 
-  // Teclado
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (currentScreen !== "game") return;
+  const closeDialog = useCallback(() => {
+    setDialog(null);
+    const previous = statusBeforeDialogRef.current;
+    if (previous === "PLAYING") resumeWithCountdown();
+    else changeStatus(previous);
+  }, [resumeWithCountdown, changeStatus]);
 
-      const key = e.key;
-      if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(key)) {
-        e.preventDefault();
+  const togglePause = useCallback(() => {
+    if (statusRef.current === "PLAYING") changeStatus("PAUSED");
+    else if (statusRef.current === "PAUSED" && !dialog) resumeWithCountdown();
+  }, [changeStatus, resumeWithCountdown, dialog]);
+
+  const exitAndSave = useCallback(async () => {
+    await finishMatch("EXIT");
+    setCurrentScreen("home");
+  }, [finishMatch]);
+
+  // Teclado da partida
+  useEffect(() => {
+    if (currentScreen !== "game") return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const onButton = target?.tagName === "BUTTON";
+      const onSlider = target instanceof HTMLInputElement && target.type === "range";
+      const current = statusRef.current;
+      const keyDirection = KEY_DIRECTIONS[event.key] ?? KEY_DIRECTIONS[event.key.toLowerCase()];
+
+      if (event.key === "Escape") {
+        event.preventDefault();
+        if (dialog) closeDialog();
+        else togglePause();
+        return;
       }
 
-      if (statusRef.current === "PLAYING") {
-        if (key === "ArrowUp" || key === "w" || key === "W") changeDirection("UP");
-        else if (key === "ArrowDown" || key === "s" || key === "S") changeDirection("DOWN");
-        else if (key === "ArrowLeft" || key === "a" || key === "A") changeDirection("LEFT");
-        else if (key === "ArrowRight" || key === "d" || key === "D") changeDirection("RIGHT");
-      } else if (
-        statusRef.current === "START" ||
-        statusRef.current === "GAMEOVER" ||
-        statusRef.current === "VICTORY" ||
-        statusRef.current === "TIMEOUT"
-      ) {
-        if (key === "Enter" || key === " ") {
-          e.preventDefault();
-          startGame(selectedCategory);
+      if (current === "PLAYING") {
+        if (keyDirection) {
+          event.preventDefault();
+          changeDirection(keyDirection);
+        } else if (event.key === " ") {
+          event.preventDefault();
+        }
+        return;
+      }
+
+      if (current === "QUESTION") {
+        // Com o foco na barra, as setas já mexem no input range
+        if (!onSlider && (event.key === "ArrowLeft" || event.key === "ArrowRight")) {
+          event.preventDefault();
+          setReliability((previous) => clampReliability(previous + (event.key === "ArrowRight" ? 5 : -5)));
+        } else if (event.key === "Enter" && !onButton) {
+          event.preventDefault();
+          confirmAnswer();
+        }
+        return;
+      }
+
+      if (event.key === "Enter" && !onButton) {
+        if (current === "FEEDBACK") {
+          event.preventDefault();
+          continueAfterFeedback();
+        } else if (current === "FINISHED") {
+          event.preventDefault();
+          startGame(level);
         }
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentScreen, changeDirection, startGame, selectedCategory]);
+  }, [currentScreen, dialog, closeDialog, togglePause, changeDirection, confirmAnswer, continueAfterFeedback, startGame, level]);
 
-  // Confirmação de Resposta via API (Confiável vs Não Confiável)
-  const handleConfirmQuestion = async (answer: boolean) => {
-    if (!currentQuestion || isQuestionAnswered || isSubmittingAnswer) return;
+  // ---------------------------------------------------------------- navegação
 
-    const activeMatchId = matchIdRef.current || 1;
-
-    setIsSubmittingAnswer(true);
-
-    try {
-      const res = await matchService.answerQuestion(
-        activeMatchId,
-        currentQuestion.id,
-        answer
-      );
-
-      setLastResult(res);
-      setScore(res.score);
-
-      if (res.is_correct) {
-        soundEffects.playCorrect();
-        setAcertos((prev) => prev + 1);
-      } else {
-        soundEffects.playMistake();
-        growPendingRef.current += 1;
-        setErros((prev) => prev + 1);
-      }
-
-      setIsQuestionAnswered(true);
-    } catch (err) {
-      console.error("Erro ao enviar resposta à API:", err);
-    } finally {
-      setIsSubmittingAnswer(false);
-    }
-  };
-
-  // Retomada do Jogo após Resposta
-  const handleResumeGame = () => {
-    const nextApplesInLevel = applesInLevel + 1;
-    const nextTotalApples = totalApples + 1;
-    setApplesInLevel(nextApplesInLevel);
-    setTotalApples(nextTotalApples);
-
-    setCurrentQuestion(null);
-    setIsQuestionAnswered(false);
-    setLastResult(null);
-
-    setStatus("PLAYING");
-  };
-
-  // Navegação de Rotas
   const handleLoginSuccess = (user: User) => {
     setCurrentUser(user);
-    refreshUserProgress();
-    const stats = authService.getUserStats(user.username);
-    if (!stats.hasSeenTutorial) {
-      setCurrentScreen("tutorial");
-    } else {
-      setCurrentScreen("home");
-    }
+    setCurrentScreen(authService.hasSeenTutorial(user.username) ? "home" : "tutorial");
   };
 
   const handleLogout = () => {
@@ -512,285 +568,187 @@ export default function App() {
     setCurrentScreen("login");
   };
 
-  const handlePlayFromHome = (cat: CategoryFilter = "Misto") => {
-    if (!currentUser) {
-      setCurrentScreen("login");
-      return;
-    }
-    const hasSeen = authService.hasSeenTutorial(currentUser.username);
-    setSelectedCategory(cat);
-    if (!hasSeen) {
-      setCurrentScreen("tutorial");
-    } else {
-      setCurrentScreen("game");
-      startGame(cat);
-    }
+  const markTutorialSeen = () => {
+    if (currentUser) authService.markTutorialAsSeen(currentUser.username);
   };
 
-  const handleTutorialComplete = () => {
-    if (currentUser) {
-      authService.markTutorialAsSeen(currentUser.username);
-    }
-    setCurrentScreen("game");
-    startGame(selectedCategory);
+  const handleNavigate = (tab: HeaderTab) => {
+    setCurrentScreen(tab === "home" ? "home" : tab === "journey" ? "journey" : "tutorial");
   };
 
-  const handleTutorialSkip = () => {
-    if (currentUser) {
-      authService.markTutorialAsSeen(currentUser.username);
-    }
-    setCurrentScreen("game");
-    startGame(selectedCategory);
-  };
-
-  const handleGoHome = async () => {
-    if (matchIdRef.current) {
-      await handleFinishMatch("GAMEOVER");
-    }
-    setStatus("START");
-    await refreshUserProgress();
+  const handleGoHome = () => {
     setCurrentScreen("home");
+    changeStatus("COUNTDOWN");
   };
 
-  const handleToggleMute = () => {
-    const muted = soundEffects.toggleMute();
-    setIsMuted(muted);
-  };
+  const handleToggleMute = () => setIsMuted(soundEffects.toggleMute());
+  const handleToggleTheme = () => setTheme((previous) => (previous === "dark" ? "light" : "dark"));
 
-  const handleToggleTheme = () => {
-    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
-  };
+  // ---------------------------------------------------------------- telas
 
-  const gameStats: GameStats = {
-    score,
-    level,
-    applesInLevel,
-    totalApples,
-    acertos,
-    erros,
-    category: selectedCategory,
-    advanced: hasAdvanced,
-  };
+  if (currentScreen === "login" || !currentUser) {
+    return (
+      <div className="fako-app screen-login">
+        <LoginScreen onLoginSuccess={handleLoginSuccess} theme={theme} onToggleTheme={handleToggleTheme} />
+      </div>
+    );
+  }
 
-  const totalAnswered = acertos + erros;
-  const currentAccuracy = totalAnswered > 0 ? Math.round((acertos / totalAnswered) * 100) : 100;
+  if (currentScreen === "tutorial") {
+    return (
+      <div className="fako-app screen-tutorial">
+        <TutorialScreen
+          questionSeconds={QUESTION_SECONDS}
+          pointsPerCorrect={POINTS_PER_CORRECT}
+          onComplete={() => {
+            markTutorialSeen();
+            startGame();
+          }}
+          onSkip={() => {
+            markTutorialSeen();
+            setCurrentScreen("home");
+          }}
+        />
+      </div>
+    );
+  }
+
+  if (currentScreen === "game") {
+    const isLastLevel = level >= maxLevels;
+    return (
+      <div className="fako-app screen-game">
+        <div className="page-shell page-shell--game">
+          <MatchHud
+            level={level}
+            boardSize={GRID_SIZE}
+            status={status}
+            timeLeft={timeLeft}
+            duration={matchDuration}
+            score={score}
+            onExit={() => openDialog("exit")}
+          />
+
+          {status === "FINISHED" && ending ? (
+            <MatchSummary
+              username={currentUser.username}
+              endReason={ending.reason}
+              score={score}
+              level={level}
+              maxLevel={maxLevels}
+              minScoreToAdvance={minScoreToAdvance}
+              advanced={ending.advanced}
+              answers={answers}
+              snakeLength={ending.snakeLength}
+              secondsPlayed={ending.secondsPlayed}
+              pointsPerCorrect={POINTS_PER_CORRECT}
+              onPlayAgain={() => startGame(ending.advanced ? undefined : level)}
+              onGoHome={handleGoHome}
+              onOpenJourney={() => setCurrentScreen("journey")}
+            />
+          ) : (
+            <GameScreen
+              status={status}
+              level={level}
+              score={score}
+              minScoreToAdvance={minScoreToAdvance}
+              isLastLevel={isLastLevel}
+              gridSize={GRID_SIZE}
+              snake={snake}
+              direction={direction}
+              apple={apple}
+              blocksFromErrors={blocksFromErrors}
+              countdownLeft={countdownLeft}
+              countdownTotal={COUNTDOWN_SECONDS}
+              onDirection={changeDirection}
+              onTogglePause={togglePause}
+              onHowToPlay={() => openDialog("howto")}
+            />
+          )}
+        </div>
+
+        {status === "QUESTION" && (
+          <QuestionPopup
+            question={currentQuestion}
+            reliability={reliability}
+            secondsLeft={questionSecondsLeft}
+            isSubmitting={isSubmittingAnswer}
+            onChangeReliability={(value) => setReliability(clampReliability(value))}
+            onConfirm={confirmAnswer}
+          />
+        )}
+
+        {status === "FEEDBACK" && lastResult && currentQuestion && (
+          <ResultPopup
+            statement={currentQuestion.statement}
+            result={lastResult}
+            pointsPerCorrect={POINTS_PER_CORRECT}
+            onContinue={continueAfterFeedback}
+          />
+        )}
+
+        {dialog === "exit" && (
+          <ExitMatchDialog
+            score={score}
+            acertos={acertos}
+            answered={answers.length}
+            timeLeft={timeLeft}
+            onContinue={closeDialog}
+            onExit={exitAndSave}
+          />
+        )}
+
+        {dialog === "howto" && (
+          <HowToPlayDialog
+            questionSeconds={QUESTION_SECONDS}
+            pointsPerCorrect={POINTS_PER_CORRECT}
+            onClose={closeDialog}
+          />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className={`fako-app screen-${currentScreen}`}>
-      {/* 1. TELA DE LOGIN / CADASTRO */}
-      {currentScreen === "login" && (
-        <LoginScreen
-          onLoginSuccess={handleLoginSuccess}
-          theme={theme}
-          onToggleTheme={handleToggleTheme}
-        />
-      )}
-
-      {/* 2. TELA INICIAL (DASHBOARD FIGMA) */}
-      {currentScreen === "home" && currentUser && (
-        <HomeScreen
-          user={currentUser}
-          stats={userStats}
-          onPlay={() => handlePlayFromHome("Misto")}
-          onSelectCategory={(cat) => handlePlayFromHome(cat)}
-          onCategories={() => setCurrentScreen("categories")}
-          onTutorial={() => setCurrentScreen("tutorial")}
-          onJourney={() => setCurrentScreen("journey")}
-          onLogout={handleLogout}
+      <div className="page-shell">
+        <AppHeader
+          active={currentScreen === "journey" ? "journey" : "home"}
+          username={currentUser.username}
+          level={progress.current_level}
+          totalScore={progress.total_score}
           isMuted={isMuted}
-          onToggleMute={handleToggleMute}
           theme={theme}
+          onNavigate={handleNavigate}
           onToggleTheme={handleToggleTheme}
+          onToggleMute={handleToggleMute}
+          onLogout={handleLogout}
         />
-      )}
 
-      {/* 3. TELA DE CATEGORIAS */}
-      {currentScreen === "categories" && (
-        <CategoriesScreen
-          onSelectCategory={(cat) => handlePlayFromHome(cat)}
-          onBack={() => setCurrentScreen("home")}
-        />
-      )}
-
-      {/* 4. TELA DE TUTORIAL */}
-      {currentScreen === "tutorial" && (
-        <TutorialScreen
-          onComplete={handleTutorialComplete}
-          onSkip={handleTutorialSkip}
-        />
-      )}
-
-      {/* 5. TELA MINHA JORNADA */}
-      {currentScreen === "journey" && currentUser && (
-        <JourneyScreen
-          user={currentUser}
-          stats={userStats}
-          onBack={() => setCurrentScreen("home")}
-          onPlay={() => handlePlayFromHome("Misto")}
-        />
-      )}
-
-      {/* 6. TELA DO JOGO (SNAKE INTEGRADO AO BACKEND) */}
-      {currentScreen === "game" && (
-        <main className="game-screen-wrapper">
-          {/* Header Mobile / Topo com Cronômetro de 120s da Partida */}
-          <div className="game-top-bar-mobile">
-            <Header
-              score={score}
-              level={level}
-              applesInLevel={applesInLevel}
-              maxApplesPerLevel={APPLES_PER_LEVEL}
-              maxLevels={MAX_LEVELS}
-              matchTimeLeft={matchTimeLeft}
-              isMuted={isMuted}
-              onToggleMute={handleToggleMute}
-              theme={theme}
-              onToggleTheme={handleToggleTheme}
-              onGoHome={handleGoHome}
-              username={currentUser?.username}
-            />
-          </div>
-
-          <div className="game-expanded-layout">
-            {/* Coluna Esquerda: Telemetria e Vidas */}
-            <aside className="game-side-panel left-panel">
-              <div className="side-card main-stats-card">
-                <span className="side-card-badge">🍏 Partida FAKO</span>
-                <div className="side-stat-row">
-                  <span className="side-stat-label">Pontos</span>
-                  <span className="side-stat-val text-accent">{score}</span>
-                </div>
-                <div className="side-stat-row">
-                  <span className="side-stat-label">Tempo Restante</span>
-                  <span className={`side-stat-val ${matchTimeLeft <= 20 ? "text-danger" : ""}`}>
-                    {matchTimeLeft}s
-                  </span>
-                </div>
-                <div className="side-stat-row">
-                  <span className="side-stat-label">Nível</span>
-                  <span className="side-stat-val">
-                    {level} <small>/ {MAX_LEVELS}</small>
-                  </span>
-                </div>
-                <div className="side-progress-box">
-                  <div className="side-progress-header">
-                    <span>Meta de Pontos</span>
-                    <span>
-                      {score} / {currentMatch?.level?.min_score_to_advance ?? 30} pts
-                    </span>
-                  </div>
-                  <div className="side-progress-track">
-                    <div
-                      className="side-progress-fill"
-                      style={{
-                        width: `${Math.min(
-                          100,
-                          (score / (currentMatch?.level?.min_score_to_advance || 30)) * 100
-                        )}%`,
-                      }}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="side-card snake-status-card">
-                <h4 className="side-card-title">🐍 Status da Cobra</h4>
-                <div className="side-metric-item">
-                  <span className="metric-name">Grade do Tabuleiro</span>
-                  <span className="metric-val">{gridSize}×{gridSize}</span>
-                </div>
-                <div className="side-metric-item">
-                  <span className="metric-name">Comprimento</span>
-                  <span className="metric-val">{snake.length} blocos</span>
-                </div>
-                <div className="side-metric-item">
-                  <span className="metric-name">Crescimento no erro</span>
-                  <span className="metric-val text-danger">+{erros}</span>
-                </div>
-              </div>
-            </aside>
-
-            {/* Coluna Central: O Tabuleiro */}
-            <section className="game-center-board">
-              <div className="board-interactive-area">
-                <GameBoard
-                  gridSize={gridSize}
-                  snake={snake}
-                  direction={direction}
-                  apple={apple}
-                  onSwipe={changeDirection}
-                />
-
-                {/* Modal da Pergunta Confiável / Não Confiável */}
-                {status === "QUESTION" && currentQuestion && (
-                  <QuestionModal
-                    question={currentQuestion}
-                    isAnswered={isQuestionAnswered}
-                    result={lastResult}
-                    onConfirm={handleConfirmQuestion}
-                    onResume={handleResumeGame}
-                    isSubmitting={isSubmittingAnswer}
-                  />
-                )}
-
-                {/* Telas de Início, Fim de Jogo, Tempo Esgotado e Vitória */}
-                <OverlayScreen
-                  status={status}
-                  stats={gameStats}
-                  onStart={() => startGame(selectedCategory)}
-                  onRestart={() => startGame(selectedCategory)}
-                  onGoHome={handleGoHome}
-                />
-              </div>
-
-              {/* Controles Virtuais D-pad */}
-              <DpadControls
-                onDirectionChange={changeDirection}
-                disabled={status !== "PLAYING"}
-              />
-            </section>
-
-            {/* Coluna Direita: Análise Crítica e Controles Rápidos */}
-            <aside className="game-side-panel right-panel">
-              <div className="side-card session-category-card">
-                <span className="side-card-badge">Área Temática</span>
-                <h4 className="category-active-title">
-                  {selectedCategory === "Misto" ? "🎲 Modo Desafio Misto" : selectedCategory}
-                </h4>
-                <p className="category-active-desc">
-                  Afirmações reais auditadas contra desinformação com referências científicas e institucionais.
-                </p>
-              </div>
-
-              <div className="side-card accuracy-card">
-                <h4 className="side-card-title">🎯 Precisão da Rodada</h4>
-                <div className="accuracy-big-number">{currentAccuracy}%</div>
-                <div className="side-counts-row">
-                  <span className="count-hit">✅ {acertos} acertos</span>
-                  <span className="count-miss">❌ {erros} erros</span>
-                </div>
-              </div>
-
-              <div className="side-card quick-nav-card">
-                <button
-                  type="button"
-                  className="secondary-button side-nav-btn"
-                  onClick={handleGoHome}
-                >
-                  🏠 Voltar ao Hub
-                </button>
-                <button
-                  type="button"
-                  className="secondary-button side-nav-btn"
-                  onClick={() => setCurrentScreen("tutorial")}
-                >
-                  📖 Ver Regras
-                </button>
-              </div>
-            </aside>
-          </div>
-        </main>
-      )}
+        {currentScreen === "journey" ? (
+          <JourneyScreen
+            levels={levels}
+            currentLevel={progress.current_level}
+            highestLevel={progress.highest_level}
+            totalScore={progress.total_score}
+            matchesPlayed={progress.matches_played}
+            bestScoreInLevel={bestScoreInCurrentLevel}
+            stats={userStats}
+            onPlayLevel={(number) => startGame(number)}
+          />
+        ) : (
+          <HomeScreen
+            username={currentUser.username}
+            currentLevel={progress.current_level}
+            maxLevels={maxLevels}
+            missingPoints={missingPoints}
+            matchSeconds={MATCH_SECONDS}
+            stats={userStats}
+            matchesPlayed={progress.matches_played}
+            onPlay={() => startGame()}
+            onTutorial={() => setCurrentScreen("tutorial")}
+          />
+        )}
+      </div>
     </div>
   );
 }

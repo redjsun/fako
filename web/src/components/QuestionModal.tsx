@@ -1,296 +1,201 @@
-import React, { useState, useEffect, useRef } from "react";
-import { Question, AnswerResult, ModelGuess } from "../types";
-import { soundEffects } from "../services/audioService";
+import React from "react";
+import { AnswerResult, Question } from "../types";
+import { reliabilityLabel } from "../utils/formatters";
+import { Icon } from "./Icon";
+import { ReliabilityBar } from "./ReliabilityBar";
 
-const ROTULO_PALPITE: Record<ModelGuess["category"], string> = {
-  falso: "Parece falsa",
-  enganoso: "Parece enganosa",
-  confere: "Parece confiável",
-  incerto: "Não teve certeza",
-};
+const SHORTCUTS = [0, 25, 50, 75, 100];
 
-const ehLink = (fonte: string) => /^https?:\/\//.test(fonte);
-
-interface QuestionModalProps {
-  question: Question;
-  isAnswered: boolean;
-  result: AnswerResult | null;
-  onConfirm: (answer: boolean) => void;
-  onResume: () => void;
-  isSubmitting?: boolean;
+interface QuestionPopupProps {
+  question: Question | null;
+  reliability: number;
+  secondsLeft: number;
+  isSubmitting: boolean;
+  onChangeReliability: (value: number) => void;
+  onConfirm: () => void;
 }
 
-export const QuestionModal: React.FC<QuestionModalProps> = ({
+/** Popup da afirmação: a partida pausa e o jogador marca de 0% a 100% na barra. */
+export const QuestionPopup: React.FC<QuestionPopupProps> = ({
   question,
-  isAnswered,
-  result,
+  reliability,
+  secondsLeft,
+  isSubmitting,
+  onChangeReliability,
   onConfirm,
-  onResume,
-  isSubmitting = false,
 }) => {
-  const QUESTION_DURATION = 45;
-  const [selectedAnswer, setSelectedAnswer] = useState<boolean | null>(null);
-  const [timeLeft, setTimeLeft] = useState<number>(QUESTION_DURATION);
-  const timerRef = useRef<number | null>(null);
-  const lastSecondRef = useRef<number>(QUESTION_DURATION);
-
-  // Reiniciar estado da pergunta
-  useEffect(() => {
-    setSelectedAnswer(null);
-    setTimeLeft(QUESTION_DURATION);
-    lastSecondRef.current = QUESTION_DURATION;
-
-    const deadline = Date.now() + QUESTION_DURATION * 1000;
-
-    timerRef.current = window.setInterval(() => {
-      const remaining = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
-      setTimeLeft(remaining);
-
-      // Efeito sonoro nos últimos 5 segundos
-      if (remaining <= 5 && remaining > 0 && remaining !== lastSecondRef.current) {
-        soundEffects.playTick();
-        lastSecondRef.current = remaining;
-      }
-
-      if (remaining <= 0) {
-        if (timerRef.current) {
-          clearInterval(timerRef.current);
-          timerRef.current = null;
-        }
-        // Auto-confirmação: usa a escolha atual ou padrão (true)
-        setSelectedAnswer((currentVal) => {
-          const finalVal = currentVal ?? true;
-          onConfirm(finalVal);
-          return finalVal;
-        });
-      }
-    }, 100);
-
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-    };
-  }, [question, onConfirm]);
-
-  // Se já foi respondido, limpa o cronômetro
-  useEffect(() => {
-    if (isAnswered && timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-  }, [isAnswered]);
-
-  // Teclas de atalho: 1 ou C (Confiável), 2 ou N (Não Confiável), Enter (Confirmar/Continuar)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (isAnswered) {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onResume();
-        }
-        return;
-      }
-
-      if (e.key === "1" || e.key === "c" || e.key === "C") {
-        setSelectedAnswer(true);
-      } else if (e.key === "2" || e.key === "n" || e.key === "N") {
-        setSelectedAnswer(false);
-      } else if (e.key === "ArrowLeft") {
-        setSelectedAnswer(true);
-      } else if (e.key === "ArrowRight") {
-        setSelectedAnswer(false);
-      } else if (e.key === "Enter") {
-        e.preventDefault();
-        if (selectedAnswer !== null && !isSubmitting) {
-          onConfirm(selectedAnswer);
-        }
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isAnswered, selectedAnswer, isSubmitting, onConfirm, onResume]);
-
-  const statement = question.statement || question.afirmacao || "";
-  const category = question.category || question.categoria || "Gerais";
-
-  const getCategoryClass = (cat: string) => {
-    const lower = cat.toLowerCase();
-    if (lower.includes("saúde") || lower.includes("saude")) return "cat-saude";
-    if (lower.includes("tec")) return "cat-tecnologia";
-    if (lower.includes("geral") || lower.includes("conhecimento")) return "cat-gerais";
-    return "cat-default";
-  };
-
-  const isLowTime = timeLeft <= 5 && !isAnswered;
-
   return (
-    <div
-      className="bubble-backdrop"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="question-text"
-    >
-      <div className="speech-bubble">
-        {/* Cabeçalho do balão: Categoria e Cronômetro */}
-        <div className="bubble-header">
-          <span className={`category-tag ${getCategoryClass(category)}`}>
-            {category}
+    <div className="popup-scrim popup-scrim--below-hud">
+      <section
+        className="popup-card question-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="question-statement"
+      >
+        <div className="question-card__pills">
+          <span className="pill pill--muted">
+            <Icon name="pause" size={14} />
+            Tempo pausado
           </span>
-          <div className={`countdown-timer ${isLowTime ? "timer-alert" : ""}`}>
-            <span className="timer-icon">⏳</span>
-            <span className="timer-seconds">
-              {isAnswered ? "Finalizado" : `${timeLeft}s`}
-            </span>
-          </div>
+          <span className={`pill pill--amber ${secondsLeft <= 10 ? "is-ending" : ""}`} role="timer">
+            <Icon name="hourglass" size={14} />
+            {secondsLeft}s para responder
+          </span>
         </div>
 
-        {/* Afirmação para checagem */}
-        <p className="statement-text" id="question-text">
-          "{statement}"
-        </p>
+        {question ? (
+          <>
+            <h2 id="question-statement" className="question-card__statement">
+              “{question.statement}”
+            </h2>
+            <p className="question-card__prompt">Quão confiável é esta informação?</p>
 
-        {/* FASE 1: Seleção de Confiabilidade (Confiável vs Não Confiável) */}
-        {!isAnswered ? (
-          <div className="semantic-interaction">
-            <span className="slider-title">
-              Como você classifica a confiabilidade desta informação?
-            </span>
-
-            <div className="semantic-buttons-row">
-              <button
-                type="button"
-                className={`semantic-btn btn-confiavel ${
-                  selectedAnswer === true ? "active" : ""
-                }`}
-                onClick={() => setSelectedAnswer(true)}
-              >
-                <span className="semantic-btn-icon">🛡️</span>
-                <span className="semantic-btn-title">Confiável</span>
-                <span className="semantic-btn-sub">Informação verídica / segura</span>
-                <span className="semantic-btn-key">Atalho: 1 ou C</span>
-              </button>
-
-              <button
-                type="button"
-                className={`semantic-btn btn-nao-confiavel ${
-                  selectedAnswer === false ? "active" : ""
-                }`}
-                onClick={() => setSelectedAnswer(false)}
-              >
-                <span className="semantic-btn-icon">⚠️</span>
-                <span className="semantic-btn-title">Não Confiável</span>
-                <span className="semantic-btn-sub">Mito, golpe ou boato falso</span>
-                <span className="semantic-btn-key">Atalho: 2 ou N</span>
-              </button>
+            <div className="question-card__reading" aria-live="polite">
+              <strong>{reliability}%</strong>
+              <span>{reliabilityLabel(reliability)}</span>
             </div>
 
-            <button
-              type="button"
-              className="action-button confirm-button"
-              disabled={selectedAnswer === null || isSubmitting}
-              onClick={() => {
-                if (selectedAnswer !== null) {
-                  onConfirm(selectedAnswer);
-                }
-              }}
-            >
-              {isSubmitting
-                ? "Validando resposta..."
-                : selectedAnswer === null
-                ? "Selecione uma opção acima"
-                : "Confirmar Análise (Enter)"}
-            </button>
-          </div>
-        ) : (
-          /* FASE 2: Revelação da Resposta e Explicação da API */
-          <div className="feedback-reveal">
-            {result && (
-              <div
-                className={`verdict-banner ${
-                  result.is_correct ? "verdict-hit" : "verdict-miss"
-                }`}
-              >
-                <div className="verdict-icon">
-                  {result.is_correct ? "🎯" : "⚠️"}
-                </div>
-                <div className="verdict-details">
-                  <h3 className="verdict-title">
-                    {result.is_correct
-                      ? "Mandou bem! Análise correta!"
-                      : "Atenção! Análise incorreta!"}
-                  </h3>
-                  <p className="verdict-points">
-                    {result.is_correct
-                      ? `+10 pontos! A cobrinha manteve seu tamanho.`
-                      : `0 pontos. A cobrinha cresceu +1 bloco!`}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Veredito Oficial do Backend */}
-            <div className="official-status-box">
-              <span className="official-label">Classificação Oficial:</span>
-              <span
-                className={`official-badge ${
-                  result?.correct_answer ? "badge-confiavel" : "badge-nao-confiavel"
-                }`}
-              >
-                {result?.correct_answer ? "🛡️ Confiável" : "⚠️ Não Confiável"}
-              </span>
-            </div>
-
-            {/* Explicação pedagógica e fonte da API */}
-            <div className="explanation-card">
-              <h4 className="explanation-title">💡 Por que essa referência?</h4>
-              <p className="explanation-text">{result?.explanation || question.explicacao}</p>
-              {(result?.source || question.fonte) && (
-                <div className="source-row">
-                  <span className="source-label">Fonte de validação:</span>
-                  {ehLink(result?.source || "") ? (
-                    <a
-                      className="source-text"
-                      href={result?.source}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Ler a notícia original
-                    </a>
-                  ) : (
-                    <span className="source-text">{result?.source || question.fonte}</span>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Palpite do classificador: estimativa estatística, pode errar */}
-            {result?.model_guess && (
-              <div className="model-guess-card">
-                <span className="model-guess-label">🤖 Palpite do modelo FAKO:</span>
-                <span className={`model-guess-badge model-guess-${result.model_guess.category}`}>
-                  {ROTULO_PALPITE[result.model_guess.category]}
-                  {result.model_guess.score !== null &&
-                    ` · nota ${Math.round(result.model_guess.score)}/100`}
-                </span>
-                <p className="model-guess-note">
-                  Estimativa estatística pelo jeito do texto, não uma checagem. O modelo também erra.
-                </p>
-              </div>
-            )}
-
-            <button
-              type="button"
-              className="action-button resume-button"
-              onClick={onResume}
+            <ReliabilityBar
+              value={reliability}
+              onChange={onChangeReliability}
+              valueLabel="Sua resposta"
               autoFocus
+            />
+
+            <div className="question-card__shortcuts" role="group" aria-label="Valores rápidos">
+              {SHORTCUTS.map((shortcut) => (
+                <button
+                  key={shortcut}
+                  type="button"
+                  className={`chip-button ${reliability === shortcut ? "is-active" : ""}`}
+                  onClick={() => onChangeReliability(shortcut)}
+                >
+                  {shortcut}%
+                </button>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              className="button button--dark button--block button--large"
+              onClick={onConfirm}
+              disabled={isSubmitting}
             >
-              Continuar Jogo (Espaço / Enter) ➔
+              {isSubmitting ? "Enviando resposta…" : "Confirmar resposta (Enter)"}
+              <Icon name="right" size={20} />
             </button>
-          </div>
+
+            <p className="question-card__help">
+              Atalhos: ← → ajusta 5% · Enter confirma
+              <br />
+              Você acerta se ficar a até 15 pontos da referência oficial.
+            </p>
+          </>
+        ) : (
+          <p className="question-card__loading" role="status">
+            Carregando a afirmação…
+          </p>
         )}
-      </div>
+      </section>
+    </div>
+  );
+};
+
+interface ResultPopupProps {
+  statement: string;
+  result: AnswerResult;
+  pointsPerCorrect: number;
+  onContinue: () => void;
+}
+
+function distanceMessage(result: AnswerResult): string {
+  if (result.distance === 0) return "Cravou a referência. Na mosca!";
+  const points = result.distance === 1 ? "ponto" : "pontos";
+  return result.is_correct
+    ? `Ficou a ${result.distance} ${points} da referência. Boa análise!`
+    : `Ficou a ${result.distance} ${points} da referência. Leia o porquê abaixo.`;
+}
+
+/** Popup do resultado: sua resposta × referência, explicação, fonte e efeito na cobrinha. */
+export const ResultPopup: React.FC<ResultPopupProps> = ({
+  statement,
+  result,
+  pointsPerCorrect,
+  onContinue,
+}) => {
+  const tone = result.is_correct ? "success" : "danger";
+
+  return (
+    <div className="popup-scrim popup-scrim--below-hud">
+      <section
+        className={`popup-card result-card result-card--${tone}`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="result-title"
+      >
+        <header className="result-card__header">
+          <span className="result-card__icon" aria-hidden="true">
+            <Icon name={result.is_correct ? "check" : "x"} size={30} />
+          </span>
+          <div className="result-card__heading">
+            <h2 id="result-title">{result.is_correct ? "Você acertou!" : "Não foi dessa vez"}</h2>
+            <p>{distanceMessage(result)}</p>
+          </div>
+          <span className="result-card__badge">
+            {result.is_correct ? `+${pointsPerCorrect} pts` : "+1 bloco"}
+          </span>
+        </header>
+
+        <div className="result-card__body">
+          <blockquote className="result-card__statement">“{statement}”</blockquote>
+
+          <div className="result-card__comparison">
+            <h3>Sua resposta × referência oficial</h3>
+            <ReliabilityBar
+              value={result.reliability}
+              reference={result.reliability_reference}
+              tolerance={result.tolerance}
+              caption={`A área tracejada é a faixa de acerto: até ${result.tolerance} pontos da referência.`}
+            />
+          </div>
+
+          <div className="result-card__why">
+            <h3>
+              <Icon name="bulb" size={18} />
+              Por quê?
+            </h3>
+            <p>{result.explanation}</p>
+            {result.source && (
+              <p className="result-card__source">
+                <Icon name="book" size={14} />
+                Fonte: {result.source}
+              </p>
+            )}
+          </div>
+
+          <div className="result-card__snake">
+            <span className="result-card__snake-blocks" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+              {!result.is_correct && <span className="is-new" />}
+            </span>
+            {result.is_correct
+              ? "A cobrinha não cresceu. Continue assim!"
+              : "A cobrinha cresceu +1 bloco. Leia com calma!"}
+          </div>
+
+          <button
+            type="button"
+            className="button button--dark button--block button--large"
+            onClick={onContinue}
+            autoFocus
+          >
+            Continuar jogando (Enter)
+            <Icon name="right" size={20} />
+          </button>
+        </div>
+      </section>
     </div>
   );
 };
