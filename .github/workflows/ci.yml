@@ -82,7 +82,7 @@ jobs:
         run: pytest -v
 
   web:
-    name: Web (build)
+    name: Web (lint e build)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -97,8 +97,27 @@ jobs:
       - name: Instalar dependências
         run: npm install
 
+      - name: Lint
+        run: npm run lint
+
       - name: Build
         run: npm run build
+
+  docs:
+    name: Docs (build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependências
+        run: pip install mkdocs-material
+
+      - name: Build
+        run: mkdocs build --strict
 
   docker:
     name: Docker (build das imagens)
