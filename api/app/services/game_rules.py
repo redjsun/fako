@@ -7,6 +7,9 @@ MATCH_DURATION_SECONDS = 120
 # O cronômetro de 120 s fica no front e pausa durante a pergunta, o feedback e as pausas,
 # então o servidor não mede o tempo de jogo: só recusa partidas abertas há mais que isto.
 MATCH_MAX_OPEN_SECONDS = 30 * 60
+# Teto de respostas por partida (uma a cada 2 s de jogo), já que o servidor não mede o
+# tempo de jogo: limita o placar de quem chama a API direto, sem pesar para quem joga.
+MAX_ANSWERS_PER_MATCH = MATCH_DURATION_SECONDS // 2
 
 POINTS_PER_CORRECT_ANSWER = 10
 # Consequência do erro na pontuação. A consequência na mecânica

@@ -70,6 +70,7 @@ Partida do jogador (`match.py`).
 | `status` | `enum` (`MatchStatus`) | `in_progress` ou `finished` |
 | `started_at` | `DateTime` | |
 | `ended_at` | `DateTime`, opcional | |
+| `current_question_id` | `FK → questions.id`, opcional | pergunta servida e ainda sem resposta: a única que a partida aceita responder, e a que `next-question` devolve até ser respondida |
 
 ## `match_answers`
 
@@ -101,6 +102,7 @@ Progresso consolidado do jogador na jornada (`progress.py`), um registro por jog
 - `questions.category_id → categories.id` (N para 1)
 - `matches.user_id → users.id` (N para 1)
 - `matches.level_id → levels.id` (N para 1)
+- `matches.current_question_id → questions.id` (N para 1, opcional)
 - `match_answers.match_id → matches.id` (N para 1)
 - `match_answers.question_id → questions.id` (N para 1)
 - `user_progress.user_id → users.id` (1 para 1)
