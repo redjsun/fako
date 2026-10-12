@@ -50,3 +50,8 @@ Use as abas no topo para navegar, ou veja o índice completo abaixo.
 | Documento | Conteúdo |
 |---|---|
 | [Relatório técnico do classificador](relatorio-tecnico.md) | Preparação dos dados, treino, métricas, desafios e aprendizados |
+
+## Glossário
+
+[Glossário](glossario.md): termos de produto, dados, engenharia de requisitos e
+arquitetura usados nesta documentação, reunidos num só lugar.
