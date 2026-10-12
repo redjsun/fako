@@ -93,7 +93,8 @@ jobs:
         continue-on-error: true
 
   web:
-    name: Web (tipos, lint, testes e build)
+    # O nome é a checagem exigida pelos rulesets da develop e da main: não renomear.
+    name: Web (build)
     runs-on: ubuntu-latest
     defaults:
       run:
