@@ -15,8 +15,9 @@ topo para navegar, ou veja o índice completo abaixo.
 | [Decisões de produto](requisitos/decisoes-de-produto.md) | Decisões abertas que mudam o contrato entre jogo, API e modelo |
 | [Técnicas de elicitação](requisitos/tecnicas-elicitacao.md) | Workshop, entrevista e a priorização MoSCoW que geraram o catálogo de requisitos |
 | [Perguntas norteadoras](requisitos/perguntas-norteadoras.md) | Os dez critérios que orientam como a IA analisa, classifica e vira questão jogável |
-| [Requisitos funcionais](requisitos/requisitos-funcionais.md) | Catálogo oficial RF01–RF24, com prioridade e origem |
-| [Requisitos não funcionais](requisitos/requisitos-nao-funcionais.md) | Catálogo oficial RNF01–RNF22, com prioridade e origem |
+| [Requisitos funcionais](requisitos/requisitos-funcionais.md) | Catálogo RF01 a RF30, com prioridade e origem |
+| [Requisitos não funcionais](requisitos/requisitos-nao-funcionais.md) | Catálogo RNF01 a RNF27, com prioridade e origem |
+| [Histórias de usuário](requisitos/historias-usuario.md) | Os requisitos funcionais reescritos como histórias de usuário |
 
 ## Produto
 
