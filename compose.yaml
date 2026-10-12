@@ -1,18 +1,48 @@
 services:
+  db:
+    image: postgres:16-alpine
+    container_name: fakenews-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fako}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fako}
+      POSTGRES_DB: ${POSTGRES_DB:-fako}
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   api:
     build: ./api
     container_name: fakenews-api
     restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-fako}:${POSTGRES_PASSWORD:-fako}@db:5432/${POSTGRES_DB:-fako}
     ports:
       - "8000:8000"
     volumes:
       - ./api/app:/app/app
+      - ./api/migrations:/app/migrations
+      - ./models:/app/models:ro   # modelos publicados (MODELS_DIR), só leitura
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      db:
+        condition: service_healthy
 
   web:
     build: ./web
     container_name: fakenews-web
     restart: unless-stopped
+    environment:
+      API_URL: http://api:8000   # destino do proxy /api do Vite
     ports:
       - "5173:5173"
     volumes:
@@ -20,3 +50,77 @@ services:
       - /app/node_modules
     depends_on:
       - api
+
+  # Pesquisa: EDA, preparo dos dados e experimentos de ML (pasta pesquisa/).
+  pesquisa:
+    build: ./pesquisa
+    container_name: fakenews-pesquisa
+    profiles: ["pesquisa"]
+    env_file:
+      - path: .env
+        required: false
+    # Para alcançar uma LLM local no host (Ollama) também no Linux.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./pesquisa:/work/pesquisa
+      - ./api/app/prompts:/work/api/app/prompts
+
+  # Coleta diária e preparo dos dados nos horários de pesquisa/crontab (supercronic).
+  agendador:
+    build: ./pesquisa
+    container_name: fakenews-agendador
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      TZ: America/Sao_Paulo
+    command: supercronic /work/pesquisa/crontab
+    volumes:
+      - ./pesquisa:/work/pesquisa
+      - ./models:/work/models
+
+  # Treino e experimentos de ML: imagem com PyTorch CPU e transformers, fora da API.
+  ml:
+    build: ./pesquisa/ml
+    container_name: fakenews-ml
+    profiles: ["ml"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # Pesos baixados do Hugging Face (BERTimbau) ficam em models/, fora do Git
+      HF_HOME: /work/models/.cache/huggingface
+    volumes:
+      - ./pesquisa:/work/pesquisa
+      - ./api/app/prompts:/work/api/app/prompts
+      - ./models:/work/models
+
+  # Ambiente do ml/ antigo (BERTimbau Y1/Y2 lido por api/app/integrations/bertimbau_engine.py).
+  ml-legado:
+    build: ./ml
+    container_name: fakenews-ml-legado
+    profiles:
+      - ml-legado
+    volumes:
+      - ./ml:/work/ml
+      - ./data:/work/data
+      - ./scripts:/work/scripts
+      - ./anotacoes:/work/anotacoes
+      - ./models:/work/models
+
+  # Documentação do projeto (MkDocs + Material), servida com live-reload.
+  docs:
+    image: squidfunk/mkdocs-material
+    container_name: fakenews-docs
+    profiles: ["docs"]
+    ports:
+      - "8001:8000"
+    volumes:
+      - .:/docs
+
+volumes:
+  db_data:

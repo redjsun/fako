@@ -1,0 +1,13 @@
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["migrations/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+# B008: Depends(...) em parâmetros padrão é o idioma do FastAPI.
+# E501: o tamanho da linha fica a cargo do `ruff format`; UP017: mantemos `timezone.utc`.
+ignore = ["B008", "E501", "UP017"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

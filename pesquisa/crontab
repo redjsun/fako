@@ -1,0 +1,6 @@
+# Tarefas do serviço agendador (supercronic), no fuso de TZ (America/Sao_Paulo no compose).
+# Os comandos rodam em /work, a raiz do repositório no container.
+# Ver doc/planejamento-retreino.md.
+
+# Coleta incremental diária: checagens novas da Fact Check API e preparo do dataset.jsonl.
+0 3 * * * python pesquisa/dados/coletar_factcheck.py --incremental && python pesquisa/dados/preparar_dados.py
