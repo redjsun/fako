@@ -74,20 +74,29 @@ make padronizar ARGS="--paralelo 8"  # lote todo; outra versão: PROMPT=api/app/
 - **Custo:** cada rodada acrescenta o tempo, o número de chamadas e os tokens (quando o
   endpoint informa) em `padronizado_<versao>.rodadas.jsonl`.
 
-### Lote de outubro de 2026
+### Lote de outubro de 2026 e o texto híbrido
 
-Medido com `qwen3:8b` no Ollama do host (Mac): **cerca de 6 s por item**, também com
-`--paralelo 4` (o Ollama atende um pedido por vez) e com `--max-caracteres 1500` (o prompt
-tem ~900 tokens e a resposta domina o tempo). Os ~28 mil itens levariam ~44 h, então o lote
-roda em duas etapas, retomando do cache:
+Medido com `qwen3:8b` no Ollama do host (Mac M4, 24 GB): **cerca de 6 s por item**. A resposta
+domina o tempo (o prompt tem ~900 tokens); cortar o texto de entrada (`--max-caracteres 1500`)
+não ajudou, e nem o paralelismo: com `OLLAMA_NUM_PARALLEL=4` e `--paralelo 4`, 7,3 s por item,
+porque os pedidos dividem a mesma banda de memória da GPU. Padronizar os ~28 mil registros
+levaria ~44 h.
+
+Por isso o primeiro modelo usa o **texto híbrido** (`texto = "hibrido"`, em
+`configs/referencia-hibrido.toml`): o `texto_curto` onde ele existe (as checagens já são
+alegações curtas) e a afirmação extraída só nos registros sem ele, os 12 mil do Fake.br e das
+mensagens, que antes ficavam fora. Eles trazem ~6,4 mil verdadeiros e os falsos das mesmas
+bases (só os verdadeiros ensinariam que "texto do Fake.br = verdadeiro"). No jogo, a manchete
+passa pela mesma extração (`Question.claim_text`). O lote:
 
 ```bash
-make padronizar ARGS="--splits validacao,teste"         # ~6 mil itens, ~10 h
-make padronizar ARGS="--splits treino --limite 6000"    # amostra estratificada pelo hash
+make padronizar ARGS="--splits validacao,teste --sem-texto-curto"     # 1.124 itens, ~2 h
+make padronizar ARGS="--splits treino --sem-texto-curto --limite 4000" # amostra pelo hash, ~7 h
 ```
 
-O resto do treino continua depois com o mesmo comando, sem `--limite`. O treino padronizado
-usa só os registros já no cache.
+A amostra do `--limite` é reproduzível (hash do id) e mantém juntos os pares do Fake.br. O
+resto do treino sem texto curto, e a versão 100% padronizada (que exige padronizar também os
+10,5 mil com texto curto, ~18 h), continuam depois com os mesmos comandos, retomando do cache.
 
 ## Calibração e limiares (#12)
 

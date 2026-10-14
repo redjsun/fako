@@ -157,6 +157,37 @@ def test_carregar_padronizado_usa_o_cache_do_prompt_e_modelo(dataset, tmp_path):
     assert not any(outro_modelo.splits.values())
 
 
+def test_carregar_hibrido_usa_o_texto_curto_e_so_extrai_onde_falta(dataset, tmp_path):
+    prompt_arquivo = tmp_path / "extrair_afirmacoes_v1.txt"
+    prompt_arquivo.write_text("Extraia: {texto}", encoding="utf-8")
+    prompt = Prompt("v1", "Extraia: {texto}")
+    linhas = [
+        {"id": "a", "afirmacoes": [{"texto": "Extraída de a", "quem_disse": None}]},
+        {"id": "g", "afirmacoes": [{"texto": "Extraída do texto longo", "quem_disse": "X"}]},
+    ]
+    caminho_cache("v1", dataset.parent).write_text(
+        "".join(
+            json.dumps({**linha, "versao": "v1", "prompt_sha1": prompt.sha1, "modelo": "qwen-x"})
+            + "\n"
+            for linha in linhas
+        ),
+        encoding="utf-8",
+    )
+    sem_anotacao = tmp_path / "x.csv"
+    original = {
+        e.id: e.texto for e in carregar(dataset=dataset, anotacoes=sem_anotacao).splits["treino"]
+    }
+    hibrido = {
+        e.id: e.texto
+        for e in carregar(
+            "hibrido", dataset, prompt_arquivo, "qwen-x", anotacoes=sem_anotacao
+        ).splits["treino"]
+    }
+    # Quem tem texto curto fica com ele, mesmo estando no cache; quem não tem entra extraído.
+    assert {i: t for i, t in hibrido.items() if i != "g"} == original
+    assert hibrido["g"] == "Extraída do texto longo" and "g" not in original
+
+
 def test_padronizado_exige_prompt_e_modelo(dataset):
     with pytest.raises(ValueError):
         carregar("padronizado", dataset)

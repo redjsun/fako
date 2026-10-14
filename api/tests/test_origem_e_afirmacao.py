@@ -69,6 +69,11 @@ def test_afirmacao_extraida_so_com_modelo_padronizado():
     assert padronizado.afirmacao("Manchete qualquer") == "Afirmação extraída"
     original = NoticiasService(None, [], FakeClassificador(), LLMQueExtrai())
     assert original.afirmacao("Manchete qualquer") is None
+    hibrido = ClassificadorPadronizado()
+    hibrido.texto_de_entrada = "hibrido"
+    assert NoticiasService(None, [], hibrido, LLMQueExtrai()).afirmacao("Manchete") == (
+        "Afirmação extraída"
+    )
     sem_llm = NoticiasService(None, [], ClassificadorPadronizado(), LLMFora())
     assert sem_llm.afirmacao("Manchete qualquer") is None
 
@@ -81,8 +86,10 @@ def palpite_ligado(monkeypatch):
     get_settings.cache_clear()
 
 
-def test_palpite_usa_a_afirmacao_extraida_com_modelo_padronizado(palpite_ligado):
+@pytest.mark.parametrize("texto_de_entrada", ["padronizado", "hibrido"])
+def test_palpite_usa_a_afirmacao_extraida_com_modelo_padronizado(palpite_ligado, texto_de_entrada):
     classificador = ClassificadorPadronizado()
+    classificador.texto_de_entrada = texto_de_entrada
     servico = ClassificadorService(classificador)
     servico.palpite_do_jogo("Manchete do jogo", "Afirmação extraída")
     servico.palpite_do_jogo("Questão humana", None)

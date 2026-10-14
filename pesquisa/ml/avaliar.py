@@ -9,7 +9,7 @@ Contrato com os scripts de treino (#9, #10): a pasta do modelo tem
 - `previsoes.jsonl`: uma linha por exemplo, `{"id", "split", "p1", "p2"}`, com as duas
   fronteiras ordinais P1 = P(veracidade > falso) e P2 = P(veracidade > enganoso), já
   calibradas. `gravar_previsoes()` grava nesse formato;
-- `config.json` (opcional): `{"texto": "original" | "padronizado", "prompt": ..., "modelo_llm": ...}`,
+- `config.json` (opcional): `{"texto": "original" | "padronizado" | "hibrido", "prompt": ..., "modelo_llm": ...}`,
   para carregar os mesmos exemplos de `dados.py`;
 - `limiares.json` (opcional, #12): `{"admin": 0.6, "jogador": 0.8}`, a confiança mínima abaixo
   da qual a saída é `incerto`.

@@ -42,7 +42,7 @@ class ClassificadorService:
         treinado no texto padronizado; senão, o enunciado como o jogador leu."""
         if not get_settings().classificador_no_jogo:
             return None
-        padronizado = self.classificador.texto_de_entrada == "padronizado"
+        padronizado = self.classificador.texto_de_entrada != "original"
         entrada = claim_text if padronizado and claim_text else statement
         try:
             analise = self.classificador.analisar(entrada, "jogador")

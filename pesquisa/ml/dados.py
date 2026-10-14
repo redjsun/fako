@@ -4,6 +4,7 @@ Uso:
     from dados import carregar
     conjunto = carregar()                       # texto_curto original, limpo
     conjunto = carregar(texto="padronizado", prompt=Path(...), modelo="qwen...")  # #20
+    conjunto = carregar(texto="hibrido", prompt=Path(...), modelo="qwen...")      # curto ou extraído
     conjunto.splits["treino"]                   # lista de Exemplo
 
     python pesquisa/ml/dados.py                 # contagens por split e classe
@@ -16,6 +17,9 @@ Regras:
   `validacao`, `teste`); `reserva` e `fora` ficam de fora.
 - **Sem `origem_rotulo=portal`**: as matérias de portais são verdadeiras por suposição e não
   entram no dataset selecionado (#6, #37). `incluir_portal=True` existe só para diagnóstico.
+- Texto `hibrido`: o `texto_curto` quando existe (as checagens já são alegações curtas) e a
+  afirmação extraída pela LLM só nos registros sem ele (Fake.br, mensagens): traz esses
+  registros para o treino sem padronizar o que já é curto.
 - Texto `original`: o `texto_curto`; registros sem ele ficam de fora. Texto `padronizado`:
   a primeira afirmação extraída pela LLM, do cache de padronizar.py (#20), com o mesmo
   prompt e o mesmo modelo do uso; registros sem afirmação (opinião) ficam de fora.
@@ -46,6 +50,7 @@ from padronizar import aplicar, caminho_cache, carregar_prompt, ler_cache
 
 RAIZ = Path(__file__).resolve().parent.parent
 DATASET = RAIZ / "data" / "processed" / "dataset.jsonl"
+TEXTOS = ("original", "padronizado", "hibrido")
 ANOTACOES = RAIZ / "anotacoes" / "consolidado.csv"
 
 SPLITS = ("treino", "validacao", "teste")
@@ -223,8 +228,8 @@ def carregar(
     incluir_portal: bool = False,
 ) -> Conjunto:
     """Treino, validação e teste, já limpos e com alvos e pesos."""
-    if texto not in ("original", "padronizado"):
-        raise ValueError(f"texto deve ser 'original' ou 'padronizado', não {texto!r}")
+    if texto not in TEXTOS:
+        raise ValueError(f"texto deve ser um de {TEXTOS}, não {texto!r}")
     conjunto = Conjunto(texto=texto, dataset_sha256=sha256(dataset))
     conjunto.splits = {s: [] for s in SPLITS}
 
@@ -236,9 +241,9 @@ def carregar(
                 registros.append(r)
 
     campo = "texto_curto"
-    if texto == "padronizado":
+    if texto != "original":
         if prompt is None or not modelo:
-            raise ValueError("texto='padronizado' exige o prompt e o modelo da padronização")
+            raise ValueError(f"texto={texto!r} exige o prompt e o modelo da padronização")
         p = carregar_prompt(prompt)
         cache = ler_cache(caminho_cache(p.versao, dataset.parent), p, modelo)
         registros = list(aplicar(registros, cache))
@@ -248,6 +253,8 @@ def carregar(
     rotulos = ler_anotacoes(anotacoes)
     for r in registros:
         bruto = (r.get(campo) or "").strip()
+        if texto == "hibrido" and (r.get("texto_curto") or "").strip():
+            bruto = r["texto_curto"].strip()
         limpo = limpar(bruto) if bruto else ""
         if not limpo:
             continue

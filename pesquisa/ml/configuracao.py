@@ -15,7 +15,7 @@ Seções:
     nome = "referencia"              # identifica a execução
     modelo = "referencia" | "bert"   # qual script de treino
     saida = "models/2026-11/referencia"
-    [dados]   dataset, texto ("original" ou "padronizado"), prompt, modelo_llm (padrão: LLM_MODEL)
+    [dados]   dataset, texto ("original", "padronizado" ou "hibrido"), prompt, modelo_llm (padrão: LLM_MODEL)
     [treino]  hiperparâmetros do modelo (livres, cada script lê os seus)
     sementes = [13, 42, 7]
 
@@ -31,7 +31,7 @@ from pathlib import Path
 RAIZ_REPOSITORIO = Path(__file__).resolve().parents[2]
 CONFIGS = Path(__file__).resolve().parent / "configs"
 MODELOS = ("referencia", "bert", "atalho")
-TEXTOS = ("original", "padronizado")
+TEXTOS = ("original", "padronizado", "hibrido")
 
 
 class ErroConfiguracao(ValueError):
@@ -98,9 +98,9 @@ def carregar_configuracao(arquivo: Path, raiz: Path = RAIZ_REPOSITORIO) -> Confi
     if texto not in TEXTOS:
         raise ErroConfiguracao(f"{arquivo.name}: dados.texto deve ser um de {TEXTOS}")
     modelo_llm = secao_dados.get("modelo_llm") or os.environ.get("LLM_MODEL") or None
-    if texto == "padronizado" and not (secao_dados.get("prompt") and modelo_llm):
+    if texto != "original" and not (secao_dados.get("prompt") and modelo_llm):
         raise ErroConfiguracao(
-            f"{arquivo.name}: texto padronizado exige dados.prompt e o modelo da padronização "
+            f"{arquivo.name}: texto {texto} exige dados.prompt e o modelo da padronização "
             "(dados.modelo_llm ou LLM_MODEL)"
         )
     sementes = dados.get("sementes", [42])

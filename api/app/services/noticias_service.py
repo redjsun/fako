@@ -254,7 +254,8 @@ class NoticiasService:
         Mesmo prompt da padronização (#20); a primeira afirmação, como no treino. Sem LLM, ou
         com a LLM fora, fica None e o classificador recebe a manchete.
         """
-        if self.llm is None or self.classificador.texto_de_entrada != "padronizado":
+        # No híbrido, a manchete (que não é texto curto de checagem) também vai pela extração.
+        if self.llm is None or self.classificador.texto_de_entrada == "original":
             return None
         try:
             extracao = self.llm.extrair_afirmacoes(manchete)
