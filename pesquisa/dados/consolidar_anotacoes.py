@@ -10,6 +10,10 @@ Só biblioteca padrão. Arquivos em pesquisa/anotacoes/ (versionados, só `id` e
 - `adjudicacao.csv`: decisão da equipe nas discordâncias, com as mesmas colunas de rótulo.
 - `consolidado.csv`: rótulo final por id, lido por preparar_dados.py e pesquisa/ml/dados.py.
 
+Veracidade anotada por uma pessoa só que contraria o rótulo da fonte fica retida: o consolidado
+mantém a original e o item vai para pesquisa/data/anotacao/divergencias-veracidade.csv, até a
+adjudicação decidir (tipo e sinais valem já).
+
 Sem argumentos, imprime a concordância por campo nos itens com mais de um anotador
 (concordância simples, kappa de Cohen entre cada par de anotadores e alfa de Krippendorff,
 que serve para qualquer número) e grava o consolidado. O rótulo final é o da adjudicação,
@@ -30,6 +34,7 @@ ANOTACOES = RAIZ / "anotacoes"
 ADJUDICACAO = ANOTACOES / "adjudicacao.csv"
 CONSOLIDADO = ANOTACOES / "consolidado.csv"
 PENDENTES = RAIZ / "data" / "anotacao" / "pendentes.csv"
+DIVERGENCIAS = RAIZ / "data" / "anotacao" / "divergencias-veracidade.csv"
 DATASET = RAIZ / "data" / "processed" / "dataset.jsonl"
 
 # doc/guia-classificacao.md §7.
@@ -114,6 +119,38 @@ def normalizar(linha: dict, anotador_padrao: str | None = None) -> dict | None:
         **sinais,
         "observacao": (linha.get("observacao") or "").strip(),
     }
+
+
+def originais(dataset: Path = DATASET) -> dict[str, dict]:
+    """Veracidade e texto de cada registro do dataset, para conferir as divergências."""
+    if not dataset.exists():
+        return {}
+    with open(dataset, encoding="utf-8") as entrada:
+        return {
+            r["id"]: {
+                "veracidade": r.get("veracidade") or "",
+                "texto": (r.get("texto_curto") or r.get("texto") or "")[:1000],
+            }
+            for r in map(json.loads, entrada)
+        }
+
+
+def segurar_divergencias(finais: list[dict], originais: dict[str, dict]) -> list[dict]:
+    """Veracidade de um anotador só que contraria o rótulo da fonte não vale sozinha.
+
+    Nesses itens o consolidado fica com a veracidade vazia (preparar_dados.py e dados.py mantêm
+    a original) até a adjudicação decidir; tipo e sinais valem já. Devolve os itens retidos.
+    """
+    retidos = []
+    for final in finais:
+        original = originais.get(final["id"], {}).get("veracidade")
+        anotada = final["veracidade"]
+        if final["adjudicado"] or final["anotadores"] > 1 or not anotada or not original:
+            continue
+        if anotada != original:
+            retidos.append({"id": final["id"], "original": original, "anotada": anotada})
+            final["veracidade"] = ""
+    return retidos
 
 
 def splits_produto(dataset: Path = DATASET) -> dict[str, str]:
@@ -294,9 +331,34 @@ def main():
         )
 
     finais, pendentes = consolidar(linhas, adjudicacao)
+    textos = originais()
+    retidos = segurar_divergencias(finais, textos)
     gravar_csv(CONSOLIDADO, COLUNAS_CONSOLIDADO, finais)
     print(f"{CONSOLIDADO.relative_to(RAIZ)}: {len(finais)} itens com rótulo final")
     print("por tipo:", dict(Counter(f["tipo"] for f in finais).most_common()))
+    if retidos:
+        # Planilha de trabalho (fora do Git, tem o texto): preencher `veracidade` e copiar as
+        # colunas de COLUNAS_RODADA para adjudicacao.csv.
+        anotacoes = {linha["id"]: linha for linha in linhas}
+        gravar_csv(
+            DIVERGENCIAS,
+            ("veracidade_original", "veracidade_anotada", "texto", *COLUNAS_RODADA),
+            [
+                {
+                    "veracidade_original": r["original"],
+                    "veracidade_anotada": r["anotada"],
+                    "texto": textos[r["id"]]["texto"],
+                    **anotacoes[r["id"]],
+                    "anotador": "adjudicacao",
+                    "veracidade": "",
+                }
+                for r in retidos
+            ],
+        )
+        print(
+            f"{len(retidos)} itens com veracidade de um anotador só contrária à fonte: mantida a "
+            f"original até a adjudicação ({DIVERGENCIAS.relative_to(RAIZ)})"
+        )
     if pendentes:
         ids = set(pendentes)
         gravar_csv(PENDENTES, COLUNAS_RODADA, [linha for linha in linhas if linha["id"] in ids])

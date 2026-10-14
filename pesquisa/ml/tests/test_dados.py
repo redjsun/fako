@@ -112,6 +112,19 @@ def test_anotacao_da_equipe_substitui_rotulo_e_origem(dataset, tmp_path):
     )
 
 
+def test_anotacao_sem_veracidade_mantem_a_original_e_satira_sai(dataset, tmp_path):
+    original = {e.id: e for e in carregar(dataset=dataset).splits["treino"]}
+    satira = next(id_ for id_ in original if id_ != "a")
+    anotacoes = tmp_path / "consolidado.csv"
+    anotacoes.write_text(
+        f"id,tipo,veracidade\na,fabricado,\n{satira},fora_escopo,\n", encoding="utf-8"
+    )
+    anotado = {e.id: e for e in carregar(dataset=dataset, anotacoes=anotacoes).splits["treino"]}
+    assert anotado["a"].veracidade == original["a"].veracidade
+    assert anotado["a"].tipo == "fabricado" and anotado["a"].origem_rotulo == "equipe"
+    assert satira not in anotado
+
+
 def test_carregar_padronizado_usa_o_cache_do_prompt_e_modelo(dataset, tmp_path):
     prompt_arquivo = tmp_path / "extrair_afirmacoes_v1.txt"
     prompt_arquivo.write_text("Extraia: {texto}", encoding="utf-8")

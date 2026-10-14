@@ -195,3 +195,24 @@ def test_preparar_dados_aplica_anotacoes_com_origem_equipe(tmp_path):
     assert x1["sinais"]["urgencia"] == 1 and x1["sinais"]["ataque"] == 0
     assert x2["split_produto"] == "fora" and x2["veracidade"] == "falso"
     assert x3["origem_rotulo"] == "agencia"
+
+
+def test_veracidade_de_um_anotador_contra_a_fonte_fica_retida():
+    linhas = [
+        anotacao("x1", "ana", veracidade="verdadeiro"),  # contraria a fonte: retida
+        anotacao("x2", "ana", veracidade="falso"),  # confirma a fonte
+        anotacao("x3", "ana", veracidade="verdadeiro"),
+        anotacao("x3", "bia", veracidade="verdadeiro"),  # dois anotadores: vale
+    ]
+    finais, _ = consolidar.consolidar(linhas, [])
+    fonte = {
+        "x1": {"veracidade": "falso"},
+        "x2": {"veracidade": "falso"},
+        "x3": {"veracidade": "falso"},
+    }
+    retidos = consolidar.segurar_divergencias(finais, fonte)
+    por_id = {f["id"]: f for f in finais}
+    assert retidos == [{"id": "x1", "original": "falso", "anotada": "verdadeiro"}]
+    assert por_id["x1"]["veracidade"] == "" and por_id["x1"]["tipo"] == "fabricado"
+    assert por_id["x2"]["veracidade"] == "falso"
+    assert por_id["x3"]["veracidade"] == "verdadeiro"

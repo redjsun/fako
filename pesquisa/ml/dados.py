@@ -23,7 +23,8 @@ Regras:
   "(Estadão Conteúdo)", "Com informações da Folha"). Mantém maiúsculas e pontuação.
 - Anotações da equipe (#5), quando existirem, entram pelo `id` a partir de
   pesquisa/anotacoes/consolidado.csv: o `tipo` vem dali, a `veracidade` anotada substitui a
-  original e a origem vira `equipe`.
+  original (vazia: fica a original) e a origem vira `equipe`. Sátira (`fora_escopo`) sai,
+  como no preparar_dados.py.
 - Alvos ordinais: `y1` = veracidade > falso e `y2` = veracidade > enganoso.
 - `checado`: há veredito de agência (`veredito_original`), para a fatia "só checados".
 - Peso por `origem_rotulo`, de ORIGEM_ROTULO_PESO em preparar_dados.py.
@@ -187,6 +188,8 @@ def ler_anotacoes(caminho: Path = ANOTACOES) -> dict[str, dict]:
 def exemplo(registro: dict, texto: str, anotacao: dict | None) -> Exemplo | None:
     veracidade, origem, tipo = registro["veracidade"], registro["origem_rotulo"], None
     if anotacao:
+        if anotacao.get("tipo") == "fora_escopo":
+            return None  # sátira: fora dos dois protocolos
         tipo = anotacao.get("tipo") or None
         veracidade = anotacao.get("veracidade") or veracidade
         origem = "equipe"
