@@ -18,6 +18,7 @@ from padronizar import (
     interpretar_resposta,
     ler_cache,
     padronizar,
+    sem_texto_curto,
     texto_de_entrada,
 )
 
@@ -330,3 +331,7 @@ def test_exportar_poe_o_original_ao_lado_da_afirmacao(tmp_path, prompt):
     assert linhas[0]["texto_original"] == "Texto longo da notícia."
     assert linhas[0]["afirmacao_1"] == "Afirmação 1" and linhas[0]["quem_disse_1"] == "Fulano"
     assert linhas[0]["n_afirmacoes"] == "2" and linhas[0]["demais_afirmacoes"] == "Afirmação 2"
+
+
+def test_sem_texto_curto_fica_so_com_os_extraidos_do_texto_longo():
+    assert [r["id"] for r in sem_texto_curto(REGISTROS)] == ["b", "c"]

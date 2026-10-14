@@ -4,6 +4,7 @@ Uso:
     python pesquisa/ml/padronizar.py --prompt api/app/ml/prompts/extrair_afirmacoes_v1.txt
     python pesquisa/ml/padronizar.py --prompt ... --limite 50     # amostra, para medir tempo e custo
     python pesquisa/ml/padronizar.py --prompt ... --splits todos  # inclui reserva e fora
+    python pesquisa/ml/padronizar.py --prompt ... --sem-texto-curto  # só os extraídos do texto
 
 Em uso, o classificador recebe afirmações extraídas pela LLM; no treino, recebia o
 `texto_curto` original (manchete nos verdadeiros, alegação de checador nos falsos). Este
@@ -143,6 +144,12 @@ def texto_de_entrada(registro: dict) -> str | None:
         if valor:
             return valor
     return None
+
+
+def sem_texto_curto(registros: Iterable[dict]) -> Iterable[dict]:
+    """Só os registros sem `texto_curto` (Fake.br, verdadeiras do FakeTrue.Br, a maior parte das
+    mensagens): os que só entram no treino de frases curtas depois da extração."""
+    return (r for r in registros if not (r.get("texto_curto") or "").strip())
 
 
 def filtrar_splits(registros: Iterable[dict], splits: Iterable[str] | None) -> Iterable[dict]:
@@ -441,6 +448,11 @@ def main():
     parser.add_argument(
         "--exportar", action="store_true", help="CSV de conferência do que já está no cache"
     )
+    parser.add_argument(
+        "--sem-texto-curto",
+        action="store_true",
+        help="só os registros sem texto_curto (extraídos do texto longo)",
+    )
     args = parser.parse_args()
 
     if not args.dataset.exists():
@@ -464,7 +476,10 @@ def main():
         )
 
     def registros():
-        for registro in filtrar_splits(ler_dataset(args.dataset), splits):
+        selecionados = filtrar_splits(ler_dataset(args.dataset), splits)
+        if args.sem_texto_curto:
+            selecionados = sem_texto_curto(selecionados)
+        for registro in selecionados:
             if not args.base or registro.get("base") in args.base:
                 yield registro
 
