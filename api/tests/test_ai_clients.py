@@ -179,3 +179,15 @@ def test_provedor_openai_configurado(settings_limpas, monkeypatch):
     monkeypatch.setenv("LLM_EXTRA_BODY", '{"reasoning_effort": "none"}')
     assert isinstance(get_llm_client(), LLMValidado)
     assert get_settings().llm_extra_body == {"reasoning_effort": "none"}
+
+
+def test_explicacao_com_fato_inventado_tenta_de_novo_e_depois_descarta():
+    analise = FakeClassificador().analisar("A terra é plana", "admin")  # falso, não incerto
+    pedido = PedidoRoteirizado(
+        '{"explicacao": "A NASA já desmentiu essa afirmação várias vezes."}',
+        '{"explicacao": "A análise automática classificou como falso."}',
+    )
+    assert "classificou" in LLMValidado(pedido).explicar(analise)
+    pedido = PedidoRoteirizado(*['{"explicacao": "A NASA desmentiu em 1969 essa afirmação."}'] * 2)
+    with pytest.raises(RespostaInvalida, match="NASA"):
+        LLMValidado(pedido).explicar(analise)

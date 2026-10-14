@@ -1,6 +1,6 @@
 COMPOSE := docker compose
 
-.PHONY: help build up down restart logs ps shell-api shell-web shell-db migrate makemigration seed admin test lint format dados padronizar atalho contagens referencia bert avaliar classificar publicar test-web test-ml shell-ml eda ml-legado docs clean
+.PHONY: help build up down restart logs ps shell-api shell-web shell-db migrate makemigration seed admin test lint format dados padronizar atalho contagens referencia bert avaliar classificar publicar amostra-questoes medir-amostra pre-anotar avaliar-extracao test-web test-ml shell-ml eda ml-legado docs clean
 
 help: ## Lista os comandos disponíveis
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -94,6 +94,18 @@ avaliar: ## Avalia modelo(s) na validação (uso: make avaliar [MODELO="models/2
 
 publicar: ## Publica um modelo para a API em models/atual (uso: make publicar [MODELO=models/2026-11/referencia])
 	rm -rf models/atual && cp -r $(MODELO) models/atual
+
+amostra-questoes: ## Planilha de avaliação das questões da LLM para o admin (uso: make amostra-questoes [ARGS="--itens 50"] > amostra.csv)
+	@$(COMPOSE) exec -T api python -m app.jobs.amostra_questoes sortear $(ARGS)
+
+medir-amostra: ## % de questões com erro na planilha preenchida (uso: make medir-amostra < amostra.csv)
+	@$(COMPOSE) exec -T api python -m app.jobs.amostra_questoes medir
+
+pre-anotar: ## Sugestões da LLM nas planilhas de anotação (uso: make pre-anotar r=2 [ACAO=comparar])
+	$(PESQUISA) python pesquisa/dados/pre_anotar.py $(or $(ACAO),sugerir) --rodada $(r)
+
+avaliar-extracao: ## Extração de afirmações nos textos BR rotulados (uso: make avaliar-extracao [ACAO=medir])
+	$(PESQUISA) python pesquisa/ml/avaliar_extracao.py $(or $(ACAO),rodar) --prompt $(PROMPT)
 
 shell-ml: ## Abre um shell no container de treino
 	$(ML) bash

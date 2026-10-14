@@ -31,6 +31,15 @@ class Settings(BaseSettings):
     # Envia o JSON Schema da saída em response_format; desligar se o provedor não aceitar.
     llm_esquema: bool = True
 
+    # Embeddings (integrations/embeddings_client.py): "fake" roda sem modelo; "openai" usa o
+    # /embeddings de embeddings_base_url (vazio: o mesmo de llm_base_url), ex.: bge-m3 no Ollama.
+    embeddings_provider: str = "fake"
+    embeddings_base_url: str = ""
+    embeddings_model: str = "bge-m3"
+    # Questão reescrita pela LLM abaixo desta similaridade com a alegação original é descartada
+    # (troca de assunto). Medido com o bge-m3 (doc/llm.md).
+    similaridade_minima_reescrita: float = 0.6
+
     # Classificador de veracidade (integrations/classificador_client.py): "fake" roda sem modelo;
     # os modelos publicados ficam em models_dir/atual.
     classificador_provider: str = "fake"

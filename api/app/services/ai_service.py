@@ -2,7 +2,9 @@
 
 - `generate()`: checagens de agência viram rascunhos de questões. A LLM só reescreve a
   alegação no formato do jogo; o gabarito (`is_true`) e a fonte vêm da checagem, nunca da LLM
-  nem do classificador. Resposta da LLM fora do esquema descarta a checagem. Por enquanto as
+  nem do classificador. Resposta da LLM fora do esquema, reescrita pouco parecida com a
+  alegação original (troca de assunto, `verificar_reescrita`) ou com negação a mais ou a menos
+  (`verificar_negacao`) descartam a checagem. Por enquanto as
   checagens vêm dos provedores de notícias (`NOTICIAS_PROVIDER=factcheck`); o job diário (#23)
   troca a origem pelas checagens recentes do dataset.
 - `classify()`: análise de uma afirmação pelo classificador, com o limiar do admin.
@@ -12,10 +14,13 @@ from collections.abc import Sequence
 
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.exceptions import ServiceUnavailableError
 from app.integrations.classificador_client import ClassificadorClient, ClassificadorIndisponivel
+from app.integrations.embeddings_client import EmbeddingsClient, FakeEmbeddings
 from app.integrations.llm_client import ChecagemDeOrigem, LLMClient, RespostaInvalida
 from app.integrations.noticias_client import Noticia, NoticiasClient, NoticiasIndisponiveis
+from app.integrations.verificadores import verificar_negacao, verificar_reescrita
 from app.models.question import Question, QuestionOrigin, QuestionStatus
 from app.repositories.question_repository import QuestionRepository
 from app.schemas.admin_schema import (
@@ -46,8 +51,10 @@ class AIService:
         llm: LLMClient,
         classificador: ClassificadorClient,
         noticias: Sequence[NoticiasClient] = (),
+        embeddings: EmbeddingsClient | None = None,
     ) -> None:
         self.llm = llm
+        self.embeddings = embeddings or FakeEmbeddings()
         self.classificador = classificador
         self.provedores = list(noticias)
         self.questions = QuestionRepository(db)
@@ -81,6 +88,11 @@ class AIService:
                 gerada = self.llm.gerar_questao(checagem_de_origem(noticia))
             except RespostaInvalida:
                 continue  # saída fora do esquema duas vezes: a checagem é descartada
+            limiar = get_settings().similaridade_minima_reescrita
+            if verificar_negacao(noticia.titulo, gerada.statement) or verificar_reescrita(
+                noticia.titulo, gerada.statement, self.embeddings, limiar
+            ):
+                continue
             is_true = bool(noticia.verdadeira)
             # Nunca publica direto; a revisão acontece em /admin/questions/{id}/review.
             rascunhos.append(

@@ -1,3 +1,5 @@
+import uuid
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -7,6 +9,7 @@ from app.integrations.llm_client import (
     VERSAO_PROMPT,
     ChecagemDeOrigem,
     FakeLLMClient,
+    LLMValidado,
     QuestaoGerada,
     RespostaInvalida,
     get_llm_client,
@@ -14,7 +17,13 @@ from app.integrations.llm_client import (
 from app.integrations.noticias_client import get_noticias_clients
 from app.main import app
 from app.models.user import User
+from tests.test_ai_clients import PedidoRoteirizado
 from tests.test_noticias import NoticiasDeTeste, checagem
+
+
+def unica(alegacao: str) -> str:
+    """O banco de teste guarda as questões entre execuções; a deduplicação compara o texto."""
+    return f"{alegacao} no lote {uuid.uuid4().hex[:6]}"
 
 
 class LLMQueReescreve(FakeLLMClient):
@@ -35,12 +44,14 @@ def admin_client(client: TestClient):
 
 
 def test_gera_rascunhos_com_o_gabarito_e_a_fonte_da_checagem(admin_client: TestClient):
-    falsa = checagem("Chá de boldo cura a dengue em um dia", "Falso", False)
-    verdadeira = checagem("Ministério ampliou a vacinação contra a gripe", "Verdadeiro", True)
+    falsa = checagem(unica("Chá de boldo cura a dengue em um dia"), "Falso", False)
+    verdadeira = checagem(
+        unica("Ministério ampliou a vacinação contra a gripe"), "Verdadeiro", True
+    )
     checagens = [
         falsa,
-        checagem("Alegação quebrada pela LLM sobre vacinas", "Falso", False),
-        checagem("Vacina causa efeito raro em parte dos casos", "Enganoso", None),
+        checagem(unica("Alegação quebrada pela LLM sobre vacinas"), "Falso", False),
+        checagem(unica("Vacina causa efeito raro em parte dos casos"), "Enganoso", None),
         verdadeira,
     ]
     app.dependency_overrides[get_noticias_clients] = lambda: [NoticiasDeTeste(checagens)]
@@ -84,3 +95,39 @@ def test_jogador_comum_recebe_403(client: TestClient, auth_headers, rota):
     corpo = {"category": "saude", "statement": "A terra é plana"}
     resposta = client.post(rota, json=corpo, headers=auth_headers)
     assert resposta.status_code == 403
+
+
+def test_gabarito_e_fonte_nunca_vem_da_llm(admin_client: TestClient):
+    falsa = checagem(unica("Chá de boldo cura a dengue em um dia"), "Falso", False)
+    app.dependency_overrides[get_noticias_clients] = lambda: [NoticiasDeTeste([falsa])]
+    # A LLM tenta dar o gabarito e a fonte: os campos fora do esquema são ignorados.
+    resposta_llm = (
+        f'{{"statement": "{falsa.titulo}", "category": "saude", '
+        '"is_true": true, "source": "https://inventado.teste"}'
+    )
+    app.dependency_overrides[get_llm_client] = lambda: LLMValidado(PedidoRoteirizado(resposta_llm))
+
+    [gerada] = admin_client.post(
+        "/admin/ai/generate", json={"category": "saude", "quantity": 1}
+    ).json()
+
+    assert gerada["is_true"] is False
+    assert gerada["source"] == falsa.url
+
+
+@pytest.mark.parametrize(
+    "reescrita",
+    [
+        "O governo vai confiscar a poupança dos brasileiros",  # troca de assunto
+        "Chá de boldo não cura a dengue em um dia",  # inversão de sentido
+    ],
+)
+def test_reescrita_infiel_e_descartada(admin_client: TestClient, reescrita):
+    falsa = checagem(unica("Chá de boldo cura a dengue em um dia"), "Falso", False)
+    app.dependency_overrides[get_noticias_clients] = lambda: [NoticiasDeTeste([falsa])]
+    resposta_llm = f'{{"statement": "{reescrita}", "category": "saude"}}'
+    app.dependency_overrides[get_llm_client] = lambda: LLMValidado(PedidoRoteirizado(resposta_llm))
+
+    resposta = admin_client.post("/admin/ai/generate", json={"category": "saude", "quantity": 1})
+
+    assert resposta.status_code == 201 and resposta.json() == []

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.deps import get_current_admin
 from app.integrations.classificador_client import ClassificadorClient, get_classificador
+from app.integrations.embeddings_client import EmbeddingsClient, get_embeddings
 from app.integrations.llm_client import LLMClient, get_llm_client
 from app.integrations.noticias_client import NoticiasClient, get_noticias_clients
 from app.models.question import QuestionStatus
@@ -38,8 +39,9 @@ def get_ai_service(
     llm: LLMClient = Depends(get_llm_client),
     classificador: ClassificadorClient = Depends(get_classificador),
     noticias: list[NoticiasClient] = Depends(get_noticias_clients),
+    embeddings: EmbeddingsClient = Depends(get_embeddings),
 ) -> AIService:
-    return AIService(db, llm, classificador, noticias)
+    return AIService(db, llm, classificador, noticias, embeddings)
 
 
 def get_classify_service(

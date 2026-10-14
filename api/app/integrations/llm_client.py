@@ -11,6 +11,8 @@ Os prompts ficam em `app/prompts/`, com a versão no nome (`gerar_questao_v1.txt
 vai junto de cada questão e análise (`VERSAO_PROMPT`). Toda resposta é JSON e passa por um
 esquema Pydantic: se não passar, o pedido é feito mais uma vez; se falhar de novo, lança
 `RespostaInvalida` e quem chamou descarta o item. Uma resposta quebrada nunca vira questão.
+A explicação também passa pelo verificador de fatos (`verificadores.py`): citar algo que não
+está na análise conta como resposta inválida.
 
 Se o provedor não estiver configurado, `get_llm_client()` devolve um cliente que lança
 `LLMIndisponivel`, e a API sobe mesmo assim.
@@ -27,11 +29,12 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Protocol, TypeVar
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError, model_validator
 
 from app.core.config import get_settings
 from app.core.exceptions import ServiceUnavailableError
 from app.integrations.classificador_client import Analise
+from app.integrations.verificadores import verificar_explicacao
 
 PASTA_PROMPTS = Path(__file__).resolve().parent.parent / "prompts"
 # Versão em uso de cada prompt; mudar a versão é criar um arquivo novo, nunca editar o antigo.
@@ -57,8 +60,16 @@ class Afirmacao(BaseModel):
 
 
 class Extracao(BaseModel):
+    """Opinião só quando não há nenhuma afirmação checável (prompt de extração, regra 8).
+    Sem afirmações e sem opinião (uma pergunta, um convite) não há o que analisar."""
+
     e_opiniao: bool
     afirmacoes: list[Afirmacao] = Field(max_length=5)
+
+    @model_validator(mode="after")
+    def opiniao_sem_afirmacoes(self) -> "Extracao":
+        self.e_opiniao = self.e_opiniao and not self.afirmacoes
+        return self
 
 
 class SaidaQuestao(BaseModel):
@@ -159,6 +170,8 @@ def ler_json(resposta: str) -> dict:
 # Recebe o prompt preenchido e o JSON Schema da saída; devolve o texto da resposta.
 Pedido = Callable[[str, dict], str]
 Saida = TypeVar("Saida", bound=BaseModel)
+# Recebe a saída já no esquema; devolve o motivo da recusa, ou None se passou.
+Verificacao = Callable[[Saida], str | None]
 
 
 class LLMValidado:
@@ -167,15 +180,26 @@ class LLMValidado:
     def __init__(self, pedir: Pedido) -> None:
         self.pedir = pedir
 
-    def _gerar(self, nome: str, variaveis: dict[str, str], esquema: type[Saida]) -> Saida:
+    def _gerar(
+        self,
+        nome: str,
+        variaveis: dict[str, str],
+        esquema: type[Saida],
+        verificar: Verificacao | None = None,
+    ) -> Saida:
         prompt = preencher(ler_prompt(nome), variaveis)
         erros = []
         for _ in range(TENTATIVAS):
             resposta = self.pedir(prompt, esquema.model_json_schema())
             try:
-                return esquema.model_validate(ler_json(resposta))
+                saida = esquema.model_validate(ler_json(resposta))
             except (ValueError, ValidationError) as erro:
                 erros.append(str(erro).splitlines()[0])
+                continue
+            motivo = verificar(saida) if verificar else None
+            if motivo is None:
+                return saida
+            erros.append(motivo)
         raise RespostaInvalida(f"{VERSAO_PROMPT[nome]}: {'; '.join(erros)}")
 
     def gerar_questao(self, checagem: ChecagemDeOrigem) -> QuestaoGerada:
@@ -200,7 +224,13 @@ class LLMValidado:
 
     def explicar(self, analise: Analise) -> str:
         entrada = json.dumps(entrada_da_explicacao(analise), ensure_ascii=False, indent=2)
-        return self._gerar("explicar", {"analise": entrada}, SaidaExplicacao).explicacao.strip()
+        saida = self._gerar(
+            "explicar",
+            {"analise": entrada},
+            SaidaExplicacao,
+            lambda s: verificar_explicacao(s.explicacao, entrada, analise.categoria),
+        )
+        return saida.explicacao.strip()
 
 
 def pedido_openai(
