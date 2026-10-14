@@ -63,7 +63,7 @@ class Settings(BaseSettings):
     # Rotina diária (app/jobs/, agendada em api/crontab): quantas notícias importar por dia, em
     # que categoria, e por quantos dias uma notícia fica no banco (depois é apagada, ou
     # arquivada se algum jogador a respondeu).
-    noticias_por_dia: int = 10
+    noticias_por_dia: int = 50
     noticias_categoria: str = "conhecimentos-gerais"
     noticias_retencao_dias: int = 30
 

@@ -93,13 +93,14 @@ class FakeNoticias:
 class GNewsClient:
     """Manchetes do Brasil, em português, pela API do GNews (https://gnews.io/docs/v4).
 
-    Só dos tópicos mais parecidos com os boatos checados (saúde, ciência, tecnologia): o
-    "general" é quase só futebol e TV, que o jogador acerta sem pensar. Um pedido por tópico,
-    intercalando os resultados.
+    Dos tópicos mais parecidos com os boatos checados (saúde, ciência, tecnologia, Brasil,
+    mundo e economia): o "general" é quase só futebol e TV, que o jogador acerta sem pensar. Um
+    pedido por tópico (10 manchetes no plano gratuito, até 60 candidatas; 6 dos 100 pedidos
+    diários), intercalando os resultados.
     """
 
     URL = "https://gnews.io/api/v4/top-headlines"
-    TOPICOS = ("health", "science", "technology")
+    TOPICOS = ("health", "science", "technology", "nation", "world", "business")
     MAXIMO_POR_PEDIDO = 10  # limite do plano gratuito
     PAUSA = 1.2  # o plano gratuito aceita um pedido por segundo (429 se vierem juntos)
 

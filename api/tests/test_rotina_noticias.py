@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from sqlalchemy import select
 
+from app.core.config import get_settings
 from app.core.database import SessionLocal
 from app.ml.classificador import FakeClassificador
 from app.models.category import Category
@@ -18,10 +19,15 @@ AGORA = datetime.now(timezone.utc)
 
 
 @pytest.fixture
-def db():
+def db(monkeypatch):
+    # Os padrões, independentes do .env de quem roda os testes.
+    monkeypatch.setenv("NOTICIAS_PUBLICAR_DIRETO", "false")
+    monkeypatch.setenv("NOTICIAS_SEM_POLITICA", "false")
+    get_settings.cache_clear()
     with SessionLocal() as sessao:
         yield sessao
         sessao.rollback()  # nada do teste fica no banco
+    get_settings.cache_clear()
 
 
 def questao(db, dias: int, origem=QuestionOrigin.NEWS) -> Question:
@@ -96,3 +102,40 @@ def test_arquivada_nao_volta_ao_jogo(db):
     NoticiasService(db, [], FakeClassificador()).limpar(dias=30)
     validadas = db.scalars(select(Question.id).where(Question.status == QuestionStatus.VALIDATED))
     assert q.id not in set(validadas)
+
+
+def test_importacao_diaria_equilibra_falsas_e_verdadeiras(db):
+    marca = uuid.uuid4().hex[:6]
+    checagens = [
+        checagem(f"Chá de {marca} cura a dengue em {i} dias", "Falso", False) for i in range(5)
+    ]
+    checagens.append(checagem(f"Governo distribuiu {marca} vacinas em outubro", "Verdadeiro", True))
+    manchetes = [
+        noticia(f"Prefeitura {marca} inaugura posto de saúde no bairro {i}") for i in range(5)
+    ]
+    for item in checagens + manchetes:
+        item.publicada_em = AGORA - timedelta(days=1)
+    service = NoticiasService(
+        db, [NoticiasDeTeste(checagens), NoticiasDeTeste(manchetes)], FakeClassificador()
+    )
+
+    resultado = service.importar_lote("saude", 6, max_idade_dias=30, por_lado=3)
+
+    lados = [q.is_true for q in resultado.imported]
+    assert lados.count(False) == 3 and lados.count(True) == 3
+    # A checagem verdadeira conta no lado das verdadeiras: entram só 2 manchetes.
+    assert sum(q.source.startswith("https://jornal.teste") for q in resultado.imported) == 2
+
+
+def test_lado_curto_nao_e_completado_com_o_outro(db):
+    marca = uuid.uuid4().hex[:6]
+    checagens = [
+        checagem(f"Chá de {marca} cura a gripe em {i} dias", "Falso", False) for i in range(6)
+    ]
+    for item in checagens:
+        item.publicada_em = AGORA - timedelta(days=1)
+    service = NoticiasService(db, [NoticiasDeTeste(checagens)], FakeClassificador())
+
+    resultado = service.importar_lote("saude", 6, max_idade_dias=30, por_lado=3)
+
+    assert [q.is_true for q in resultado.imported] == [False, False, False]

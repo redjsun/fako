@@ -213,9 +213,9 @@ def test_gnews_intercala_os_topicos(monkeypatch):
 
     monkeypatch.setattr(cliente, "do_topico", do_topico)
     monkeypatch.setattr(cliente, "PAUSA", 0)
-    titulos = [n.titulo.split(" - ")[0] for n in cliente.buscar(4)]
-    assert pedidos == ["health", "science", "technology"]
-    assert titulos == ["health 0", "science 0", "technology 0", "health 1"]
+    titulos = [n.titulo.split(" - ")[0] for n in cliente.buscar(8)]
+    assert pedidos == list(GNewsClient.TOPICOS)
+    assert titulos == [f"{topico} 0" for topico in GNewsClient.TOPICOS] + ["health 1", "science 1"]
 
 
 def test_gnews_converte_artigo():

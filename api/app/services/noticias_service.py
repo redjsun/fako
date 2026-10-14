@@ -14,7 +14,8 @@ O rótulo nunca é o do classificador: a análise dele fica só como registro.
 Se o classificador estiver indisponível, a notícia entra mesmo assim, sem análise.
 
 Rotina diária (app/jobs/): `importar_lote()` traz as notícias do dia, só as publicadas dentro
-da janela de retenção; `limpar()` tira do banco as importadas há mais de
+da janela de retenção e equilibradas (`por_lado`: até 25 falsas e 25 verdadeiras; um lado
+curto não é completado com o outro); `limpar()` tira do banco as importadas há mais de
 NOTICIAS_RETENCAO_DIAS (30). As que algum jogador respondeu, ou que estão em jogo numa partida,
 são arquivadas em vez de apagadas: saem do jogo e ficam para o histórico e a revisão.
 """
@@ -88,6 +89,7 @@ class NoticiasService:
     ) -> None:
         self.provedores = noticias
         self.classificador = classificador
+        self.por_lado: int | None = None
         self.questions = QuestionRepository(db)
         self.content = ContentService(db)
 
@@ -95,9 +97,14 @@ class NoticiasService:
         return self.importar_lote(data.category, data.quantity)
 
     def importar_lote(
-        self, categoria: str, quantidade: int, max_idade_dias: int | None = None
+        self,
+        categoria: str,
+        quantidade: int,
+        max_idade_dias: int | None = None,
+        por_lado: int | None = None,
     ) -> NewsImportResponse:
-        """Importa até `quantidade` notícias; com `max_idade_dias`, descarta as mais velhas."""
+        """Importa até `quantidade` notícias; com `max_idade_dias`, descarta as mais velhas, e
+        com `por_lado`, importa no máximo esse tanto de falsas e esse tanto de verdadeiras."""
         category = self.content.get_category(categoria)
         limite = (
             datetime.now(timezone.utc) - timedelta(days=max_idade_dias)
@@ -108,9 +115,15 @@ class NoticiasService:
         vistas: set[str] = set()
         falhas = []
         restante = quantidade
+        self.por_lado = por_lado
         for posicao, provedor in enumerate(self.provedores):
             # Cada provedor fica com a sua parte do que falta; um fora do ar não derruba os outros.
-            cota = math.ceil(restante / (len(self.provedores) - posicao))
+            # Com `por_lado`, quem equilibra é o teto de cada lado, não a parte do provedor.
+            cota = (
+                restante
+                if por_lado is not None
+                else math.ceil(restante / (len(self.provedores) - posicao))
+            )
             try:
                 noticias = provedor.buscar(CANDIDATOS)
             except NoticiasIndisponiveis as erro:
@@ -144,6 +157,8 @@ class NoticiasService:
         for noticia in noticias:
             if len(importadas) - inicio == cota:
                 break
+            if self.lado_cheio(noticia, importadas):
+                continue
             # Nas checagens o "veículo" é a agência, que não aparece no texto da alegação.
             manchete = normalizar_manchete(
                 noticia.titulo, None if noticia.veredito else noticia.veiculo
@@ -159,6 +174,12 @@ class NoticiasService:
                 continue
             vistas.add(manchete.casefold())
             importadas.append(self._rascunho(manchete, noticia, category))
+
+    def lado_cheio(self, noticia: Noticia, importadas: list[Question]) -> bool:
+        if self.por_lado is None or noticia.verdadeira is None:
+            return False
+        lado = sum(q.is_true == noticia.verdadeira for q in importadas)
+        return lado >= self.por_lado
 
     def _rascunho(self, manchete: str, noticia: Noticia, category: Category) -> Question:
         question = Question(
