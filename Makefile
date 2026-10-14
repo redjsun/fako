@@ -1,6 +1,6 @@
 COMPOSE := docker compose
 
-.PHONY: help build up down restart logs ps shell-api shell-web shell-db migrate makemigration seed admin test lint format dados padronizar atalho contagens referencia bert avaliar calibrar classificar publicar importar-noticias limpar-noticias amostra-questoes medir-amostra pre-anotar avaliar-extracao test-web test-ml shell-ml eda docs clean
+.PHONY: help build up down restart logs ps shell-api shell-web shell-db migrate makemigration seed admin test lint format dados padronizar atalho contagens referencia bert avaliar calibrar exportar-onnx classificar publicar importar-noticias limpar-noticias amostra-questoes medir-amostra pre-anotar avaliar-extracao test-web test-ml shell-ml eda docs clean
 
 help: ## Lista os comandos disponíveis
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -91,6 +91,9 @@ classificar: ## Teste manual do modelo (uso: make classificar [ARGS='"uma frase"
 
 avaliar: ## Avalia modelo(s) na validação (uso: make avaliar [MODELO="models/2026-11/referencia models/2026-11/bert"] [ARGS=--teste])
 	$(ML) python pesquisa/ml/avaliar.py --modelo $(MODELO) $(ARGS)
+
+exportar-onnx: ## Exporta o BERTimbau para ONNX, para a API (uso: make exportar-onnx [MODELO=models/2026-11/bert])
+	$(ML) python pesquisa/ml/exportar_onnx.py --modelo $(MODELO)
 
 calibrar: ## Calibra as fronteiras e grava limiares.json na validação (uso: make calibrar [MODELO=models/2026-11/referencia])
 	$(ML) python pesquisa/ml/calibrar.py --modelo $(MODELO)

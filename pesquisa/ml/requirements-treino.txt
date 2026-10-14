@@ -5,3 +5,7 @@ torch>=2.4
 transformers>=4.44
 sentence-transformers>=3.0
 matplotlib>=3.8  # diagrama de confiabilidade do avaliar.py
+# Exportação do BERTimbau para ONNX (exportar_onnx.py): a API roda o modelo sem PyTorch.
+onnx==1.23.1
+onnxscript==0.7.2
+onnxruntime==1.30.0

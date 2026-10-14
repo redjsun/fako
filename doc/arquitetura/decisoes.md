@@ -107,8 +107,10 @@ inicialização e rota `/ai/analyze`) colocava PyTorch e transformers na imagem 
 `embeddings.py`, `verificadores.py`, `normalizacao.py` e os prompts versionados em
 `prompts/`. `integrations/` fica só com APIs externas. O treino continua em `pesquisa/ml/`;
 os dois lados se encontram nos artefatos de `models/` (AD07) e nos prompts. O caminho antigo
-foi removido; o BERTimbau volta como adaptador de `ClassificadorClient` servido por um
-container próprio (#10).
+foi removido; o BERTimbau volta como adaptador de `ClassificadorClient` (`BertOnnx`): o
+treino exporta o modelo para ONNX (`pesquisa/ml/exportar_onnx.py`) e a API o roda com
+`onnxruntime` e `tokenizers`, uns 180 MB na imagem em vez de 1 a 2 GB do PyTorch, sem um
+container próprio para o modelo.
 
 **Consequências.** A imagem da API fica sem PyTorch e cada camada tem um papel só. Em troca,
 o que a API e a pesquisa compartilham (a `limpar()` de `normalizacao.py`) continua copiado nos

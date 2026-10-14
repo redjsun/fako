@@ -53,6 +53,10 @@ A resposta do import lista as importadas e as descartadas, com o motivo.
 - Adaptador `ReferenciaTfidf` de `ClassificadorClient`
   (`ml/classificador.py`), ligado por `CLASSIFICADOR_PROVIDER=referencia`.
   Lê `MODELS_DIR/atual/referencia.joblib` e, se houver, o `limiares.json` do modelo.
+- Adaptador `BertOnnx`, ligado por `CLASSIFICADOR_PROVIDER=bert`: o BERTimbau exportado com
+  `make exportar-onnx MODELO=models/AAAA-MM/bert` (`modelo.onnx`, `tokenizer.json`,
+  `onnx.json`), rodado com `onnxruntime`, sem PyTorch na API. Mesma calibração, limiares e
+  regra de decisão da referência; sem contribuições por palavra.
 - A frase passa pela `limpar()` do treino antes do TF-IDF. **`normalizacao.py` é cópia de
   `pesquisa/ml/dados.py` e `pesquisa/dados/preparar_dados.py`: mudou lá, muda aqui.**
 - O `scikit-learn` da API tem a mesma versão da imagem `ml` (o joblib não carrega entre
@@ -77,7 +81,7 @@ de um modelo melhor.
 
 | Variável | Valores |
 |---|---|
-| `CLASSIFICADOR_PROVIDER` | `fake` (sem modelo) ou `referencia` |
+| `CLASSIFICADOR_PROVIDER` | `fake` (sem modelo), `referencia` (TF-IDF) ou `bert` (BERTimbau em ONNX) |
 | `CLASSIFICADOR_NO_JOGO` | `false` (padrão) ou `true` |
 | `NOTICIAS_PROVIDER` | `fake` (manchetes inventadas, sem chave), `gnews`, `factcheck` ou vários separados por vírgula (`factcheck,gnews`) |
 | `NOTICIAS_API_KEY` | chave gratuita do GNews (https://gnews.io, 100 pedidos por dia) |

@@ -136,10 +136,7 @@ class ReferenciaTfidf:
         matriz = self.modelo["vetorizador"].transform([texto])
         p1 = float(self.modelo["fronteira_1"].predict_proba(matriz)[0, 1])
         p2 = min(float(self.modelo["fronteira_2"].predict_proba(matriz)[0, 1]), p1)
-        if self.calibracao:
-            p1 = platt(p1, self.calibracao["fronteira_1"])
-            p2 = platt(p2, self.calibracao["fronteira_2"])
-        return p1, min(p2, p1)
+        return calibradas(p1, p2, self.calibracao)
 
     def contribuicoes(self, texto: str, n: int = 8) -> list[tuple[str, float]]:
         """Termos que mais pesaram na fronteira 1 (negativo puxa para falso). Só o admin vê."""
@@ -164,6 +161,62 @@ def legivel(variavel: str) -> str:
     return f"[{termo}]" if tipo == "caracteres" else termo
 
 
+class BertOnnx:
+    """BERTimbau com cabeça ordinal CORAL (pesquisa/ml/treinar_bert.py), exportado para ONNX.
+
+    Lê da pasta publicada o `modelo.onnx`, o `tokenizer.json` e o `onnx.json` (`max_tokens`,
+    `versao`) gravados por pesquisa/ml/exportar_onnx.py, e roda com `onnxruntime` na CPU, sem
+    PyTorch. Mesma limpeza, calibração (`calibracao.json`), limiares e regra de decisão da
+    referência. Não há contribuições por palavra: o admin vê só a análise.
+    """
+
+    ARQUIVO = "modelo.onnx"
+
+    def __init__(self, pasta: Path):
+        import onnxruntime  # só quem usa este adaptador carrega o runtime
+        from tokenizers import Tokenizer
+
+        meta = ler_json(pasta / "onnx.json") or {}
+        self.sessao = onnxruntime.InferenceSession(
+            str(pasta / self.ARQUIVO), providers=["CPUExecutionProvider"]
+        )
+        self.tokenizador = Tokenizer.from_file(str(pasta / "tokenizer.json"))
+        self.tokenizador.no_padding()
+        self.tokenizador.enable_truncation(max_length=meta.get("max_tokens", 96))
+        self.versao = meta.get("versao", pasta.name)
+        self.limiares = ler_limiares(pasta)
+        self.calibracao = ler_json(pasta / "calibracao.json")
+        self.texto_de_entrada = (ler_json(pasta / "config.json") or {}).get("texto", "original")
+
+    def fronteiras(self, texto: str) -> tuple[float, float]:
+        import numpy as np
+
+        codificado = self.tokenizador.encode(texto)
+        logits = self.sessao.run(
+            ["logits"],
+            {
+                "input_ids": np.array([codificado.ids], dtype=np.int64),
+                "attention_mask": np.array([codificado.attention_mask], dtype=np.int64),
+            },
+        )[0][0]
+        p1 = 1 / (1 + math.exp(-float(logits[0])))
+        p2 = min(1 / (1 + math.exp(-float(logits[1]))), p1)
+        return calibradas(p1, p2, self.calibracao)
+
+    def analisar(self, afirmacao: str, limiar: Limiar) -> Analise:
+        texto = limpar(afirmacao) or afirmacao.strip()
+        p1, p2 = self.fronteiras(texto)
+        return analise_das_fronteiras(afirmacao, p1, p2, self.limiares[limiar], self.versao)
+
+
+def calibradas(p1: float, p2: float, calibracao: dict | None) -> tuple[float, float]:
+    """As fronteiras depois do Platt de `calibracao.json`, se houver; P1 >= P2 sempre."""
+    if calibracao:
+        p1 = platt(p1, calibracao["fronteira_1"])
+        p2 = platt(p2, calibracao["fronteira_2"])
+    return p1, min(p2, p1)
+
+
 def ler_json(arquivo: Path) -> dict | None:
     return json.loads(arquivo.read_text(encoding="utf-8")) if arquivo.exists() else None
 
@@ -182,7 +235,7 @@ def ler_limiares(pasta: Path) -> dict[str, float]:
     return {**LIMIARES_PADRAO, **json.loads(arquivo.read_text(encoding="utf-8"))}
 
 
-ADAPTADORES = {"referencia": ReferenciaTfidf}
+ADAPTADORES = {"referencia": ReferenciaTfidf, "bert": BertOnnx}
 
 
 class ClassificadorAusente:
@@ -216,5 +269,5 @@ def get_classificador() -> ClassificadorClient:
         return ClassificadorAusente(f"Nenhum modelo publicado em {modelo}")
     try:
         return _carregar(provedor, modelo, arquivo.stat().st_mtime)
-    except Exception as erro:  # arquivo corrompido ou de outra versão do scikit-learn
+    except Exception as erro:  # arquivo corrompido ou de outra versão da biblioteca
         return ClassificadorAusente(f"O modelo em {modelo} não carregou: {erro}")
