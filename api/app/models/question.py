@@ -16,6 +16,8 @@ class QuestionStatus(str, enum.Enum):
     DRAFT = "draft"
     VALIDATED = "validated"
     REJECTED = "rejected"
+    # Notícia vencida que algum jogador respondeu: sai do jogo, fica para o histórico.
+    ARCHIVED = "archived"
 
 
 class QuestionOrigin(str, enum.Enum):

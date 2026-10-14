@@ -1,6 +1,6 @@
 COMPOSE := docker compose
 
-.PHONY: help build up down restart logs ps shell-api shell-web shell-db migrate makemigration seed admin test lint format dados padronizar atalho contagens referencia bert avaliar classificar publicar amostra-questoes medir-amostra pre-anotar avaliar-extracao test-web test-ml shell-ml eda docs clean
+.PHONY: help build up down restart logs ps shell-api shell-web shell-db migrate makemigration seed admin test lint format dados padronizar atalho contagens referencia bert avaliar classificar publicar importar-noticias limpar-noticias amostra-questoes medir-amostra pre-anotar avaliar-extracao test-web test-ml shell-ml eda docs clean
 
 help: ## Lista os comandos disponíveis
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -94,6 +94,12 @@ avaliar: ## Avalia modelo(s) na validação (uso: make avaliar [MODELO="models/2
 
 publicar: ## Publica um modelo para a API em models/atual (uso: make publicar [MODELO=models/2026-11/referencia])
 	rm -rf models/atual && cp -r $(MODELO) models/atual
+
+importar-noticias: ## Importa as notícias do dia agora, como o agendador-api (uso: make importar-noticias [ARGS="--quantidade 5"])
+	$(COMPOSE) exec api python -m app.jobs.importar_noticias $(ARGS)
+
+limpar-noticias: ## Apaga as notícias vencidas agora, como o agendador-api (uso: make limpar-noticias [ARGS="--dias 30"])
+	$(COMPOSE) exec api python -m app.jobs.limpar_noticias $(ARGS)
 
 amostra-questoes: ## Planilha de avaliação das questões da LLM para o admin (uso: make amostra-questoes [ARGS="--itens 50"] > amostra.csv)
 	@$(COMPOSE) exec -T api python -m app.jobs.amostra_questoes sortear $(ARGS)

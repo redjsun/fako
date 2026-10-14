@@ -46,6 +46,35 @@ services:
       db:
         condition: service_healthy
 
+  # Rotina diária da API nos horários de api/crontab (supercronic): importa as notícias do dia
+  # e apaga as vencidas. Mesma imagem e mesmo .env da API.
+  agendador-api:
+    build:
+      context: ./api
+      x-bake:
+        cache-from:
+          - type=gha,scope=api
+        cache-to:
+          - type=gha,scope=api,mode=max
+    container_name: fakenews-agendador-api
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-fako}:${POSTGRES_PASSWORD:-fako}@db:5432/${POSTGRES_DB:-fako}
+      TZ: America/Sao_Paulo
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: supercronic /app/crontab
+    volumes:
+      - ./api/app:/app/app
+      - ./api/crontab:/app/crontab:ro
+      - ./models:/app/models:ro
+    depends_on:
+      db:
+        condition: service_healthy
+
   web:
     build:
       context: ./web

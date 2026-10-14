@@ -12,10 +12,16 @@ revisão humana em /admin/questions/{id}/review, ou, com NOTICIAS_PUBLICAR_DIRET
 O rótulo nunca é o do classificador: a análise dele fica só como registro.
 
 Se o classificador estiver indisponível, a notícia entra mesmo assim, sem análise.
+
+Rotina diária (app/jobs/): `importar_lote()` traz as notícias do dia, só as publicadas dentro
+da janela de retenção; `limpar()` tira do banco as importadas há mais de
+NOTICIAS_RETENCAO_DIAS (30). As que algum jogador respondeu, ou que estão em jogo numa partida,
+são arquivadas em vez de apagadas: saem do jogo e ficam para o histórico e a revisão.
 """
 
 import math
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
@@ -52,6 +58,21 @@ def fonte(noticia: Noticia) -> str:
     return noticia.url[:500]
 
 
+@dataclass
+class Limpeza:
+    apagadas: int
+    arquivadas: int
+
+
+def antiga(noticia: Noticia, limite: datetime | None) -> bool:
+    if limite is None or noticia.publicada_em is None:
+        return False
+    publicada = noticia.publicada_em
+    if publicada.tzinfo is None:
+        publicada = publicada.replace(tzinfo=timezone.utc)
+    return publicada < limite
+
+
 def motivo(noticia: Noticia, texto: str) -> str | None:
     if noticia.veredito is None:
         return motivo_descarte(texto, noticia.url)
@@ -71,11 +92,22 @@ class NoticiasService:
         self.content = ContentService(db)
 
     def importar(self, data: NewsImportRequest) -> NewsImportResponse:
-        category = self.content.get_category(data.category)
+        return self.importar_lote(data.category, data.quantity)
+
+    def importar_lote(
+        self, categoria: str, quantidade: int, max_idade_dias: int | None = None
+    ) -> NewsImportResponse:
+        """Importa até `quantidade` notícias; com `max_idade_dias`, descarta as mais velhas."""
+        category = self.content.get_category(categoria)
+        limite = (
+            datetime.now(timezone.utc) - timedelta(days=max_idade_dias)
+            if max_idade_dias is not None
+            else None
+        )
         importadas, descartadas = [], []
         vistas: set[str] = set()
         falhas = []
-        restante = data.quantity
+        restante = quantidade
         for posicao, provedor in enumerate(self.provedores):
             # Cada provedor fica com a sua parte do que falta; um fora do ar não derruba os outros.
             cota = math.ceil(restante / (len(self.provedores) - posicao))
@@ -85,7 +117,13 @@ class NoticiasService:
                 falhas.append(erro)
                 continue
             antes = len(importadas)
-            self._importar(noticias, cota, category, importadas, descartadas, vistas)
+            recentes = []
+            for noticia in noticias:
+                if antiga(noticia, limite):
+                    descartadas.append(NewsDiscarded(title=noticia.titulo, reason="notícia antiga"))
+                else:
+                    recentes.append(noticia)
+            self._importar(recentes, cota, category, importadas, descartadas, vistas)
             restante -= len(importadas) - antes
         if falhas and len(falhas) == len(self.provedores):
             raise falhas[0]
@@ -148,3 +186,17 @@ class NoticiasService:
             question.model_confidence = analise.confianca
             question.model_version = analise.versao_modelo
         return self.questions.add(question)
+
+    def limpar(self, dias: int) -> Limpeza:
+        """Apaga as notícias importadas há mais de `dias`; arquiva as que estão em uso."""
+        vencidas = self.questions.news_created_before(
+            datetime.now(timezone.utc) - timedelta(days=dias)
+        )
+        ids = {q.id for q in vencidas}
+        em_uso = self.questions.ids_in_use(ids)
+        for question in vencidas:
+            if question.id in em_uso:
+                question.status = QuestionStatus.ARCHIVED
+        self.questions.db.flush()  # a sessão não grava sozinha (autoflush=False)
+        self.questions.delete_ids(ids - em_uso)
+        return Limpeza(apagadas=len(ids - em_uso), arquivadas=len(em_uso))

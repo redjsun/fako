@@ -105,3 +105,18 @@ API, as checagens mais recentes das agências brasileiras (a mesma lista de
 - Cada classe do treino tem uma "cara" própria (manchete, ponto final, minúsculas); o modelo
   pode puxar uma manchete para `confere` só pela forma (`pesquisa/ml/atalho.py`). A nota do
   modelo na curadoria é apoio à revisão, não um veredito.
+
+## Rotina diária
+
+O serviço `agendador-api` (mesma imagem da API, supercronic com os horários de
+`api/crontab`, fuso de São Paulo) sobe com `make up` e roda todo dia:
+
+| Horário | Comando | O que faz |
+|---|---|---|
+| 5h30 | `python -m app.jobs.limpar_noticias` | Notícias importadas há mais de `NOTICIAS_RETENCAO_DIAS` (30): apaga as que ninguém respondeu; **arquiva** (`status=archived`) as que algum jogador respondeu ou que estão em jogo numa partida, que saem do jogo e ficam para o histórico e a revisão |
+| 6h | `python -m app.jobs.importar_noticias` | Até `NOTICIAS_POR_DIA` (10) notícias dos provedores de `NOTICIAS_PROVIDER` (`factcheck,gnews`: as duas APIs, com a quantidade dividida entre elas), na categoria `NOTICIAS_CATEGORIA`. Mesmos filtros e deduplicação de `POST /admin/news/import`; notícias publicadas antes da janela de retenção ficam de fora, para não voltarem logo depois de apagadas |
+
+As notícias entram como rascunho, ou já validadas com `NOTICIAS_PUBLICAR_DIRETO=true`. Se
+os dois provedores estiverem fora, a importação do dia não grava nada e termina com erro no
+log (`docker compose logs agendador-api`). Para rodar na hora: `make importar-noticias` e
+`make limpar-noticias`.

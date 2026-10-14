@@ -60,6 +60,12 @@ class Settings(BaseSettings):
     noticias_publicar_direto: bool = False
     # Descarta alegações checadas sobre política e eleição.
     noticias_sem_politica: bool = False
+    # Rotina diária (app/jobs/, agendada em api/crontab): quantas notícias importar por dia, em
+    # que categoria, e por quantos dias uma notícia fica no banco (depois é apagada, ou
+    # arquivada se algum jogador a respondeu).
+    noticias_por_dia: int = 10
+    noticias_categoria: str = "conhecimentos-gerais"
+    noticias_retencao_dias: int = 30
 
 
 @lru_cache
