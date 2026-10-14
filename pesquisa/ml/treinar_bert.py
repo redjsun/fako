@@ -21,10 +21,17 @@ Saídas na pasta `saida` da configuração:
 - `codificador/`: BERTimbau ajustado e tokenizador (`save_pretrained`);
 - `cabeca_coral.pt`: pesos da camada linear e os dois vieses;
 - `previsoes.jsonl` e `config.json` (contrato do avaliar.py).
+
+Ponto de retomada: no fim de cada época, `retomada/semente-N.pt` guarda pesos, otimizador,
+agenda, histórico, melhor época e o estado dos geradores aleatórios. Rodar de novo continua da
+última época concluída, com o mesmo embaralhamento de uma rodada sem pausa; a assinatura
+(configuração, dataset, semente, épocas) impede retomar com outra configuração. `--do-zero`
+ignora os pontos salvos. A pasta `retomada/` é apagada quando o treino termina.
 """
 
 import argparse
 import random
+import shutil
 import statistics
 import time
 from datetime import date
@@ -40,6 +47,7 @@ from configuracao import CONFIGS, Configuracao, carregar_configuracao
 from dados import CLASSES, ORDEM, Exemplo, carregar
 
 PASTA_CODIFICADOR = "codificador"
+PASTA_RETOMADA = "retomada"
 ARQUIVO_CABECA = "cabeca_coral.pt"
 FRASES_LATENCIA = 200
 
@@ -133,10 +141,41 @@ def carregar_modelo(pasta: Path) -> dict:
     }
 
 
+def caminho_retomada(saida: Path, semente: int) -> Path:
+    return saida / PASTA_RETOMADA / f"semente-{semente}.pt"
+
+
+def gravar_retomada(caminho: Path, estado: dict):
+    """Grava por cima só depois de escrever por inteiro: uma pausa no meio não corrompe."""
+    caminho.parent.mkdir(parents=True, exist_ok=True)
+    temporario = caminho.with_suffix(".tmp")
+    torch.save(estado, temporario)
+    temporario.replace(caminho)
+
+
+def ler_retomada(caminho: Path, assinatura: dict) -> dict | None:
+    if not caminho.exists():
+        return None
+    estado = torch.load(caminho, map_location="cpu", weights_only=False)
+    if estado.get("assinatura") != assinatura:
+        print(f"Ponto de retomada de outra configuração, ignorado: {caminho}")
+        return None
+    return estado
+
+
 def treinar_semente(
-    semente: int, treino: list[Exemplo], validacao: list[Exemplo], config: Configuracao
+    semente: int,
+    treino: list[Exemplo],
+    validacao: list[Exemplo],
+    config: Configuracao,
+    retomada: Path | None = None,
+    assinatura: dict | None = None,
 ) -> tuple[float, int, Coral, list[float]]:
-    """Ajusta uma semente; devolve (melhor F1, época, rede na melhor época, F1 por época)."""
+    """Ajusta uma semente; devolve (melhor F1, época, rede na melhor época, F1 por época).
+
+    Com `retomada`, grava o ponto de retomada no fim de cada época e, se ele já existir com a
+    mesma `assinatura`, continua da época seguinte à última concluída.
+    """
     parametros = config.treino
     fixar_semente(semente)
     tokenizador = AutoTokenizer.from_pretrained(parametros["modelo_base"])
@@ -163,8 +202,21 @@ def treinar_semente(
     perda = nn.BCEWithLogitsLoss(reduction="none")
     modelo = {"rede": rede, "tokenizador": tokenizador, "max_tokens": max_tokens}
 
-    historico, melhor, sem_melhora = [], None, 0
-    for epoca in range(1, max_epocas + 1):
+    historico, melhor, sem_melhora, primeira = [], None, 0, 1
+    assinatura = {**(assinatura or {}), "semente": semente, "max_epocas": max_epocas}
+    salvo = ler_retomada(retomada, assinatura) if retomada else None
+    if salvo:
+        rede.load_state_dict(salvo["rede"])
+        otimizador.load_state_dict(salvo["otimizador"])
+        agenda.load_state_dict(salvo["agenda"])
+        historico, melhor, sem_melhora = salvo["historico"], salvo["melhor"], salvo["sem_melhora"]
+        torch.set_rng_state(salvo["aleatorio"]["torch"])
+        np.random.set_state(salvo["aleatorio"]["numpy"])
+        random.setstate(salvo["aleatorio"]["python"])
+        primeira = max_epocas + 1 if salvo["concluida"] else salvo["epoca"] + 1
+        print(f"semente {semente}: retomando depois da época {salvo['epoca']}")
+
+    for epoca in range(primeira, max_epocas + 1):
         rede.train()
         ordem = torch.randperm(len(textos)).tolist()
         embaralhados = [textos[i] for i in ordem]
@@ -187,22 +239,46 @@ def treinar_semente(
             f"semente {semente} época {epoca}: perda {soma / len(textos):.4f}, "
             f"F1 macro na validação {f1:.3f} ({time.perf_counter() - inicio_epoca:.0f} s)"
         )
+        parar = False
         if melhor is None or f1 > melhor[0]:
             estado = {k: v.detach().clone() for k, v in rede.state_dict().items()}
             melhor, sem_melhora = (f1, epoca, estado), 0
         else:
             sem_melhora += 1
-            if sem_melhora > paciencia:
-                break
+            parar = sem_melhora > paciencia
+        if retomada:
+            gravar_retomada(
+                retomada,
+                {
+                    "assinatura": assinatura,
+                    "epoca": epoca,
+                    "concluida": parar or epoca == max_epocas,
+                    "rede": rede.state_dict(),
+                    "otimizador": otimizador.state_dict(),
+                    "agenda": agenda.state_dict(),
+                    "historico": historico,
+                    "melhor": melhor,
+                    "sem_melhora": sem_melhora,
+                    "aleatorio": {
+                        "torch": torch.get_rng_state(),
+                        "numpy": np.random.get_state(),
+                        "python": random.getstate(),
+                    },
+                },
+            )
+        if parar:
+            break
 
     f1, epoca, estado = melhor
     rede.load_state_dict(estado)
     return f1, epoca, rede, historico
 
 
-def treinar(config: Configuracao, saida: Path | None = None) -> dict:
+def treinar(config: Configuracao, saida: Path | None = None, do_zero: bool = False) -> dict:
     """Treina cada semente, guarda a melhor e grava modelo, previsões e configuração."""
     saida = saida or config.saida
+    if do_zero:
+        shutil.rmtree(saida / PASTA_RETOMADA, ignore_errors=True)
     inicio = time.perf_counter()
     torch.set_num_threads(config.treino.get("threads") or torch.get_num_threads())
     conjunto = carregar(**config.argumentos_dados())
@@ -210,9 +286,18 @@ def treinar(config: Configuracao, saida: Path | None = None) -> dict:
     if len({e.veracidade for e in treino}) < 3 or not validacao:
         raise ValueError("O treino precisa das três classes e a validação não pode estar vazia")
 
+    registro = config.registro(conjunto.dataset_sha256)
+    assinatura = {chave: registro[chave] for chave in ("configuracao_sha1", "dataset_sha256")}
     por_semente, melhor = {}, None
     for semente in config.sementes:
-        f1, epoca, rede, historico = treinar_semente(semente, treino, validacao, config)
+        f1, epoca, rede, historico = treinar_semente(
+            semente,
+            treino,
+            validacao,
+            config,
+            retomada=caminho_retomada(saida, semente),
+            assinatura=assinatura,
+        )
         por_semente[str(semente)] = {
             "f1_macro_validacao": f1,
             "epoca": epoca,
@@ -253,7 +338,10 @@ def treinar(config: Configuracao, saida: Path | None = None) -> dict:
         "segundos_treino": round(time.perf_counter() - inicio, 1),
         "latencia_ms_por_frase": round(latencia, 3),
     }
-    gravar_previsoes(saida, previsoes, {**config.registro(conjunto.dataset_sha256), **resultado})
+    gravar_previsoes(saida, previsoes, {**registro, **resultado})
+    shutil.rmtree(
+        saida / PASTA_RETOMADA, ignore_errors=True
+    )  # treino completo: não há o que retomar
     return resultado
 
 
@@ -263,13 +351,16 @@ def main():
     parser.add_argument("--saida", type=Path, help="sobrescreve a pasta de saída da configuração")
     parser.add_argument("--sementes", type=int, nargs="+", help="sobrescreve as sementes")
     parser.add_argument("--max-epocas", type=int, help="sobrescreve treino.max_epocas")
+    parser.add_argument(
+        "--do-zero", action="store_true", help="ignora os pontos de retomada e recomeça"
+    )
     args = parser.parse_args()
     config = carregar_configuracao(args.config)
     if args.sementes:
         config.sementes = args.sementes
     if args.max_epocas:
         config.treino = {**config.treino, "max_epocas": args.max_epocas}
-    resultado = treinar(config, args.saida)
+    resultado = treinar(config, args.saida, do_zero=args.do_zero)
     saida = args.saida or config.saida
     print(
         f"\nSemente {resultado['semente_escolhida']} (F1 macro {resultado['f1_macro_validacao']:.3f}; "

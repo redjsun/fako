@@ -42,3 +42,95 @@ def test_classe_rara_pesa_mais():
     assert pesos["verdadeiro"] > pesos["enganoso"] > pesos["falso"]
     total = sum(pesos[e.veracidade] for e in exemplos)
     assert total == pytest.approx(len(exemplos))
+
+
+PALAVRAS = ["vacina", "tem", "chip", "governo", "confisca", "poupança", "a", "o", "de"]
+
+
+@pytest.fixture
+def bert_minusculo(tmp_path, monkeypatch):
+    """Troca o BERTimbau por um BERT de 1 camada, sem baixar nada."""
+    import transformers
+
+    import treinar_bert
+
+    vocabulario = tmp_path / "vocab.txt"
+    vocabulario.write_text(
+        "\n".join(["[PAD]", "[UNK]", "[CLS]", "[SEP]", "[MASK]", *PALAVRAS]), encoding="utf-8"
+    )
+    config = transformers.BertConfig(
+        vocab_size=5 + len(PALAVRAS),
+        hidden_size=16,
+        num_hidden_layers=1,
+        num_attention_heads=2,
+        intermediate_size=32,
+    )
+    monkeypatch.setattr(
+        treinar_bert.AutoTokenizer,
+        "from_pretrained",
+        lambda *_: transformers.BertTokenizerFast(vocab_file=str(vocabulario)),
+    )
+    monkeypatch.setattr(
+        treinar_bert.AutoModel, "from_pretrained", lambda *_: transformers.BertModel(config)
+    )
+    return treinar_bert
+
+
+def exemplos_de_treino():
+    frases = {
+        "falso": "a vacina tem chip",
+        "enganoso": "o governo confisca a poupança",
+        "verdadeiro": "vacina de governo",
+    }
+    return [
+        Exemplo(**{**exemplo(v).__dict__, "id": f"{v}{i}", "texto": frases[v]})
+        for v in frases
+        for i in range(4)
+    ]
+
+
+def test_retomada_continua_da_epoca_salva_e_da_o_mesmo_resultado(bert_minusculo, tmp_path):
+    from configuracao import Configuracao
+
+    config = Configuracao(
+        nome="bert",
+        modelo="bert",
+        saida=tmp_path,
+        dataset=tmp_path / "x.jsonl",
+        treino={"modelo_base": "x", "max_epocas": 2, "paciencia": 5, "lote": 4},
+    )
+    treino = validacao = exemplos_de_treino()
+    assinatura = {"configuracao_sha1": "c", "dataset_sha256": "d"}
+
+    f1_direto, _, rede_direta, historico_direto = bert_minusculo.treinar_semente(
+        7, treino, validacao, config
+    )
+
+    # Uma rodada que "pausa" depois da época 1: a avaliação da época 2 é interrompida.
+    retomada = bert_minusculo.caminho_retomada(tmp_path, 7)
+    original = bert_minusculo.fronteiras
+    chamadas = []
+
+    def pausa_na_segunda(*args, **kwargs):
+        chamadas.append(1)
+        if len(chamadas) == 2:
+            raise KeyboardInterrupt
+        return original(*args, **kwargs)
+
+    bert_minusculo.fronteiras = pausa_na_segunda
+    try:
+        with pytest.raises(KeyboardInterrupt):
+            bert_minusculo.treinar_semente(7, treino, validacao, config, retomada, assinatura)
+    finally:
+        bert_minusculo.fronteiras = original
+    assert torch.load(retomada, weights_only=False)["epoca"] == 1
+
+    f1, _, rede, historico = bert_minusculo.treinar_semente(
+        7, treino, validacao, config, retomada, assinatura
+    )
+    assert historico == pytest.approx(historico_direto) and f1 == pytest.approx(f1_direto)
+    for chave, valor in rede_direta.state_dict().items():
+        torch.testing.assert_close(rede.state_dict()[chave], valor)
+
+    # Com outra assinatura, o ponto salvo não vale.
+    assert bert_minusculo.ler_retomada(retomada, {"configuracao_sha1": "outra"}) is None
