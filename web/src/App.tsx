@@ -284,19 +284,24 @@ export default function App() {
       setDialog(null);
       setEnding(null);
 
-      let match: Match | null = null;
+      let match: Match;
       try {
         match = await matchService.startMatch(levelNumber ?? progress.current_level);
       } catch (error) {
+        // Sem a API não há partida: as perguntas e a correção vêm só dela.
         console.error("Erro ao iniciar a partida na API:", error);
+        if (authService.getCurrentUser()) {
+          window.alert("Não foi possível iniciar a partida: o servidor não respondeu. Tente de novo.");
+        }
+        return;
       }
       if (!authService.getCurrentUser()) return; // a sessão expirou durante o pedido
 
-      const matchLevel = match?.level.number ?? levelNumber ?? 1;
-      const duration = match?.duration_seconds ?? MATCH_SECONDS;
+      const matchLevel = match.level.number;
+      const duration = match.duration_seconds;
       const startSnake = initialSnake();
 
-      matchIdRef.current = match?.id ?? null;
+      matchIdRef.current = match.id;
       setCurrentMatch(match);
       setLevel(matchLevel);
       setTickMs(tickForLevel(matchLevel));
@@ -445,9 +450,7 @@ export default function App() {
     try {
       const result = await matchService.answerQuestion(matchIdRef.current ?? 0, question.id, value);
       setLastResult(result);
-      // A API devolve o placar oficial; se ela cair no meio da partida, a pergunta local
-      // ainda soma os pontos do acerto.
-      setScore(result.score);
+      setScore(result.score); // placar oficial da API
       setAnswers((previous) => [
         ...previous,
         {

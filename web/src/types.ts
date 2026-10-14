@@ -5,6 +5,14 @@ export interface Question {
 }
 
 // Resultado da resposta na barra de confiabilidade (0 a 100).
+// Palpite do classificador sobre a afirmação (CLASSIFICADOR_NO_JOGO), só depois da resposta.
+export interface ModelGuess {
+  category: "falso" | "enganoso" | "confere" | "incerto";
+  score: number | null; // 0 a 100; sem nota quando incerto
+  confidence: number;
+  model_version: string;
+}
+
 export interface AnswerResult {
   is_correct: boolean;
   correct_answer: boolean;
@@ -15,6 +23,7 @@ export interface AnswerResult {
   explanation: string;
   source: string;
   score: number;
+  model_guess?: ModelGuess | null;
 }
 
 // Afirmação já respondida, para o feedback, o resumo da partida e o histórico.

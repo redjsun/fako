@@ -84,7 +84,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       if (result.success && result.user) {
         onLoginSuccess(result.user);
       } else {
-        setError("Não foi possível entrar como visitante.");
+        setError(result.error || "Não foi possível entrar como visitante.");
       }
     } catch {
       setError("Erro ao acessar como visitante.");

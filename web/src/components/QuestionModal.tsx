@@ -1,5 +1,5 @@
 import React from "react";
-import { AnswerResult, Question } from "../types";
+import { AnswerResult, ModelGuess, Question } from "../types";
 import { reliabilityLabel } from "../utils/formatters";
 import { Icon } from "./Icon";
 import { ReliabilityBar } from "./ReliabilityBar";
@@ -117,6 +117,32 @@ function distanceMessage(result: AnswerResult): string {
 }
 
 /** Popup do resultado: sua resposta × referência, explicação, fonte e efeito na cobrinha. */
+const GUESS_LABELS: Record<ModelGuess["category"], string> = {
+  falso: "Falso",
+  enganoso: "Enganoso",
+  confere: "Confere",
+  incerto: "Incerto",
+};
+
+// O que o classificador achou da afirmação; não muda a correção, que vem da checagem.
+const ModelGuessCard: React.FC<{ guess: ModelGuess }> = ({ guess }) => (
+  <div className="result-card__why result-card__model">
+    <h3>
+      <Icon name="bulb" size={18} />
+      O que o classificador achou
+    </h3>
+    <p>
+      <strong>{GUESS_LABELS[guess.category] ?? guess.category}</strong>
+      {guess.category === "incerto"
+        ? " — o modelo não tem certeza sobre esta afirmação."
+        : ` — nota ${Math.round(guess.score ?? 0)} de 100, com ${Math.round(
+            guess.confidence * 100
+          )}% de confiança.`}
+    </p>
+    <p className="result-card__source">Modelo: {guess.model_version}</p>
+  </div>
+);
+
 export const ResultPopup: React.FC<ResultPopupProps> = ({
   statement,
   result,
@@ -172,6 +198,8 @@ export const ResultPopup: React.FC<ResultPopupProps> = ({
               </p>
             )}
           </div>
+
+          {result.model_guess && <ModelGuessCard guess={result.model_guess} />}
 
           <div className="result-card__snake">
             <span className="result-card__snake-blocks" aria-hidden="true">

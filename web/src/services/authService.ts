@@ -71,8 +71,7 @@ function longestStreak(answers: AnsweredQuestion[]): number {
   return best;
 }
 
-const OFFLINE_ERROR =
-  "Servidor indisponível no momento. Entre como visitante para jogar sem conta.";
+const OFFLINE_ERROR = "Servidor indisponível no momento. Tente de novo em instantes.";
 
 // Versões anteriores guardavam aqui as contas com a senha em texto puro.
 try {
@@ -147,18 +146,25 @@ class AuthService {
   }
 
   public async loginAsGuest(): Promise<{ success: boolean; error?: string; user?: User }> {
-    // Modo Visitante é 100% autônomo, instantâneo e offline-first
-    const guestNum = Math.floor(1000 + Math.random() * 9000);
-    const sessionUser: User = {
-      id: guestNum,
-      username: `Visitante #${guestNum}`,
-      is_admin: false,
-      createdAt: Date.now(),
-    };
-
-    setAuthToken(`guest-token-${guestNum}`);
-    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionUser));
-    return { success: true, user: sessionUser };
+    // Visitante joga com as questões e o classificador da API: cria uma conta temporária, com
+    // nome e senha aleatórios que ninguém precisa guardar (a sessão dura o tempo do token).
+    const sufixo = Array.from(crypto.getRandomValues(new Uint8Array(4)), (b) =>
+      b.toString(16).padStart(2, "0")
+    ).join("");
+    const senha = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) =>
+      b.toString(16).padStart(2, "0")
+    ).join("");
+    try {
+      const tokenResp = await httpPost<{ access_token: string }>("/auth/register", {
+        username: `visitante_${sufixo}`,
+        password: senha,
+      });
+      setAuthToken(tokenResp.access_token);
+      return { success: true, user: await this.startSession() };
+    } catch (error) {
+      setAuthToken(null);
+      return { success: false, error: authError(error, "Não foi possível entrar como visitante.") };
+    }
   }
 
   public getCurrentUser(): User | null {
@@ -177,7 +183,9 @@ class AuthService {
       const token = getAuthToken();
       if (!token) return null;
       if (token.startsWith("guest-") || token.startsWith("local-")) {
-        return this.getCurrentUser();
+        // Sessão de visitante das versões sem API: não vale mais na API.
+        this.logout();
+        return null;
       }
       const userResp = await httpGet<User>("/users/me");
       const sessionUser: User = {

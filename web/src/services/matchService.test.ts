@@ -17,7 +17,7 @@ describe("matchService", () => {
     vi.unstubAllGlobals();
   });
 
-  it("na partida da API, questões esgotadas sobem como 404 em vez de virar pergunta local", async () => {
+  it("questões esgotadas sobem como 404 para o jogo encerrar a partida", async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(new Response(JSON.stringify(apiMatch), { status: 201 }))
@@ -33,16 +33,9 @@ describe("matchService", () => {
     expect((error as HttpError).status).toBe(404);
   });
 
-  it("com a API fora do ar, a partida e as perguntas são locais e corrigidas no front", async () => {
-    const fetchMock = vi.fn().mockRejectedValue(new TypeError("Failed to fetch"));
-    vi.stubGlobal("fetch", fetchMock);
+  it("com a API fora do ar, a partida não começa em modo local", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
 
-    const match = await matchService.startMatch(1);
-    const question = await matchService.getNextQuestion(match.id);
-    const result = await matchService.answerQuestion(match.id, question.id, 50);
-
-    expect(question.id).toBeLessThan(0);
-    expect(fetchMock).toHaveBeenCalledTimes(1); // só a tentativa de criar a partida
-    expect(result.explanation).toBeTruthy();
+    await expect(matchService.startMatch(1)).rejects.toThrow();
   });
 });
