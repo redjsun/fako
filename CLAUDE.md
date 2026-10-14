@@ -34,7 +34,7 @@ Tudo roda por Docker Compose (o Docker Desktop precisa estar aberto). `make help
 - `make padronizar`, `make atalho`, `make contagens`, `make shell-ml`: experimentos de `pesquisa/ml/`
 - `make eda`: Jupyter Lab em `:8888`
 
-Segredos ficam em `.env` (copiar de `.env.example`): `FACTCHECK_API_KEY`, `LLM_*`, `AI_*`.
+Segredos ficam em `.env` (copiar de `.env.example`): `FACTCHECK_API_KEY`, `LLM_*`, `CLASSIFICADOR_*`.
 
 ## Dados
 

@@ -18,9 +18,18 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expires_minutes: int = 60 * 24
 
-    # Provedor usado por integrations/ai_client.py; "fake" roda sem chamadas externas.
-    ai_provider: str = "fake"
-    ai_api_key: str = ""
+    # LLM (integrations/llm_client.py): "fake" roda sem chamadas externas; "openai" usa um
+    # endpoint compatível com a API de chat da OpenAI (Ollama, LiteLLM ou provedor hospedado).
+    # LLM_BASE_URL, LLM_MODEL, LLM_API_KEY e LLM_EXTRA_BODY são os mesmos da pesquisa.
+    llm_provider: str = "fake"
+    llm_base_url: str = ""
+    llm_model: str = ""
+    llm_api_key: str = ""
+    llm_extra_body: dict = {}
+    llm_temperatura: float = 0.2
+    llm_tempo_limite: float = 120.0
+    # Envia o JSON Schema da saída em response_format; desligar se o provedor não aceitar.
+    llm_esquema: bool = True
 
     # Classificador de veracidade (integrations/classificador_client.py): "fake" roda sem modelo;
     # os modelos publicados ficam em models_dir/atual.

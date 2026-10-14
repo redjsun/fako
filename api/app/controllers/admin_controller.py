@@ -5,8 +5,8 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.deps import get_current_admin
-from app.integrations.ai_client import AIClient, get_ai_client
 from app.integrations.classificador_client import ClassificadorClient, get_classificador
+from app.integrations.llm_client import LLMClient, get_llm_client
 from app.integrations.noticias_client import NoticiasClient, get_noticias_clients
 from app.models.question import QuestionStatus
 from app.schemas.admin_schema import (
@@ -34,9 +34,21 @@ def get_content_service(db: Session = Depends(get_db)) -> ContentService:
 
 
 def get_ai_service(
-    db: Session = Depends(get_db), ai_client: AIClient = Depends(get_ai_client)
+    db: Session = Depends(get_db),
+    llm: LLMClient = Depends(get_llm_client),
+    classificador: ClassificadorClient = Depends(get_classificador),
+    noticias: list[NoticiasClient] = Depends(get_noticias_clients),
 ) -> AIService:
-    return AIService(db, ai_client)
+    return AIService(db, llm, classificador, noticias)
+
+
+def get_classify_service(
+    db: Session = Depends(get_db),
+    llm: LLMClient = Depends(get_llm_client),
+    classificador: ClassificadorClient = Depends(get_classificador),
+) -> AIService:
+    # Sem notícias: um NOTICIAS_PROVIDER mal configurado não derruba a análise.
+    return AIService(db, llm, classificador)
 
 
 @router.get("/questions", response_model=list[QuestionAdminResponse])
@@ -73,12 +85,13 @@ def review_question(
 def generate_questions(
     data: AIGenerateRequest, service: AIService = Depends(get_ai_service)
 ) -> list[QuestionAdminResponse]:
+    """Checagens de agência reescritas pela LLM viram rascunhos, com o gabarito da checagem."""
     return service.generate(data)
 
 
 @router.post("/ai/classify", response_model=AIClassifyResponse)
 def classify_statement(
-    data: AIClassifyRequest, service: AIService = Depends(get_ai_service)
+    data: AIClassifyRequest, service: AIService = Depends(get_classify_service)
 ) -> AIClassifyResponse:
     return service.classify(data)
 

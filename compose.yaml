@@ -32,6 +32,9 @@ services:
         required: false
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-fako}:${POSTGRES_PASSWORD:-fako}@db:5432/${POSTGRES_DB:-fako}
+    # Para alcançar uma LLM local no host (Ollama) também no Linux.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "8000:8000"
     volumes:
@@ -136,6 +139,18 @@ services:
       - ./anotacoes:/work/anotacoes
       - ./models:/work/models
 
+  # LLM local em container, alternativa ao Ollama no host (no Mac, o do host usa a GPU e é
+  # mais rápido). Uso: docker compose --profile llm up -d ollama, depois
+  # docker compose exec ollama ollama pull qwen3:8b e LLM_BASE_URL=http://ollama:11434/v1.
+  ollama:
+    image: ollama/ollama:0.12.6
+    container_name: fakenews-ollama
+    profiles: ["llm"]
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+
   # Documentação do projeto (MkDocs + Material), servida com live-reload.
   docs:
     image: squidfunk/mkdocs-material
@@ -148,3 +163,4 @@ services:
 
 volumes:
   db_data:
+  ollama_data:

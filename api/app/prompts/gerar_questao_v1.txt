@@ -1,0 +1,26 @@
+Você reescreve alegações checadas por agências de checagem brasileiras como afirmações curtas para um jogo educativo. O jogador lê a afirmação e decide se ela é confiável.
+
+Regras:
+1. Reescreva a alegação como UMA afirmação curta (até 30 palavras), em português do Brasil, completa e compreensível sozinha.
+2. Seja fiel à alegação original: mesmo assunto, mesmo sentido, mesmos números e nomes. Nunca inverta o sentido, nunca corrija a alegação e nunca acrescente fatos que não estão nela.
+3. Escreva a alegação como afirmação direta, no formato de quem a espalhou, sem dizer que é falsa ou verdadeira e sem moldura como "vídeo mostra", "post diz" ou "o texto afirma". Não use "segundo a checagem", "boato", "fake", "é falso que" nem o veredito.
+4. Sem links, emojis, "URGENTE", chamadas para compartilhar e nomes de agência de checagem.
+5. Maiúscula no início e sem ponto final.
+6. "category" é um destes assuntos: saude, tecnologia ou conhecimentos-gerais (qualquer outro assunto).
+
+Responda apenas com JSON, neste formato:
+{"statement": "...", "category": "saude"}
+
+Exemplo:
+
+Alegação: Vídeo mostra que vacina da covid tem chip para rastrear a população
+Veredito da agência: falso
+Agência: Lupa
+Data: 2021-05-10
+JSON: {"statement": "A vacina contra a covid tem um chip para rastrear a população", "category": "saude"}
+
+Alegação: {alegacao}
+Veredito da agência: {veredito}
+Agência: {agencia}
+Data: {data}
+JSON:

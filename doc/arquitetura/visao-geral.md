@@ -61,7 +61,12 @@ As views não chamam `fetch` diretamente; toda chamada HTTP passa pelo
 
 A documentação interativa fica em `http://localhost:8000/docs`. Os services levantam
 exceções de `core/exceptions.py`, convertidas em respostas HTTP pelo handler de `main.py`.
-A IA fica atrás da interface `integrations/ai_client.py` (`AI_PROVIDER=fake` por padrão).
+A LLM fica atrás da interface `integrations/llm_client.py` (`LLM_PROVIDER=fake` por padrão;
+`openai` usa qualquer endpoint compatível com a API de chat da OpenAI, como o Ollama). Os
+prompts ficam em `app/prompts/` com a versão no nome, e toda resposta passa por um esquema
+Pydantic: fora dele, o pedido é repetido uma vez e, se falhar de novo, o item é descartado.
+Em `POST /admin/ai/generate`, a LLM só reescreve a alegação de uma checagem; o gabarito e a
+fonte vêm da checagem.
 O classificador de veracidade fica atrás de `integrations/classificador_client.py`
 (`CLASSIFICADOR_PROVIDER=fake` por padrão): cada modelo treinado é um adaptador que devolve as
 duas fronteiras ordinais, e `analise_das_fronteiras()` aplica a mesma regra de decisão a todos.

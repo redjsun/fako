@@ -61,10 +61,12 @@ e imagens a mais para manter.
 para gerar questões, mas nem todo ambiente de desenvolvimento ou de CI tem os modelos
 publicados disponíveis.
 
-**Decisão.** `integrations/classificador_client.py` e `integrations/ai_client.py` definem a
-interface; o provedor real é plugável (`CLASSIFICADOR_PROVIDER`, `AI_PROVIDER`), com um
-provedor `fake` como padrão. Sem modelo publicado, o cliente real lança
-`ClassificadorIndisponivel` e a API continua de pé.
+**Decisão.** `integrations/classificador_client.py` (`ClassificadorClient`) e
+`integrations/llm_client.py` (`LLMClient`) definem as interfaces, separadas porque classificar
+e gerar texto têm dependências, falhas e versões diferentes. O provedor real é plugável
+(`CLASSIFICADOR_PROVIDER`, `LLM_PROVIDER`), com um provedor `fake` como padrão. Sem modelo
+publicado ou sem LLM configurada, o cliente lança `ClassificadorIndisponivel` ou
+`LLMIndisponivel` e a API continua de pé.
 
 **Consequências.** Desenvolvimento e testes não dependem de ter um modelo treinado em mãos;
 em troca, o comportamento com o provedor fake pode divergir do real se a interface não for

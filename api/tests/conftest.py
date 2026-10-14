@@ -13,6 +13,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy.exc import OperationalError
 
 from app.core.database import engine
+from app.integrations.classificador_client import FakeClassificador, get_classificador
+from app.integrations.llm_client import FakeLLMClient, get_llm_client
 from app.main import app
 from app.seeds.run import main as seed
 
@@ -28,6 +30,16 @@ def database() -> None:
         return
     command.upgrade(Config("alembic.ini"), "head")
     seed()
+
+
+@pytest.fixture(autouse=True)
+def clientes_fake():
+    """LLM e classificador fake em todos os testes, seja qual for o .env; cada teste pode
+    sobrescrever. Os overrides são limpos no fim de cada teste."""
+    app.dependency_overrides[get_llm_client] = FakeLLMClient
+    app.dependency_overrides[get_classificador] = FakeClassificador
+    yield
+    app.dependency_overrides.clear()
 
 
 @pytest.fixture
