@@ -11,7 +11,14 @@ do veredito da agência (as enganosas ou ambíguas ficam de fora). Entram como r
 revisão humana em /admin/questions/{id}/review, ou, com NOTICIAS_PUBLICAR_DIRETO, já validadas.
 O rótulo nunca é o do classificador: a análise dele fica só como registro.
 
-Se o classificador estiver indisponível, a notícia entra mesmo assim, sem análise.
+Se o classificador estiver indisponível, a notícia entra mesmo assim, sem análise. Se o
+modelo publicado foi treinado no texto padronizado pela LLM, a manchete passa antes pelo mesmo
+prompt de extração (`claim_text`), e é essa afirmação que o classificador recebe, aqui e no
+palpite mostrado ao jogador.
+
+Ao jogador, a explicação destaca **onde a alegação circulou** (quem publicou e quando, do
+`claimant` da Fact Check API; nas manchetes, o veículo), e a checagem fica como apoio em
+`source`.
 
 Rotina diária (app/jobs/): `importar_lote()` traz as notícias do dia, só as publicadas dentro
 da janela de retenção e equilibradas (`por_lado`: até 25 falsas e 25 verdadeiras; um lado
@@ -32,7 +39,13 @@ from app.ml.classificador import (
     ClassificadorClient,
     ClassificadorIndisponivel,
 )
-from app.ml.normalizacao import motivo_descarte, normalizar_manchete
+from app.ml.llm import LLMClient, LLMIndisponivel, RespostaInvalida
+from app.ml.normalizacao import (
+    PLATAFORMAS,
+    REDES_SOCIAIS,
+    motivo_descarte,
+    normalizar_manchete,
+)
 from app.models.category import Category
 from app.models.question import Question, QuestionOrigin, QuestionStatus
 from app.repositories.question_repository import QuestionRepository
@@ -45,11 +58,25 @@ from app.services.content_service import ContentService, to_admin_response
 CANDIDATOS = 100
 
 
+def onde_circulou(autor: str | None) -> str:
+    """ "redes sociais" -> "Circulou nas redes sociais"; "WhatsApp" -> "Circulou no WhatsApp";
+    "Jair Bolsonaro" -> "Afirmação de Jair Bolsonaro"."""
+    if not autor or autor == REDES_SOCIAIS:
+        return "Circulou nas redes sociais"
+    if autor in PLATAFORMAS.values():
+        return f"Circulou no {autor}"
+    return f"Afirmação de {autor}"
+
+
 def explicacao(noticia: Noticia) -> str:
-    quando = f" em {noticia.publicada_em:%d/%m/%Y}" if noticia.publicada_em else ""
     if noticia.veredito:
-        agencia = noticia.veiculo or "uma agência de checagem"
-        return f"Checado por {agencia}{quando}: {noticia.veredito}."
+        data = noticia.origem_data or (noticia.publicada_em and noticia.publicada_em.date())
+        quando = f" em {data:%d/%m/%Y}" if data else ""
+        agencia = noticia.veiculo or "Uma agência de checagem"
+        lado = "verdadeira" if noticia.verdadeira else "falsa"
+        circulou = onde_circulou(noticia.origem_autor)
+        return f"{circulou}{quando}. {agencia} checou e concluiu que é {lado}."
+    quando = f" em {noticia.publicada_em:%d/%m/%Y}" if noticia.publicada_em else ""
     veiculo = noticia.veiculo or "um veículo de imprensa"
     return f"Manchete publicada por {veiculo}{quando}."
 
@@ -85,10 +112,15 @@ def motivo(noticia: Noticia, texto: str) -> str | None:
 
 class NoticiasService:
     def __init__(
-        self, db: Session, noticias: list[NoticiasClient], classificador: ClassificadorClient
+        self,
+        db: Session,
+        noticias: list[NoticiasClient],
+        classificador: ClassificadorClient,
+        llm: LLMClient | None = None,
     ) -> None:
         self.provedores = noticias
         self.classificador = classificador
+        self.llm = llm
         self.por_lado: int | None = None
         self.questions = QuestionRepository(db)
         self.content = ContentService(db)
@@ -194,11 +226,19 @@ class NoticiasService:
             status=QuestionStatus.DRAFT,
             origin=QuestionOrigin.NEWS,
         )
+        if noticia.veredito:
+            question.origin_author = noticia.origem_autor or REDES_SOCIAIS
+            question.origin_date = noticia.origem_data
+        else:  # manchete: a origem é o próprio veículo, com o link da matéria
+            question.origin_author = (noticia.veiculo or "")[:200] or None
+            question.origin_link = fonte(noticia)
+            question.origin_date = noticia.publicada_em.date() if noticia.publicada_em else None
+        question.claim_text = self.afirmacao(manchete)
         if get_settings().noticias_publicar_direto:
             question.status = QuestionStatus.VALIDATED
             question.validated_at = datetime.now(timezone.utc)
         try:
-            analise = self.classificador.analisar(manchete, "admin")
+            analise = self.classificador.analisar(question.claim_text or manchete, "admin")
         except ClassificadorIndisponivel:
             analise = None
         if analise:
@@ -207,6 +247,20 @@ class NoticiasService:
             question.model_confidence = analise.confianca
             question.model_version = analise.versao_modelo
         return self.questions.add(question)
+
+    def afirmacao(self, manchete: str) -> str | None:
+        """A afirmação no formato do treino padronizado, se o modelo publicado foi treinado nele.
+
+        Mesmo prompt da padronização (#20); a primeira afirmação, como no treino. Sem LLM, ou
+        com a LLM fora, fica None e o classificador recebe a manchete.
+        """
+        if self.llm is None or self.classificador.texto_de_entrada != "padronizado":
+            return None
+        try:
+            extracao = self.llm.extrair_afirmacoes(manchete)
+        except (LLMIndisponivel, RespostaInvalida):
+            return None
+        return extracao.afirmacoes[0].texto if extracao.afirmacoes else None
 
     def limpar(self, dias: int) -> Limpeza:
         """Apaga as notícias importadas há mais de `dias`; arquiva as que estão em uso."""

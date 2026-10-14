@@ -106,6 +106,29 @@ API, as checagens mais recentes das agências brasileiras (a mesma lista de
   pode puxar uma manchete para `confere` só pela forma (`pesquisa/ml/atalho.py`). A nota do
   modelo na curadoria é apoio à revisão, não um veredito.
 
+## O que o jogador vê depois de responder
+
+- **Onde circulou** (alegação checada): quem fez a alegação e quando, do `claimant` e do
+  `claimDate` da Fact Check API, normalizados por `normalizar_autor()`
+  (`ml/normalizacao.py`). Rótulos genéricos ("Boato de internet", "Várias fontes",
+  "[site:name]", 83% dos casos) viram "redes sociais"; uma plataforma citada vira o nome dela
+  (WhatsApp, Facebook, X...); nomes reais ficam ("Jair Bolsonaro"). A API não traz o link do
+  post: raspar a matéria da agência achou link em 3 de 21 páginas, e às vezes era a prova da
+  checagem, não o boato. Por isso o link mostrado é o da checagem, como apoio ("Checagem:
+  aosfatos.org").
+- **Onde foi publicada** (manchete): o veículo, a data e o link da matéria.
+- A explicação segue a mesma ordem: "Circulou no WhatsApp em 30/09/2026. Aos Fatos checou e
+  concluiu que é falsa."
+- Campos em `questions`: `origin_author`, `origin_link` e `origin_date`; na resposta,
+  `claim_origin` (`kind` `alegacao` ou `materia`). Questões humanas e as importadas antes
+  ficam sem origem.
+
+Se o modelo publicado foi treinado no texto padronizado (`"texto": "padronizado"` no
+`config.json`), a manchete passa na importação pelo prompt de extração (#19/#20) e a primeira
+afirmação vai para `questions.claim_text`, que é o que o classificador recebe na análise e no
+palpite do jogo. A LLM roda uma vez, na importação, e o palpite continua levando
+milissegundos.
+
 ## Rotina diária
 
 O serviço `agendador-api` (mesma imagem da API, supercronic com os horários de

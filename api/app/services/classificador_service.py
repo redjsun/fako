@@ -37,11 +37,15 @@ class ClassificadorService:
             contributions=analise.contribuicoes,
         )
 
-    def palpite_do_jogo(self, statement: str) -> ModelGuess | None:
+    def palpite_do_jogo(self, statement: str, claim_text: str | None = None) -> ModelGuess | None:
+        """`claim_text` (a afirmação extraída na importação) só entra se o modelo publicado foi
+        treinado no texto padronizado; senão, o enunciado como o jogador leu."""
         if not get_settings().classificador_no_jogo:
             return None
+        padronizado = self.classificador.texto_de_entrada == "padronizado"
+        entrada = claim_text if padronizado and claim_text else statement
         try:
-            analise = self.classificador.analisar(statement, "jogador")
+            analise = self.classificador.analisar(entrada, "jogador")
         except ClassificadorIndisponivel:
             return None
         return ModelGuess(

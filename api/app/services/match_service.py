@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.core.exceptions import BusinessRuleError, NotFoundError
 from app.ml.classificador import ClassificadorClient, FakeClassificador
 from app.models.match import Match, MatchAnswer, MatchStatus
-from app.models.question import QuestionStatus
+from app.models.question import Question, QuestionStatus
 from app.models.user import User
 from app.repositories.level_repository import LevelRepository
 from app.repositories.match_repository import MatchRepository
@@ -15,6 +15,7 @@ from app.repositories.question_repository import QuestionRepository
 from app.schemas.match_schema import (
     AnswerRequest,
     AnswerResultResponse,
+    ClaimOriginResponse,
     MatchResponse,
     MatchResultResponse,
     MatchStartRequest,
@@ -23,6 +24,17 @@ from app.schemas.question_schema import QuestionResponse
 from app.services import game_rules
 from app.services.classificador_service import ClassificadorService
 from app.services.progress_service import ProgressService
+
+
+def origem_da_afirmacao(question: Question) -> ClaimOriginResponse | None:
+    if not question.origin_author:
+        return None  # questões humanas e as importadas antes da origem
+    return ClaimOriginResponse(
+        kind="materia" if question.origin_link else "alegacao",
+        author=question.origin_author,
+        when=question.origin_date,
+        link=question.origin_link,
+    )
 
 
 class MatchService:
@@ -115,7 +127,8 @@ class MatchService:
             explanation=question.explanation,
             source=question.source,
             score=match.score,
-            model_guess=self.classificador.palpite_do_jogo(question.statement),
+            model_guess=self.classificador.palpite_do_jogo(question.statement, question.claim_text),
+            claim_origin=origem_da_afirmacao(question),
         )
 
     def finish(self, user: User, match_id: int) -> MatchResultResponse:

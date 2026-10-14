@@ -10,6 +10,7 @@ Se o modelo não carregar, `get_classificador()` devolve um cliente que lança
 """
 
 import json
+import math
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
@@ -60,6 +61,10 @@ class Analise:
 
 
 class ClassificadorClient(Protocol):
+    # "original" ou "padronizado": o texto em que o modelo foi treinado. No padronizado, a
+    # entrada é a afirmação extraída pela LLM (Question.claim_text), não o enunciado cru.
+    texto_de_entrada: str
+
     def analisar(self, afirmacao: str, limiar: Limiar) -> Analise: ...
 
 
@@ -99,6 +104,7 @@ class FakeClassificador:
     """Sem modelo, determinístico: para desenvolvimento e testes."""
 
     versao = "fake"
+    texto_de_entrada = "original"
 
     def analisar(self, afirmacao: str, limiar: Limiar) -> Analise:
         return analise_das_fronteiras(afirmacao, 0.5, 0.25, LIMIARES_PADRAO[limiar], self.versao)
@@ -109,7 +115,10 @@ class ReferenciaTfidf:
 
     Lê o `referencia.joblib` da pasta publicada: um dicionário só com objetos do
     scikit-learn (`vetorizador`, `fronteira_1`, `fronteira_2`) e a `versao`. A frase passa
-    pela mesma `limpar()` do treino antes de virar TF-IDF.
+    pela mesma `limpar()` do treino antes de virar TF-IDF. Se houver `calibracao.json`
+    (pesquisa/ml/calibrar.py), as fronteiras são calibradas por Platt antes da regra de
+    decisão; `texto_de_entrada` diz se o modelo foi treinado no texto original ou no
+    padronizado pela LLM (`config.json`).
     """
 
     ARQUIVO = "referencia.joblib"
@@ -120,11 +129,16 @@ class ReferenciaTfidf:
         self.modelo = joblib.load(pasta / self.ARQUIVO)
         self.versao = self.modelo.get("versao", pasta.name)
         self.limiares = ler_limiares(pasta)
+        self.calibracao = ler_json(pasta / "calibracao.json")
+        self.texto_de_entrada = (ler_json(pasta / "config.json") or {}).get("texto", "original")
 
     def fronteiras(self, texto: str) -> tuple[float, float]:
         matriz = self.modelo["vetorizador"].transform([texto])
         p1 = float(self.modelo["fronteira_1"].predict_proba(matriz)[0, 1])
-        p2 = float(self.modelo["fronteira_2"].predict_proba(matriz)[0, 1])
+        p2 = min(float(self.modelo["fronteira_2"].predict_proba(matriz)[0, 1]), p1)
+        if self.calibracao:
+            p1 = platt(p1, self.calibracao["fronteira_1"])
+            p2 = platt(p2, self.calibracao["fronteira_2"])
         return p1, min(p2, p1)
 
     def contribuicoes(self, texto: str, n: int = 8) -> list[tuple[str, float]]:
@@ -150,6 +164,16 @@ def legivel(variavel: str) -> str:
     return f"[{termo}]" if tipo == "caracteres" else termo
 
 
+def ler_json(arquivo: Path) -> dict | None:
+    return json.loads(arquivo.read_text(encoding="utf-8")) if arquivo.exists() else None
+
+
+def platt(p: float, parametros: dict[str, float]) -> float:
+    """sigmoide(a · logit(p) + b), a mesma de pesquisa/ml/calibrar.py."""
+    p = min(max(p, 1e-6), 1 - 1e-6)
+    return 1 / (1 + math.exp(-(parametros["a"] * math.log(p / (1 - p)) + parametros["b"])))
+
+
 def ler_limiares(pasta: Path) -> dict[str, float]:
     """`limiares.json` do modelo, se houver (calibrado na validação, #12); senão o padrão."""
     arquivo = pasta / "limiares.json"
@@ -163,6 +187,8 @@ ADAPTADORES = {"referencia": ReferenciaTfidf}
 
 class ClassificadorAusente:
     """Responde no lugar do modelo que não carregou."""
+
+    texto_de_entrada = "original"
 
     def __init__(self, motivo: str):
         self.motivo = motivo

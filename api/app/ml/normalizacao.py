@@ -15,6 +15,8 @@ aqui. **Mudou lá, muda aqui.**
   alegação que depende de mídia, que já traz a conclusão da agência e, opcionalmente, política.
 - `verdadeira_pelo_veredito()`: o veredito da agência em verdadeiro/falso; None nos enganosos
   e ambíguos, que não viram afirmação do jogo.
+- `normalizar_autor()`: quem fez a alegação (`claimant` da Fact Check API), para mostrar ao
+  jogador onde ela circulou. Só desta API, não vem do treino.
 """
 
 import html
@@ -216,3 +218,42 @@ def verdadeira_pelo_veredito(veredito: str | None) -> bool | None:
     if veredito in VEREDITOS_VERDADEIRO:
         return True
     return None
+
+
+# `claimant` da Fact Check API: em 97% das checagens vem preenchido, mas quase sempre com um
+# rótulo genérico ("Boato de internet", "Várias fontes", "[site:name]").
+PLATAFORMAS = {
+    "whatsapp": "WhatsApp",
+    "facebook": "Facebook",
+    "instagram": "Instagram",
+    "tiktok": "TikTok",
+    "youtube": "YouTube",
+    "kwai": "Kwai",
+    "telegram": "Telegram",
+    "twitter": "X (Twitter)",
+}
+REDES_SOCIAIS = "redes sociais"
+AUTOR_GENERICO = re.compile(
+    r"boato|rede[s]? socia|v[aá]rias fontes|m[uú]ltiplas fontes|fontes diversas|"
+    r"desinforma|postage|publica[cç][oõ]es|posts?\b|internet|usu[aá]rios|perfis|viral|"
+    r"^v[aá]rios$|v[ií]deos?\b|"
+    r"^\W*\[?site|^\W*$",
+    re.IGNORECASE,
+)
+
+
+def normalizar_autor(bruto: str | None) -> str | None:
+    """ "Posts no Facebook" -> "Facebook"; "Boato de internet" -> "redes sociais";
+    "Jair Bolsonaro" -> "Jair Bolsonaro"; vazio -> None."""
+    autor = re.sub(r"\s+", " ", (bruto or "").strip().strip("\"'“”.")).strip()
+    if not autor:
+        return None
+    minusculo = autor.lower()
+    plataforma = next((nome for chave, nome in PLATAFORMAS.items() if chave in minusculo), None)
+    if plataforma:
+        return plataforma
+    if minusculo == "x" or (re.search(r"\bx\b", minusculo) and AUTOR_GENERICO.search(autor)):
+        return PLATAFORMAS["twitter"]
+    if AUTOR_GENERICO.search(autor):
+        return REDES_SOCIAIS
+    return autor[:200]

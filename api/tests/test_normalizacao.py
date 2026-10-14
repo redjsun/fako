@@ -1,6 +1,6 @@
 import pytest
 
-from app.ml.normalizacao import limpar, motivo_descarte, normalizar_manchete
+from app.ml.normalizacao import limpar, motivo_descarte, normalizar_autor, normalizar_manchete
 
 FORA = "opinião, vídeo, ao vivo ou publicidade"
 
@@ -96,3 +96,25 @@ def test_manchete_de_servico_sai(manchete):
 )
 def test_manchete_explicativa_sai(manchete):
     assert motivo_descarte(manchete) == "pergunta ou explicativa"
+
+
+@pytest.mark.parametrize(
+    "bruto, autor",
+    [
+        ("Boato de internet", "redes sociais"),
+        ('"Boato de internet"', "redes sociais"),
+        ("Várias fontes", "redes sociais"),
+        ("[site:name]", "redes sociais"),
+        ("Imagem viral", "redes sociais"),
+        ("Posts no Facebook", "Facebook"),
+        ("Usuários do WhatsApp", "WhatsApp"),
+        ("Postagens no X", "X (Twitter)"),
+        ("X", "X (Twitter)"),
+        ("Jair Bolsonaro", "Jair Bolsonaro"),
+        ("Jornal da Cidade Online", "Jornal da Cidade Online"),
+        ("", None),
+        (None, None),
+    ],
+)
+def test_normalizar_autor(bruto, autor):
+    assert normalizar_autor(bruto) == autor

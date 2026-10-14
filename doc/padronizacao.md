@@ -74,6 +74,38 @@ make padronizar ARGS="--paralelo 8"  # lote todo; outra versão: PROMPT=api/app/
 - **Custo:** cada rodada acrescenta o tempo, o número de chamadas e os tokens (quando o
   endpoint informa) em `padronizado_<versao>.rodadas.jsonl`.
 
+### Lote de outubro de 2026
+
+Medido com `qwen3:8b` no Ollama do host (Mac): **cerca de 6 s por item**, também com
+`--paralelo 4` (o Ollama atende um pedido por vez) e com `--max-caracteres 1500` (o prompt
+tem ~900 tokens e a resposta domina o tempo). Os ~28 mil itens levariam ~44 h, então o lote
+roda em duas etapas, retomando do cache:
+
+```bash
+make padronizar ARGS="--splits validacao,teste"         # ~6 mil itens, ~10 h
+make padronizar ARGS="--splits treino --limite 6000"    # amostra estratificada pelo hash
+```
+
+O resto do treino continua depois com o mesmo comando, sem `--limite`. O treino padronizado
+usa só os registros já no cache.
+
+## Calibração e limiares (#12)
+
+`make calibrar MODELO=models/2026-11/<modelo>` (`pesquisa/ml/calibrar.py`) ajusta Platt por
+fronteira na `validacao`, grava `calibracao.json` (aplicado pela API) e `limiares.json`
+(admin: até 5% dos verdadeiros viram falso; jogador: até 1%), e regrava `previsoes.jsonl`
+calibradas, com as brutas em `previsoes_brutas.jsonl`.
+
+Na referência sobre o **texto original** (14/10/2026): ECE da validação de 0,192 para 0,007; o
+modelo estava cerca de 4 vezes confiante demais (`a` = 0,27 na fronteira 1). Com os limiares
+honestos, admin 0,65 e jogador 0,69, ficam incertas 82% e 91% das frases da validação. O
+modelo não separa bem as classes, e a validação tem só 60 verdadeiros em 2.497 (2%).
+
+**Cuidado com a proporção das classes.** A calibração aprende a proporção da validação (2% de
+verdadeiros no texto original); no jogo, a importação diária traz metade verdadeiras. Com o
+texto padronizado, os registros só com `texto` entram, e a validação passa a ter ~435
+verdadeiros, o que diminui essa diferença.
+
 ## Regra para várias afirmações ou nenhuma
 
 Decisão: **o cache guarda todas as afirmações**, e `aplicar()` (que `pesquisa/ml/dados.py` vai

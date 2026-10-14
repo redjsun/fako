@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 import pytest
 from fastapi.testclient import TestClient
@@ -122,7 +122,10 @@ def test_importa_checagens_com_o_lado_do_veredito(admin_client: TestClient):
     corpo = resposta.json()
     falsa, verdadeira = corpo["imported"]
     assert falsa["is_true"] is False and verdadeira["is_true"] is True
-    assert falsa["explanation"] == "Checado por Agência Teste em 03/10/2026: falso."
+    assert falsa["explanation"] == (
+        "Circulou nas redes sociais em 03/10/2026. Agência Teste checou e concluiu que é falsa."
+    )
+    assert falsa["origin_author"] == "redes sociais" and falsa["origin_link"] is None
     assert falsa["category"] == "conhecimentos-gerais"
     assert [d["reason"] for d in corpo["discarded"]] == ["veredito sem lado no jogo (exagerado)"]
 
@@ -176,6 +179,8 @@ def test_factcheck_sem_chave_responde_indisponivel(admin_client: TestClient, mon
 def test_factcheck_converte_alegacao_com_a_checagem_da_agencia_pedida():
     claim = {
         "text": "Vacina contém chip",
+        "claimant": "Posts no Facebook",
+        "claimDate": "2026-09-30T00:00:00Z",
         "claimReview": [
             {"publisher": {"name": "Outra", "site": "outra.org"}, "textualRating": "Verdadeiro"},
             {
@@ -188,6 +193,8 @@ def test_factcheck_converte_alegacao_com_a_checagem_da_agencia_pedida():
     }
     convertida = FactCheckClient.checagem(claim, "aosfatos.org")
     assert convertida.veiculo == "Aos Fatos" and convertida.url == "https://aosfatos.org/x"
+    assert convertida.origem_autor == "Facebook"
+    assert convertida.origem_data == date(2026, 9, 30)
     assert convertida.veredito == "falso" and convertida.verdadeira is False
     assert FactCheckClient.checagem({"text": "sem checagem"}, "aosfatos.org") is None
 

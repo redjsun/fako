@@ -17,6 +17,7 @@ from app.core.config import get_settings
 from app.core.database import SessionLocal
 from app.integrations.noticias_client import NoticiasIndisponiveis, get_noticias_clients
 from app.ml.classificador import get_classificador
+from app.ml.llm import get_llm_client
 from app.services.noticias_service import NoticiasService
 
 
@@ -27,7 +28,9 @@ def main() -> None:
     args = parser.parse_args()
     try:
         with SessionLocal.begin() as db:
-            service = NoticiasService(db, get_noticias_clients(), get_classificador())
+            service = NoticiasService(
+                db, get_noticias_clients(), get_classificador(), get_llm_client()
+            )
             resultado = service.importar_lote(
                 settings.noticias_categoria,
                 args.quantidade,

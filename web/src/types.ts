@@ -13,6 +13,14 @@ export interface ModelGuess {
   model_version: string;
 }
 
+// Onde a afirmação circulou (alegação checada) ou foi publicada (manchete de veículo).
+export interface ClaimOrigin {
+  kind: "alegacao" | "materia";
+  author: string;
+  when: string | null; // AAAA-MM-DD
+  link: string | null;
+}
+
 export interface AnswerResult {
   is_correct: boolean;
   correct_answer: boolean;
@@ -24,6 +32,7 @@ export interface AnswerResult {
   source: string;
   score: number;
   model_guess?: ModelGuess | null;
+  claim_origin?: ClaimOrigin | null;
 }
 
 // Afirmação já respondida, para o feedback, o resumo da partida e o histórico.

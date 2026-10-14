@@ -33,6 +33,10 @@ def to_admin_response(question: Question) -> QuestionAdminResponse:
         model_score=question.model_score,
         model_confidence=question.model_confidence,
         model_version=question.model_version,
+        claim_text=question.claim_text,
+        origin_author=question.origin_author,
+        origin_link=question.origin_link,
+        origin_date=question.origin_date,
     )
 
 

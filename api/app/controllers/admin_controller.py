@@ -102,8 +102,9 @@ def get_noticias_service(
     db: Session = Depends(get_db),
     noticias: list[NoticiasClient] = Depends(get_noticias_clients),
     classificador: ClassificadorClient = Depends(get_classificador),
+    llm: LLMClient = Depends(get_llm_client),
 ) -> NoticiasService:
-    return NoticiasService(db, noticias, classificador)
+    return NoticiasService(db, noticias, classificador, llm)
 
 
 @router.post("/news/import", response_model=NewsImportResponse, status_code=status.HTTP_201_CREATED)

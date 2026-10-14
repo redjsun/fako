@@ -115,3 +115,22 @@ def test_get_classificador_carrega_o_modelo_publicado_uma_vez(tmp_path, monkeypa
         assert get_classificador() is classificador
     finally:
         get_settings.cache_clear()
+
+
+def test_calibracao_do_modelo_e_aplicada_nas_fronteiras(tmp_path):
+    publicar_modelo_minimo(tmp_path / "atual")
+    bruto = ReferenciaTfidf(tmp_path / "atual").fronteiras("vacina tem chip")
+    # a = 0 e b = 0 levam qualquer fronteira a 0,5: a saída passa a ser a calibrada.
+    neutra = {"a": 0.0, "b": 0.0}
+    calibracao = {"fronteira_1": neutra, "fronteira_2": neutra}
+    (tmp_path / "atual" / "calibracao.json").write_text(json.dumps(calibracao))
+    calibrado = ReferenciaTfidf(tmp_path / "atual").fronteiras("vacina tem chip")
+    assert bruto != pytest.approx((0.5, 0.5))
+    assert calibrado == pytest.approx((0.5, 0.5))
+
+
+def test_texto_de_entrada_vem_do_config_do_modelo(tmp_path):
+    publicar_modelo_minimo(tmp_path / "atual")
+    assert ReferenciaTfidf(tmp_path / "atual").texto_de_entrada == "original"
+    (tmp_path / "atual" / "config.json").write_text(json.dumps({"texto": "padronizado"}))
+    assert ReferenciaTfidf(tmp_path / "atual").texto_de_entrada == "padronizado"

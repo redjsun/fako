@@ -14,13 +14,13 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from itertools import zip_longest
 from typing import Protocol
 
 from app.core.config import get_settings
 from app.core.exceptions import ServiceUnavailableError
-from app.ml.normalizacao import normalizar_veredito, verdadeira_pelo_veredito
+from app.ml.normalizacao import normalizar_autor, normalizar_veredito, verdadeira_pelo_veredito
 
 
 class NoticiasIndisponiveis(ServiceUnavailableError):
@@ -42,6 +42,11 @@ class Noticia:
     veredito: str | None = None
     # None quando o veredito não tem lado no jogo (enganoso, ambíguo).
     verdadeira: bool | None = True
+    # Onde a alegação circulou, nas checagens (`claimant` e `claimDate` da Fact Check API).
+    # A API não traz o link do post; raspar a matéria da agência achou link em 3 de 21 páginas,
+    # e nem sempre do post checado (às vezes da prova), então o link fica sendo o da checagem.
+    origem_autor: str | None = None
+    origem_data: date | None = None
 
 
 class NoticiasClient(Protocol):
@@ -213,6 +218,7 @@ class FactCheckClient:
         if revisao is None:
             return None
         veredito = normalizar_veredito(revisao.get("textualRating"))
+        circulou_em = data_iso(claim.get("claimDate"))
         return Noticia(
             titulo=claim.get("text") or "",
             url=revisao.get("url") or "",
@@ -221,6 +227,8 @@ class FactCheckClient:
             descricao=revisao.get("title"),
             veredito=veredito,
             verdadeira=verdadeira_pelo_veredito(veredito),
+            origem_autor=normalizar_autor(claim.get("claimant")),
+            origem_data=circulou_em.date() if circulou_em else None,
         )
 
 
