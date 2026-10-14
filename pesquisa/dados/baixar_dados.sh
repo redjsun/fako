@@ -3,6 +3,10 @@
 # Uso: bash pesquisa/dados/baixar_dados.sh   (ou: make dados)
 set -euo pipefail
 
+# No Git Bash (Windows), sem isto os padrões do sparse-checkout ("/size_normalized_texts/")
+# viram caminhos do Windows ("C:/Program Files/Git/...") e o Fake.br vem sem os textos.
+export MSYS_NO_PATHCONV=1
+
 RAIZ="$(cd "$(dirname "$0")/.." && pwd)"
 RAW="$RAIZ/data/raw"
 mkdir -p "$RAW"
