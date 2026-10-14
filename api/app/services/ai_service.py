@@ -16,11 +16,11 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.exceptions import ServiceUnavailableError
-from app.integrations.classificador_client import ClassificadorClient, ClassificadorIndisponivel
-from app.integrations.embeddings_client import EmbeddingsClient, FakeEmbeddings
-from app.integrations.llm_client import ChecagemDeOrigem, LLMClient, RespostaInvalida
 from app.integrations.noticias_client import Noticia, NoticiasClient, NoticiasIndisponiveis
-from app.integrations.verificadores import verificar_negacao, verificar_reescrita
+from app.ml.classificador import ClassificadorClient, ClassificadorIndisponivel
+from app.ml.embeddings import EmbeddingsClient, FakeEmbeddings
+from app.ml.llm import ChecagemDeOrigem, LLMClient, RespostaInvalida
+from app.ml.verificadores import verificar_negacao, verificar_reescrita
 from app.models.question import Question, QuestionOrigin, QuestionStatus
 from app.repositories.question_repository import QuestionRepository
 from app.schemas.admin_schema import (

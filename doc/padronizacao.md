@@ -18,8 +18,8 @@ A afirmação padronizada é também a pergunta do jogo, sem outra reescrita: ve
 ## Como roda
 
 ```bash
-make padronizar ARGS="--limite 50"   # amostra, com api/app/prompts/extrair_afirmacoes_v1.txt
-make padronizar ARGS="--paralelo 8"  # lote todo; outra versão: PROMPT=api/app/prompts/..._v2.txt
+make padronizar ARGS="--limite 50"   # amostra, com api/app/ml/prompts/extrair_afirmacoes_v1.txt
+make padronizar ARGS="--paralelo 8"  # lote todo; outra versão: PROMPT=api/app/ml/prompts/..._v2.txt
 ```
 
 - **Entrada:** os registros de `pesquisa/data/processed/dataset.jsonl` com `split_produto` em
@@ -27,7 +27,7 @@ make padronizar ARGS="--paralelo 8"  # lote todo; outra versão: PROMPT=api/app/
   no mesmo formato. `reserva` e `fora` (~42 mil) não entram no modelo do jogo e ficam de fora
   (`--splits todos` inclui). Usa o `texto_curto`; sem ele (Fake.br, verdadeiras do
   FakeTrue.Br, a maior parte das mensagens), usa o `texto`.
-- **Prompt:** o arquivo `api/app/prompts/extrair_afirmacoes_vN.txt` da #19, o mesmo do
+- **Prompt:** o arquivo `api/app/ml/prompts/extrair_afirmacoes_vN.txt` da #19, o mesmo do
   uso. O texto do registro entra no marcador `{texto}` (ou no fim, se o prompt não tiver o
   marcador). A resposta segue o esquema da #19, `{"e_opiniao": ..., "afirmacoes":
   [{"texto": ..., "quem_disse": ...}]}`; lista vazia quer dizer opinião. O cache guarda o

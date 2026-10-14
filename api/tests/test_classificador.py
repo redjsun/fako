@@ -7,7 +7,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import FeatureUnion
 
 from app.core.config import get_settings
-from app.integrations.classificador_client import (
+from app.ml.classificador import (
     ClassificadorAusente,
     ClassificadorIndisponivel,
     FakeClassificador,

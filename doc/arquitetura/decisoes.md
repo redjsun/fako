@@ -49,7 +49,7 @@ agendador de coleta e, agora, a documentação, cada um com dependências difere
 com PyTorch no treino, Node no frontend, por exemplo).
 
 **Decisão.** Cada parte roda em seu próprio serviço no `compose.yaml`, com imagem própria.
-Serviços que não sobem toda hora (`pesquisa`, `ml`, `ml-legado`, `docs`) usam `profiles` do
+Serviços que não sobem toda hora (`pesquisa`, `ml`, `llm`, `docs`) usam `profiles` do
 Compose, para não pesar o `make up` do dia a dia.
 
 **Consequências.** Nenhuma dependência de instalação local além do Docker; em troca, builds
@@ -61,8 +61,8 @@ e imagens a mais para manter.
 para gerar questões, mas nem todo ambiente de desenvolvimento ou de CI tem os modelos
 publicados disponíveis.
 
-**Decisão.** `integrations/classificador_client.py` (`ClassificadorClient`) e
-`integrations/llm_client.py` (`LLMClient`) definem as interfaces, separadas porque classificar
+**Decisão.** `ml/classificador.py` (`ClassificadorClient`) e
+`ml/llm.py` (`LLMClient`) definem as interfaces, separadas porque classificar
 e gerar texto têm dependências, falhas e versões diferentes. O provedor real é plugável
 (`CLASSIFICADOR_PROVIDER`, `LLM_PROVIDER`), com um provedor `fake` como padrão. Sem modelo
 publicado ou sem LLM configurada, o cliente lança `ClassificadorIndisponivel` ou
@@ -96,3 +96,21 @@ grandes e não cabem num repositório Git sem LFS.
 **Consequências.** Repositório leve e histórico de Git limpo; em troca, publicar um modelo
 novo é uma operação fora do Git (`make publicar`), que precisa de disciplina própria de
 versionamento (ver `doc/planejamento-retreino.md`).
+
+## AD08. Uso dos modelos numa camada `ml/` da API; treino fora da API
+
+**Contexto.** O código que usa os modelos estava misturado com as integrações externas
+(`integrations/`), e um caminho antigo (`ml/` na raiz, motor BERTimbau Y1/Y2 carregado na
+inicialização e rota `/ai/analyze`) colocava PyTorch e transformers na imagem da API.
+
+**Decisão.** `api/app/ml/` reúne o uso dos modelos: `classificador.py`, `llm.py`,
+`embeddings.py`, `verificadores.py`, `normalizacao.py` e os prompts versionados em
+`prompts/`. `integrations/` fica só com APIs externas. O treino continua em `pesquisa/ml/`;
+os dois lados se encontram nos artefatos de `models/` (AD07) e nos prompts. O caminho antigo
+foi removido; o BERTimbau volta como adaptador de `ClassificadorClient` servido por um
+container próprio (#10).
+
+**Consequências.** A imagem da API fica sem PyTorch e cada camada tem um papel só. Em troca,
+o que a API e a pesquisa compartilham (a `limpar()` de `normalizacao.py`) continua copiado nos
+dois lados e precisa mudar junto.
+

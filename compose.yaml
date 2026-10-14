@@ -87,7 +87,7 @@ services:
       - "8888:8888"
     volumes:
       - ./pesquisa:/work/pesquisa
-      - ./api/app/prompts:/work/api/app/prompts
+      - ./api/app/ml/prompts:/work/api/app/ml/prompts
 
   # Coleta diária e preparo dos dados nos horários de pesquisa/crontab (supercronic).
   agendador:
@@ -123,33 +123,9 @@ services:
       HF_HOME: /work/models/.cache/huggingface
     volumes:
       - ./pesquisa:/work/pesquisa
-      - ./api/app/prompts:/work/api/app/prompts
+      - ./api/app/ml/prompts:/work/api/app/ml/prompts
       - ./models:/work/models
 
-  # Ambiente do ml/ antigo (BERTimbau Y1/Y2 lido por api/app/integrations/bertimbau_engine.py).
-  ml-legado:
-    build: ./ml
-    container_name: fakenews-ml-legado
-    profiles:
-      - ml-legado
-    volumes:
-      - ./ml:/work/ml
-      - ./data:/work/data
-      - ./scripts:/work/scripts
-      - ./anotacoes:/work/anotacoes
-      - ./models:/work/models
-
-  # LLM local em container, alternativa ao Ollama no host (no Mac, o do host usa a GPU e é
-  # mais rápido). Uso: docker compose --profile llm up -d ollama, depois
-  # docker compose exec ollama ollama pull qwen3:8b e LLM_BASE_URL=http://ollama:11434/v1.
-  ollama:
-    image: ollama/ollama:0.12.6
-    container_name: fakenews-ollama
-    profiles: ["llm"]
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
 
   # Documentação do projeto (MkDocs + Material), servida com live-reload.
   docs:

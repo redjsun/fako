@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Literal, Protocol
 
 from app.core.config import get_settings
-from app.integrations.normalizacao import limpar
+from app.ml.normalizacao import limpar
 
 Limiar = Literal["admin", "jogador"]
 Categoria = Literal["falso", "enganoso", "confere", "incerto", "opiniao"]

@@ -1,6 +1,6 @@
 COMPOSE := docker compose
 
-.PHONY: help build up down restart logs ps shell-api shell-web shell-db migrate makemigration seed admin test lint format dados padronizar atalho contagens referencia bert avaliar classificar publicar amostra-questoes medir-amostra pre-anotar avaliar-extracao test-web test-ml shell-ml eda ml-legado docs clean
+.PHONY: help build up down restart logs ps shell-api shell-web shell-db migrate makemigration seed admin test lint format dados padronizar atalho contagens referencia bert avaliar classificar publicar amostra-questoes medir-amostra pre-anotar avaliar-extracao test-web test-ml shell-ml eda docs clean
 
 help: ## Lista os comandos disponíveis
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -63,12 +63,12 @@ dados: ## Baixa as bases para pesquisa/data/raw/ e gera dataset.jsonl e claimpt.
 	$(PESQUISA) python pesquisa/dados/preparar_dados.py
 	$(PESQUISA) python pesquisa/dados/preparar_claimpt.py
 
-PROMPT ?= api/app/prompts/extrair_afirmacoes_v1.txt
+PROMPT ?= api/app/ml/prompts/extrair_afirmacoes_v1.txt
 
-padronizar: ## Padroniza o texto curto com a LLM (uso: make padronizar [PROMPT=api/app/prompts/extrair_afirmacoes_vN.txt] [ARGS="--limite 50"])
+padronizar: ## Padroniza o texto curto com a LLM (uso: make padronizar [PROMPT=api/app/ml/prompts/extrair_afirmacoes_vN.txt] [ARGS="--limite 50"])
 	$(PESQUISA) python pesquisa/ml/padronizar.py --prompt $(PROMPT) $(ARGS)
 
-atalho: ## Teste de atalho: AUC só pela forma do texto (uso: make atalho [ARGS="--prompt api/app/prompts/extrair_afirmacoes_v1.txt"])
+atalho: ## Teste de atalho: AUC só pela forma do texto (uso: make atalho [ARGS="--prompt api/app/ml/prompts/extrair_afirmacoes_v1.txt"])
 	$(ML) python pesquisa/ml/atalho.py $(ARGS)
 
 contagens: ## Contagens por split e classe do conjunto de treino (pesquisa/ml/dados.py)
@@ -118,9 +118,6 @@ test-ml: ## Roda lint e testes de pesquisa/ml/
 
 eda: ## Sobe o Jupyter Lab da EDA em http://localhost:8888
 	$(COMPOSE) --profile pesquisa up -d pesquisa
-
-ml-legado: ## Ambiente do ml/ antigo (BERTimbau Y1/Y2 da API): carregamento e verificação dos dados
-	$(COMPOSE) --profile ml-legado run --rm ml-legado python -m ml.dados
 
 docs: ## Sobe a documentação (MkDocs) em http://localhost:8001
 	$(COMPOSE) --profile docs up docs

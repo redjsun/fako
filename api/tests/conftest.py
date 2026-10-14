@@ -13,10 +13,10 @@ from fastapi.testclient import TestClient
 from sqlalchemy.exc import OperationalError
 
 from app.core.database import engine
-from app.integrations.classificador_client import FakeClassificador, get_classificador
-from app.integrations.embeddings_client import FakeEmbeddings, get_embeddings
-from app.integrations.llm_client import FakeLLMClient, get_llm_client
 from app.main import app
+from app.ml.classificador import FakeClassificador, get_classificador
+from app.ml.embeddings import FakeEmbeddings, get_embeddings
+from app.ml.llm import FakeLLMClient, get_llm_client
 from app.seeds.run import main as seed
 
 

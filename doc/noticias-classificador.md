@@ -22,7 +22,7 @@ provedor de notícias ──► normalização ──► filtros ──► dedup
    os outros, e o que ele não trouxe passa para os seguintes. O `category` é opcional
    (padrão `conhecimentos-gerais`): o jogo não separa por categoria, mas a questão exige uma.
 2. Cada manchete é normalizada para o formato do `texto_curto` do treino
-   (`integrations/normalizacao.py`): entidades HTML, sufixo " - Veículo" do agregador e a mesma
+   (`ml/normalizacao.py`): entidades HTML, sufixo " - Veículo" do agregador e a mesma
    `limpar()` de `pesquisa/ml/dados.py` (URLs e créditos de veículo nas pontas; caixa e
    pontuação mantidas).
 3. Saem as manchetes que não servem como afirmação verdadeira, com os mesmos filtros das
@@ -51,7 +51,7 @@ A resposta do import lista as importadas e as descartadas, com o motivo.
 ## Classificador na API
 
 - Adaptador `ReferenciaTfidf` de `ClassificadorClient`
-  (`integrations/classificador_client.py`), ligado por `CLASSIFICADOR_PROVIDER=referencia`.
+  (`ml/classificador.py`), ligado por `CLASSIFICADOR_PROVIDER=referencia`.
   Lê `MODELS_DIR/atual/referencia.joblib` e, se houver, o `limiares.json` do modelo.
 - A frase passa pela `limpar()` do treino antes do TF-IDF. **`normalizacao.py` é cópia de
   `pesquisa/ml/dados.py` e `pesquisa/dados/preparar_dados.py`: mudou lá, muda aqui.**

@@ -7,7 +7,7 @@ sementes = [42]
 [dados]
 dataset = "pesquisa/data/processed/dataset.jsonl"
 texto = "padronizado"
-prompt = "api/app/prompts/extrair_afirmacoes_v1.txt"
+prompt = "api/app/ml/prompts/extrair_afirmacoes_v1.txt"
 # modelo_llm: o LLM_MODEL do .env, o mesmo que gerou o cache (ou fixe aqui a versão)
 
 [treino]

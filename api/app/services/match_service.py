@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import BusinessRuleError, NotFoundError
-from app.integrations.classificador_client import ClassificadorClient, FakeClassificador
+from app.ml.classificador import ClassificadorClient, FakeClassificador
 from app.models.match import Match, MatchAnswer, MatchStatus
 from app.models.question import QuestionStatus
 from app.models.user import User

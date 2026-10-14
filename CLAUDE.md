@@ -9,6 +9,7 @@ um classificador de veracidade treinado com bases brasileiras de fake news. Todo
 | Pasta | O que é |
 |---|---|
 | `api/` | FastAPI + SQLAlchemy 2 + Alembic + PostgreSQL. Camadas `controller → service → repository → model` (`doc/arquitetura/visao-geral.md`) |
+| `api/app/ml/` | Uso dos modelos pela API: classificador, LLM, embeddings, verificadores e os prompts versionados (`prompts/`, lidos também pela pesquisa). Sem PyTorch; o treino fica em `pesquisa/ml/` |
 | `web/` | React 18 + Vite + TypeScript. `view → controller (hook) → service → API`; HTTP só via `services/httpClient.ts` |
 | `pesquisa/` | Tudo de dados e treinamento. Imagem e serviço `pesquisa` no compose (`Dockerfile`, `requirements.txt`) |
 | `pesquisa/dados/` | Download, coleta (scrapers e Fact Check API) e preparo dos dados |
@@ -59,7 +60,7 @@ Segredos ficam em `.env` (copiar de `.env.example`): `FACTCHECK_API_KEY`, `LLM_*
 - Novo código em `pesquisa/ml/` vem com testes em `pesquisa/ml/tests/` (rodam no CI, job "ML").
 - Todo script de treino lê uma configuração de `pesquisa/ml/configs/` e grava as previsões com
   `avaliar.gravar_previsoes()` (`id`, `split`, `p1`, `p2`), para o `avaliar.py` medir todos do mesmo jeito.
-- Na API, cada modelo é um adaptador de `ClassificadorClient` (`api/app/integrations/classificador_client.py`).
+- Na API, cada modelo é um adaptador de `ClassificadorClient` (`api/app/ml/classificador.py`).
 
 ## Fluxo de trabalho
 

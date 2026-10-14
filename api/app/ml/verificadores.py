@@ -14,7 +14,7 @@ ou None se passou; quem chama descarta o item recusado.
 
 import re
 
-from app.integrations.embeddings_client import EmbeddingsClient, sem_acento, similaridade
+from app.ml.embeddings import EmbeddingsClient, sem_acento, similaridade
 
 LINK = re.compile(r"https?://\S+|www\.\S+|\b[\w-]+(?:\.[\w-]+)*\.(?:com|org|net|gov|br)\b")
 NUMERO = re.compile(r"\d+(?:[.,]\d+)*")

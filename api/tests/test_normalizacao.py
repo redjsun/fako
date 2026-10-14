@@ -1,6 +1,6 @@
 import pytest
 
-from app.integrations.normalizacao import limpar, motivo_descarte, normalizar_manchete
+from app.ml.normalizacao import limpar, motivo_descarte, normalizar_manchete
 
 FORA = "opinião, vídeo, ao vivo ou publicidade"
 

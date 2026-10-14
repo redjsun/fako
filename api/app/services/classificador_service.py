@@ -8,11 +8,11 @@
 
 from app.core.config import get_settings
 from app.core.exceptions import ServiceUnavailableError
-from app.integrations.classificador_client import (
+from app.ml.classificador import (
     ClassificadorClient,
     ClassificadorIndisponivel,
 )
-from app.integrations.normalizacao import limpar
+from app.ml.normalizacao import limpar
 from app.schemas.admin_schema import ClassifierAnalyzeResponse
 from app.schemas.match_schema import ModelGuess
 

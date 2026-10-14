@@ -1,8 +1,8 @@
 """Avaliação da extração de afirmações em textos brasileiros (issue #19).
 
 Uso:
-    python pesquisa/ml/avaliar_extracao.py rodar --prompt api/app/prompts/extrair_afirmacoes_v1.txt
-    python pesquisa/ml/avaliar_extracao.py medir --prompt api/app/prompts/extrair_afirmacoes_v1.txt
+    python pesquisa/ml/avaliar_extracao.py rodar --prompt api/app/ml/prompts/extrair_afirmacoes_v1.txt
+    python pesquisa/ml/avaliar_extracao.py medir --prompt api/app/ml/prompts/extrair_afirmacoes_v1.txt
 
 Mede o mesmo prompt da API e da padronização, com o extrator de padronizar.py.
 

@@ -5,7 +5,7 @@ Uso:
     python pesquisa/dados/pre_anotar.py comparar --rodada 2
 
 Só biblioteca padrão. A LLM é a mesma da padronização (LLM_BASE_URL, LLM_MODEL, LLM_API_KEY,
-LLM_EXTRA_BODY), com o prompt api/app/prompts/pre_anotar_v1.txt.
+LLM_EXTRA_BODY), com o prompt api/app/ml/prompts/pre_anotar_v1.txt.
 
 - `sugerir`: lê as planilhas de trabalho pesquisa/data/anotacao/rodada-NN-<anotador>.csv
   (sortear_anotacao.py), pede a sugestão de cada id (cache em rodada-NN-llm.csv, fora do Git:
@@ -35,7 +35,7 @@ from consolidar_anotacoes import SINAIS, TIPOS, kappa_cohen
 RAIZ = Path(__file__).resolve().parent.parent
 PLANILHAS = RAIZ / "data" / "anotacao"
 ANOTACOES = RAIZ / "anotacoes"
-PROMPT = RAIZ.parent / "api" / "app" / "prompts" / "pre_anotar_v1.txt"
+PROMPT = RAIZ.parent / "api" / "app" / "ml" / "prompts" / "pre_anotar_v1.txt"
 
 CAMPOS = ("tipo", *SINAIS)
 COLUNAS_SUGESTAO = ("sugestao_tipo", "sugestao_sinais")

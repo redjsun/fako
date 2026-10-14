@@ -2,8 +2,8 @@ import json
 
 import pytest
 
-from app.integrations.embeddings_client import FakeEmbeddings, cosseno
-from app.integrations.verificadores import (
+from app.ml.embeddings import FakeEmbeddings, cosseno
+from app.ml.verificadores import (
     citados,
     verificar_explicacao,
     verificar_negacao,

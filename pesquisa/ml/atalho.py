@@ -2,7 +2,7 @@
 
 Uso:
     python pesquisa/ml/atalho.py
-    python pesquisa/ml/atalho.py --prompt api/app/prompts/extrair_afirmacoes_v1.txt   # + padronizado
+    python pesquisa/ml/atalho.py --prompt api/app/ml/prompts/extrair_afirmacoes_v1.txt   # + padronizado
     python pesquisa/ml/atalho.py --com-portal    # inclui os portais, como o notebook eda_2 (seção 7)
 
 Uma regressão logística que só vê tamanho, pontuação, caixa alta e a primeira palavra. A AUC

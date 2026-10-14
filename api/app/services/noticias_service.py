@@ -3,7 +3,7 @@
 Fluxo: cada provedor entrega os textos (com mais de um, a quantidade pedida é dividida entre
 eles, para equilibrar as falsas das checagens com as verdadeiras das manchetes); cada um é
 normalizado para o formato do treino
-(integrations/normalizacao.py), passa pelos filtros (os das matérias de portal nas manchetes;
+(ml/normalizacao.py), passa pelos filtros (os das matérias de portal nas manchetes;
 tamanho, mídia, conclusão embutida e, opcionalmente, política nas alegações checadas), sai se
 já existe no banco (mesma URL ou mesmo texto) e é analisado pelo classificador com o limiar do
 admin. Manchete de veículo entra verdadeira (foi publicada); alegação checada entra com o lado
@@ -20,12 +20,12 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.integrations.classificador_client import (
+from app.integrations.noticias_client import Noticia, NoticiasClient, NoticiasIndisponiveis
+from app.ml.classificador import (
     ClassificadorClient,
     ClassificadorIndisponivel,
 )
-from app.integrations.normalizacao import motivo_descarte, normalizar_manchete
-from app.integrations.noticias_client import Noticia, NoticiasClient, NoticiasIndisponiveis
+from app.ml.normalizacao import motivo_descarte, normalizar_manchete
 from app.models.category import Category
 from app.models.question import Question, QuestionOrigin, QuestionStatus
 from app.repositories.question_repository import QuestionRepository

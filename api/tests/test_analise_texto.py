@@ -1,10 +1,10 @@
 import pytest
 
 from app.core.exceptions import ServiceUnavailableError
-from app.integrations.classificador_client import ClassificadorAusente, FakeClassificador
-from app.integrations.llm_client import LLMValidado
+from app.ml.classificador import ClassificadorAusente, FakeClassificador
+from app.ml.llm import LLMValidado
 from app.services.analise_texto_service import AnaliseTextoService
-from tests.test_ai_clients import PedidoRoteirizado
+from tests.test_llm import PedidoRoteirizado
 
 
 class ClassificadorEspiao(FakeClassificador):

@@ -4,9 +4,9 @@ from datetime import date
 import pytest
 
 from app.core.config import get_settings
-from app.integrations import llm_client
-from app.integrations.classificador_client import Checagem, FakeClassificador, Sinal
-from app.integrations.llm_client import (
+from app.ml import llm as llm_client
+from app.ml.classificador import Checagem, FakeClassificador, Sinal
+from app.ml.llm import (
     PASTA_PROMPTS,
     VERSAO_PROMPT,
     ChecagemDeOrigem,

@@ -14,6 +14,9 @@ app/
 ├── repositories/     # acesso a dados
 ├── models/           # Model — entidades de domínio (SQLAlchemy)
 ├── schemas/          # DTOs de entrada e saída da API
+├── ml/               # uso dos modelos: classificador, LLM, embeddings, verificadores, prompts
+├── integrations/     # APIs externas (notícias)
+├── jobs/             # comandos fora das rotas (python -m app.jobs....)
 └── seeds/            # dados iniciais (categorias, níveis, questões)
 migrations/           # migrations do Alembic, geradas a partir dos models
 ```
@@ -29,7 +32,19 @@ header `Authorization: Bearer`. `core/deps.py` expõe `get_current_user` e
 
 Fluxo: `controller → service → repository → model`.
 Os `schemas` trafegam entre controller e service; os `models` não vazam para fora
-da camada de negócio.
+da camada de negócio. Os services usam o que precisam de `ml/` (classificar, gerar texto)
+e de `integrations/` (buscar notícias) por interfaces injetadas com `Depends`, trocadas
+por fakes nos testes.
+
+**ML em camadas.** `app/ml/` é só o lado de **uso**: carrega os artefatos publicados em
+`MODELS_DIR/atual` e responde em milissegundos, sem PyTorch na imagem da API. O **treino** e a
+avaliação ficam em `pesquisa/ml/` (container `ml`), que grava os artefatos em
+`models/AAAA-MM/`; `make publicar` aponta `models/atual` para a versão escolhida. A pesquisa lê
+os mesmos prompts de `app/ml/prompts/`, para treino e uso falarem o mesmo formato.
+
+```
+pesquisa/ml/ (treino) ──grava──> models/AAAA-MM/ ──publicar──> models/atual ──lê──> api/app/ml/
+```
 
 ## Frontend (`web/src/`)
 
@@ -61,13 +76,13 @@ As views não chamam `fetch` diretamente; toda chamada HTTP passa pelo
 
 A documentação interativa fica em `http://localhost:8000/docs`. Os services levantam
 exceções de `core/exceptions.py`, convertidas em respostas HTTP pelo handler de `main.py`.
-A LLM fica atrás da interface `integrations/llm_client.py` (`LLM_PROVIDER=fake` por padrão;
+A LLM fica atrás da interface `ml/llm.py` (`LLM_PROVIDER=fake` por padrão;
 `openai` usa qualquer endpoint compatível com a API de chat da OpenAI, como o Ollama). Os
-prompts ficam em `app/prompts/` com a versão no nome, e toda resposta passa por um esquema
+prompts ficam em `app/ml/prompts/` com a versão no nome, e toda resposta passa por um esquema
 Pydantic: fora dele, o pedido é repetido uma vez e, se falhar de novo, o item é descartado.
 Em `POST /admin/ai/generate`, a LLM só reescreve a alegação de uma checagem; o gabarito e a
 fonte vêm da checagem.
-O classificador de veracidade fica atrás de `integrations/classificador_client.py`
+O classificador de veracidade fica atrás de `ml/classificador.py`
 (`CLASSIFICADOR_PROVIDER=fake` por padrão): cada modelo treinado é um adaptador que devolve as
 duas fronteiras ordinais, e `analise_das_fronteiras()` aplica a mesma regra de decisão a todos.
 Os modelos publicados são lidos de `MODELS_DIR/atual` (a pasta `models/`, montada só para

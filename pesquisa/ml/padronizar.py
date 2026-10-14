@@ -1,7 +1,7 @@
 """Padroniza o texto curto do treino com o mesmo prompt de extração do uso (issue #20).
 
 Uso:
-    python pesquisa/ml/padronizar.py --prompt api/app/prompts/extrair_afirmacoes_v1.txt
+    python pesquisa/ml/padronizar.py --prompt api/app/ml/prompts/extrair_afirmacoes_v1.txt
     python pesquisa/ml/padronizar.py --prompt ... --limite 50     # amostra, para medir tempo e custo
     python pesquisa/ml/padronizar.py --prompt ... --splits todos  # inclui reserva e fora
 

@@ -9,13 +9,13 @@ Usado pelo `POST /admin/ai/classify` com texto longo (#26) e pelas notícias da 
 """
 
 from app.core.exceptions import ServiceUnavailableError
-from app.integrations.classificador_client import (
+from app.ml.classificador import (
     Analise,
     ClassificadorClient,
     ClassificadorIndisponivel,
     Limiar,
 )
-from app.integrations.llm_client import VERSAO_PROMPT, LLMClient, RespostaInvalida
+from app.ml.llm import VERSAO_PROMPT, LLMClient, RespostaInvalida
 
 
 class AnaliseTextoService:

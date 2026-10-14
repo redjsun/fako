@@ -62,6 +62,7 @@ nav:
   - Produto:
       - Banco de perguntas do jogo: banco-perguntas.md
       - Notícias externas e classificador: noticias-classificador.md
+      - LLM na API: llm.md
   - Pesquisa e dados:
       - Análise exploratória dos dados: eda.md
       - Dataset de verdadeiros confiáveis: dataset-verdadeiras.md

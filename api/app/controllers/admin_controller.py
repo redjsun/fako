@@ -5,10 +5,10 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.deps import get_current_admin
-from app.integrations.classificador_client import ClassificadorClient, get_classificador
-from app.integrations.embeddings_client import EmbeddingsClient, get_embeddings
-from app.integrations.llm_client import LLMClient, get_llm_client
 from app.integrations.noticias_client import NoticiasClient, get_noticias_clients
+from app.ml.classificador import ClassificadorClient, get_classificador
+from app.ml.embeddings import EmbeddingsClient, get_embeddings
+from app.ml.llm import LLMClient, get_llm_client
 from app.models.question import QuestionStatus
 from app.schemas.admin_schema import (
     AIClassifyRequest,

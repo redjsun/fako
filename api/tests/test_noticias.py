@@ -6,7 +6,6 @@ from fastapi.testclient import TestClient
 
 from app.core.config import get_settings
 from app.core.deps import get_current_admin
-from app.integrations.classificador_client import FakeClassificador, get_classificador
 from app.integrations.noticias_client import (
     FactCheckClient,
     GNewsClient,
@@ -15,6 +14,7 @@ from app.integrations.noticias_client import (
     get_noticias_clients,
 )
 from app.main import app
+from app.ml.classificador import FakeClassificador, get_classificador
 from app.models.user import User
 
 

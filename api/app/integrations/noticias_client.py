@@ -2,7 +2,7 @@
 
 As notícias viram afirmações do jogo pela curadoria (services/noticias_service.py). O
 provedor só entrega o texto cru e os metadados; a normalização para o formato do treino
-fica em integrations/normalizacao.py, igual para todos os provedores.
+fica em ml/normalizacao.py, igual para todos os provedores.
 
 - GNews: manchetes publicadas, sempre verdadeiras.
 - Fact Check: alegações checadas por agências, com o veredito (quase sempre falsas).
@@ -20,7 +20,7 @@ from typing import Protocol
 
 from app.core.config import get_settings
 from app.core.exceptions import ServiceUnavailableError
-from app.integrations.normalizacao import normalizar_veredito, verdadeira_pelo_veredito
+from app.ml.normalizacao import normalizar_veredito, verdadeira_pelo_veredito
 
 
 class NoticiasIndisponiveis(ServiceUnavailableError):

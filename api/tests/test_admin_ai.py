@@ -4,8 +4,10 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.core.deps import get_current_admin
-from app.integrations.classificador_client import ClassificadorAusente, get_classificador
-from app.integrations.llm_client import (
+from app.integrations.noticias_client import get_noticias_clients
+from app.main import app
+from app.ml.classificador import ClassificadorAusente, get_classificador
+from app.ml.llm import (
     VERSAO_PROMPT,
     ChecagemDeOrigem,
     FakeLLMClient,
@@ -14,10 +16,8 @@ from app.integrations.llm_client import (
     RespostaInvalida,
     get_llm_client,
 )
-from app.integrations.noticias_client import get_noticias_clients
-from app.main import app
 from app.models.user import User
-from tests.test_ai_clients import PedidoRoteirizado
+from tests.test_llm import PedidoRoteirizado
 from tests.test_noticias import NoticiasDeTeste, checagem
 
 

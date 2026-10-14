@@ -9,6 +9,3 @@ bcrypt==4.2.1
 pyjwt==2.15.1
 # Referência TF-IDF: a mesma versão do treino (imagem ml), senão o joblib não carrega
 scikit-learn==1.9.1
---extra-index-url https://download.pytorch.org/whl/cpu
-torch>=2.2.0
-transformers>=4.40.0

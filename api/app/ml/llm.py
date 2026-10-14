@@ -7,7 +7,7 @@ Uma interface, `LLMClient`, com duas implementações:
   proxy do LiteLLM ou um provedor hospedado); trocar de provedor é trocar `LLM_BASE_URL` e
   `LLM_MODEL`.
 
-Os prompts ficam em `app/prompts/`, com a versão no nome (`gerar_questao_v1.txt`); a versão
+Os prompts ficam em `app/ml/prompts/`, com a versão no nome (`gerar_questao_v1.txt`); a versão
 vai junto de cada questão e análise (`VERSAO_PROMPT`). Toda resposta é JSON e passa por um
 esquema Pydantic: se não passar, o pedido é feito mais uma vez; se falhar de novo, lança
 `RespostaInvalida` e quem chamou descarta o item. Uma resposta quebrada nunca vira questão.
@@ -33,10 +33,10 @@ from pydantic import BaseModel, Field, ValidationError, model_validator
 
 from app.core.config import get_settings
 from app.core.exceptions import ServiceUnavailableError
-from app.integrations.classificador_client import Analise
-from app.integrations.verificadores import verificar_explicacao
+from app.ml.classificador import Analise
+from app.ml.verificadores import verificar_explicacao
 
-PASTA_PROMPTS = Path(__file__).resolve().parent.parent / "prompts"
+PASTA_PROMPTS = Path(__file__).resolve().parent / "prompts"
 # Versão em uso de cada prompt; mudar a versão é criar um arquivo novo, nunca editar o antigo.
 VERSAO_PROMPT = {
     "extrair_afirmacoes": "extrair_afirmacoes_v1",

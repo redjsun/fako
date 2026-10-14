@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expires_minutes: int = 60 * 24
 
-    # LLM (integrations/llm_client.py): "fake" roda sem chamadas externas; "openai" usa um
+    # LLM (ml/llm.py): "fake" roda sem chamadas externas; "openai" usa um
     # endpoint compatível com a API de chat da OpenAI (Ollama, LiteLLM ou provedor hospedado).
     # LLM_BASE_URL, LLM_MODEL, LLM_API_KEY e LLM_EXTRA_BODY são os mesmos da pesquisa.
     llm_provider: str = "fake"
@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     # Envia o JSON Schema da saída em response_format; desligar se o provedor não aceitar.
     llm_esquema: bool = True
 
-    # Embeddings (integrations/embeddings_client.py): "fake" roda sem modelo; "openai" usa o
+    # Embeddings (ml/embeddings.py): "fake" roda sem modelo; "openai" usa o
     # /embeddings de embeddings_base_url (vazio: o mesmo de llm_base_url), ex.: bge-m3 no Ollama.
     embeddings_provider: str = "fake"
     embeddings_base_url: str = ""
@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     # (troca de assunto). Medido com o bge-m3 (doc/llm.md).
     similaridade_minima_reescrita: float = 0.6
 
-    # Classificador de veracidade (integrations/classificador_client.py): "fake" roda sem modelo;
+    # Classificador de veracidade (ml/classificador.py): "fake" roda sem modelo;
     # os modelos publicados ficam em models_dir/atual.
     classificador_provider: str = "fake"
     models_dir: str = "/app/models"
@@ -60,8 +60,6 @@ class Settings(BaseSettings):
     noticias_publicar_direto: bool = False
     # Descarta alegações checadas sobre política e eleição.
     noticias_sem_politica: bool = False
-    # Dispositivo do motor BERTimbau Y1/Y2 (integrations/bertimbau_engine.py)
-    ai_device: str = "cpu"
 
 
 @lru_cache

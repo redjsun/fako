@@ -31,7 +31,7 @@ lendo o código, não só os planos. Serve para auditar se o catálogo de
 | RF20 | | `components/MatchSummary.tsx`, `POST /matches/{id}/finish` | Implementado |
 | RF21 | | `Question.explanation` (model), `MatchSummary.tsx` | Implementado |
 | RF22 | | `pesquisa/ml/padronizar.py`, `pesquisa/dados/preparar_dados.py` | Implementado |
-| RF23 | | `Question.model_category`/`model_score`/`model_confidence` (model), `api/app/integrations/classificador_client.py` | Implementado |
+| RF23 | | `Question.model_category`/`model_score`/`model_confidence` (model), `api/app/ml/classificador.py` | Implementado |
 | RF24 | | `pesquisa/ml/treinar_referencia.py`, `doc/relatorio-tecnico.md` | Implementado na referência TF-IDF; pendente no BERTimbau |
 | RF25 | #30 | `authService.ts`, `matchService.ts`, `progressService.ts`, `auth_controller.py`, `match_controller.py`, `progress_controller.py` | Implementado, com banco local em `matchService.ts` como fallback quando a API está fora do ar |
 | RF26 | #23 | | Planejado |
