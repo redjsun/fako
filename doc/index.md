@@ -18,7 +18,6 @@ Use as abas no topo para navegar, ou veja o índice completo abaixo.
 | [Requisitos funcionais](requisitos/requisitos-funcionais.md) | Catálogo RF01 a RF30, com prioridade e origem |
 | [Requisitos não funcionais](requisitos/requisitos-nao-funcionais.md) | Catálogo RNF01 a RNF27, com prioridade e origem |
 | [Histórias de usuário](requisitos/historias-usuario.md) | Os requisitos funcionais reescritos como histórias de usuário |
-| [Matriz de rastreabilidade](requisitos/matriz-rastreabilidade.md) | Cada requisito ligado à issue, ao artefato de código e ao status real |
 
 ## Arquitetura
 
