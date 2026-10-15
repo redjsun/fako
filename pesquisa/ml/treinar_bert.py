@@ -27,6 +27,12 @@ agenda, histórico, melhor época e o estado dos geradores aleatórios. Rodar de
 última época concluída, com o mesmo embaralhamento de uma rodada sem pausa; a assinatura
 (configuração, dataset, semente, épocas) impede retomar com outra configuração. `--do-zero`
 ignora os pontos salvos. A pasta `retomada/` é apagada quando o treino termina.
+
+Dispositivo: a GPU NVIDIA (`cuda`) quando houver, senão a do Mac (`mps`), senão a CPU; fixe com
+`--dispositivo` ou `treino.dispositivo`. Fora do container (que tem o PyTorch só de CPU):
+    pip install torch && pip install -r pesquisa/ml/requirements-treino.txt
+    python pesquisa/ml/treinar_bert.py --dispositivo cuda
+O ponto de retomada não depende do dispositivo, e a latência é sempre medida na CPU, como na API.
 """
 
 import argparse
@@ -79,6 +85,22 @@ def pesos_por_classe(exemplos: list[Exemplo]) -> dict[str, float]:
     return {c: len(exemplos) / (len(CLASSES) * n) if n else 0.0 for c, n in contagem.items()}
 
 
+def escolher_dispositivo(pedido: str | None = None) -> torch.device:
+    """O `pedido` (cuda, mps ou cpu) ou, sem ele, o mais rápido disponível."""
+    disponiveis = {
+        "cuda": torch.cuda.is_available(),
+        "mps": torch.backends.mps.is_available(),
+        "cpu": True,
+    }
+    if pedido:
+        if pedido not in disponiveis:
+            raise ValueError(f"Dispositivo desconhecido: {pedido} (use cuda, mps ou cpu)")
+        if not disponiveis[pedido]:
+            raise ValueError(f"Dispositivo {pedido} indisponível nesta máquina")
+        return torch.device(pedido)
+    return torch.device(next(nome for nome, ok in disponiveis.items() if ok))
+
+
 def fixar_semente(semente: int):
     random.seed(semente)
     np.random.seed(semente)
@@ -105,8 +127,10 @@ def fronteiras(textos: list[str], modelo: dict, tamanho: int = 64) -> tuple[np.n
     """P1 e P2 de um modelo carregado com `carregar_modelo`."""
     rede, tokenizador = modelo["rede"], modelo["tokenizador"]
     rede.eval()
+    dispositivo = next(rede.parameters()).device
     p1, p2 = [], []
     for _, entrada in lotes(textos, tokenizador, modelo["max_tokens"], tamanho):
+        entrada = entrada.to(dispositivo)
         a, b = fronteiras_de_logits(rede(entrada["input_ids"], entrada["attention_mask"]))
         p1.append(a)
         p2.append(b)
@@ -170,6 +194,7 @@ def treinar_semente(
     config: Configuracao,
     retomada: Path | None = None,
     assinatura: dict | None = None,
+    dispositivo: torch.device | None = None,
 ) -> tuple[float, int, Coral, list[float]]:
     """Ajusta uma semente; devolve (melhor F1, época, rede na melhor época, F1 por época).
 
@@ -177,17 +202,20 @@ def treinar_semente(
     mesma `assinatura`, continua da época seguinte à última concluída.
     """
     parametros = config.treino
+    dispositivo = dispositivo or torch.device("cpu")
     fixar_semente(semente)
     tokenizador = AutoTokenizer.from_pretrained(parametros["modelo_base"])
-    rede = Coral(AutoModel.from_pretrained(parametros["modelo_base"]))
+    rede = Coral(AutoModel.from_pretrained(parametros["modelo_base"])).to(dispositivo)
     max_tokens, tamanho = parametros.get("max_tokens", 96), parametros.get("lote", 32)
     max_epocas = parametros.get("max_epocas", 4)
     paciencia = parametros.get("paciencia", 1)
 
     classe = pesos_por_classe(treino)
     textos = [e.texto for e in treino]
-    alvos = torch.tensor([[e.y1, e.y2] for e in treino], dtype=torch.float)
-    pesos = torch.tensor([e.peso * classe[e.veracidade] for e in treino], dtype=torch.float)
+    alvos = torch.tensor([[e.y1, e.y2] for e in treino], dtype=torch.float, device=dispositivo)
+    pesos = torch.tensor(
+        [e.peso * classe[e.veracidade] for e in treino], dtype=torch.float, device=dispositivo
+    )
     y_validacao = np.array([ORDEM[e.veracidade] for e in validacao])
 
     otimizador = torch.optim.AdamW(
@@ -211,6 +239,8 @@ def treinar_semente(
         agenda.load_state_dict(salvo["agenda"])
         historico, melhor, sem_melhora = salvo["historico"], salvo["melhor"], salvo["sem_melhora"]
         torch.set_rng_state(salvo["aleatorio"]["torch"])
+        if dispositivo.type == "cuda" and "cuda" in salvo["aleatorio"]:
+            torch.cuda.set_rng_state_all(salvo["aleatorio"]["cuda"])
         np.random.set_state(salvo["aleatorio"]["numpy"])
         random.setstate(salvo["aleatorio"]["python"])
         primeira = max_epocas + 1 if salvo["concluida"] else salvo["epoca"] + 1
@@ -222,6 +252,7 @@ def treinar_semente(
         embaralhados = [textos[i] for i in ordem]
         inicio_epoca, soma = time.perf_counter(), 0.0
         for inicio, entrada in lotes(embaralhados, tokenizador, max_tokens, tamanho):
+            entrada = entrada.to(dispositivo)
             indices = ordem[inicio : inicio + tamanho]
             logits = rede(entrada["input_ids"], entrada["attention_mask"])
             valor = (perda(logits, alvos[indices]).sum(dim=1) * pesos[indices]).mean()
@@ -263,6 +294,11 @@ def treinar_semente(
                         "torch": torch.get_rng_state(),
                         "numpy": np.random.get_state(),
                         "python": random.getstate(),
+                        **(
+                            {"cuda": torch.cuda.get_rng_state_all()}
+                            if dispositivo.type == "cuda"
+                            else {}
+                        ),
                     },
                 },
             )
@@ -274,9 +310,16 @@ def treinar_semente(
     return f1, epoca, rede, historico
 
 
-def treinar(config: Configuracao, saida: Path | None = None, do_zero: bool = False) -> dict:
+def treinar(
+    config: Configuracao,
+    saida: Path | None = None,
+    do_zero: bool = False,
+    dispositivo: str | None = None,
+) -> dict:
     """Treina cada semente, guarda a melhor e grava modelo, previsões e configuração."""
     saida = saida or config.saida
+    dispositivo = escolher_dispositivo(dispositivo or config.treino.get("dispositivo"))
+    print(f"Dispositivo: {dispositivo}")
     if do_zero:
         shutil.rmtree(saida / PASTA_RETOMADA, ignore_errors=True)
     inicio = time.perf_counter()
@@ -297,6 +340,7 @@ def treinar(config: Configuracao, saida: Path | None = None, do_zero: bool = Fal
             config,
             retomada=caminho_retomada(saida, semente),
             assinatura=assinatura,
+            dispositivo=dispositivo,
         )
         por_semente[str(semente)] = {
             "f1_macro_validacao": f1,
@@ -320,6 +364,7 @@ def treinar(config: Configuracao, saida: Path | None = None, do_zero: bool = Fal
         if exemplos:
             previsoes[split] = (exemplos, *fronteiras([e.texto for e in exemplos], modelo))
 
+    rede.to("cpu")  # a API roda na CPU
     textos_latencia = [e.texto for e in validacao[:FRASES_LATENCIA]]
     inicio_latencia = time.perf_counter()
     for texto in textos_latencia:
@@ -354,13 +399,18 @@ def main():
     parser.add_argument(
         "--do-zero", action="store_true", help="ignora os pontos de retomada e recomeça"
     )
+    parser.add_argument(
+        "--dispositivo",
+        choices=("cuda", "mps", "cpu"),
+        help="sobrescreve treino.dispositivo; sem nenhum dos dois, o mais rápido disponível",
+    )
     args = parser.parse_args()
     config = carregar_configuracao(args.config)
     if args.sementes:
         config.sementes = args.sementes
     if args.max_epocas:
         config.treino = {**config.treino, "max_epocas": args.max_epocas}
-    resultado = treinar(config, args.saida, do_zero=args.do_zero)
+    resultado = treinar(config, args.saida, do_zero=args.do_zero, dispositivo=args.dispositivo)
     saida = args.saida or config.saida
     print(
         f"\nSemente {resultado['semente_escolhida']} (F1 macro {resultado['f1_macro_validacao']:.3f}; "

@@ -5,7 +5,11 @@ torch = pytest.importorskip("torch")
 pytest.importorskip("transformers")
 
 from dados import Exemplo  # noqa: E402
-from treinar_bert import fronteiras_de_logits, pesos_por_classe  # noqa: E402
+from treinar_bert import (  # noqa: E402
+    escolher_dispositivo,
+    fronteiras_de_logits,
+    pesos_por_classe,
+)
 
 
 def exemplo(veracidade: str) -> Exemplo:
@@ -42,6 +46,25 @@ def test_classe_rara_pesa_mais():
     assert pesos["verdadeiro"] > pesos["enganoso"] > pesos["falso"]
     total = sum(pesos[e.veracidade] for e in exemplos)
     assert total == pytest.approx(len(exemplos))
+
+
+def test_dispositivo_prefere_cuda_depois_mps_depois_cpu(monkeypatch):
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.backends.mps, "is_available", lambda: True)
+    assert escolher_dispositivo().type == "cuda"
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    assert escolher_dispositivo().type == "mps"
+    monkeypatch.setattr(torch.backends.mps, "is_available", lambda: False)
+    assert escolher_dispositivo().type == "cpu"
+
+
+def test_dispositivo_pedido_precisa_existir(monkeypatch):
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    assert escolher_dispositivo("cpu").type == "cpu"
+    with pytest.raises(ValueError, match="indisponível"):
+        escolher_dispositivo("cuda")
+    with pytest.raises(ValueError, match="desconhecido"):
+        escolher_dispositivo("tpu")
 
 
 PALAVRAS = ["vacina", "tem", "chip", "governo", "confisca", "poupança", "a", "o", "de"]
