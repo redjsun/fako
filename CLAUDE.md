@@ -13,7 +13,7 @@ um classificador de veracidade treinado com bases brasileiras de fake news. Todo
 | `web/` | React 18 + Vite + TypeScript. `view → controller (hook) → service → API`; HTTP só via `services/httpClient.ts` |
 | `pesquisa/` | Tudo de dados e treinamento. Imagem e serviço `pesquisa` no compose (`Dockerfile`, `requirements.txt`) |
 | `pesquisa/dados/` | Download, coleta (scrapers e Fact Check API) e preparo dos dados |
-| `pesquisa/ml/` | Experimentos de ML. `dados.py` é a única porta de entrada dos dados de treino (splits, limpeza, alvos, pesos); `padronizar.py` (LLM), `atalho.py` (teste de atalho), `avaliar.py` (métricas comuns, lê `previsoes.jsonl` de cada modelo). Container `ml` (PyTorch CPU) no compose |
+| `pesquisa/ml/` | Experimentos de ML. `dados.py` é a única porta de entrada dos dados de treino (splits, limpeza, alvos, pesos); `padronizar.py` (LLM), `atalho.py` (teste de atalho), `avaliar.py` (métricas comuns, lê `previsoes.jsonl` de cada modelo). Container `ml` no compose (PyTorch CPU; CUDA com `GPU=1`, via `compose.gpu.yaml`) |
 | `pesquisa/ml/configs/` | Uma configuração TOML por execução de treino (dados, hiperparâmetros, sementes, saída), lida por `configuracao.py`; o hash dela vai para o `config.json` do modelo |
 | `pesquisa/ml/tests/fixtures/` | `dataset_smoke.jsonl`: afirmações inventadas para o teste de ponta a ponta no CI (nunca texto de veículo) |
 | `pesquisa/anotacoes/` | Anotações da equipe (#5), versionadas: só `id` e rótulos, nunca o texto |
@@ -33,6 +33,7 @@ Tudo roda por Docker Compose (o Docker Desktop precisa estar aberto). `make help
 - `make dados`: baixa as bases para `pesquisa/data/raw/` e gera `pesquisa/data/processed/dataset.jsonl`.
   Os coletores (`pesquisa/dados/coletar_*.py`) rodam à parte e são lentos (~1 req/s, com cache)
 - `make padronizar`, `make atalho`, `make contagens`, `make shell-ml`: experimentos de `pesquisa/ml/`
+- `make bert GPU=1`: treino na GPU NVIDIA (exige o NVIDIA Container Toolkit no host; `make gpu` confere)
 - `make eda`: Jupyter Lab em `:8888`
 
 Segredos ficam em `.env` (copiar de `.env.example`): `FACTCHECK_API_KEY`, `LLM_*`, `CLASSIFICADOR_*`.

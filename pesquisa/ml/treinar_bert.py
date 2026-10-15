@@ -29,7 +29,8 @@ agenda, histórico, melhor época e o estado dos geradores aleatórios. Rodar de
 ignora os pontos salvos. A pasta `retomada/` é apagada quando o treino termina.
 
 Dispositivo: a GPU NVIDIA (`cuda`) quando houver, senão a do Mac (`mps`), senão a CPU; fixe com
-`--dispositivo` ou `treino.dispositivo`. Fora do container (que tem o PyTorch só de CPU):
+`--dispositivo` ou `treino.dispositivo`. No container, a GPU NVIDIA pede `make bert GPU=1`
+(compose.gpu.yaml, PyTorch CUDA). Fora do container:
     pip install torch && pip install -r pesquisa/ml/requirements-treino.txt
     python pesquisa/ml/treinar_bert.py --dispositivo cuda
 O ponto de retomada não depende do dispositivo, e a latência é sempre medida na CPU, como na API.
