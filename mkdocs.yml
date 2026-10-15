@@ -54,7 +54,6 @@ nav:
       - Requisitos funcionais: requisitos/requisitos-funcionais.md
       - Requisitos não funcionais: requisitos/requisitos-nao-funcionais.md
       - Histórias de usuário: requisitos/historias-usuario.md
-      - Matriz de rastreabilidade: requisitos/matriz-rastreabilidade.md
   - Arquitetura:
       - Visão geral: arquitetura/visao-geral.md
       - Decisões de arquitetura: arquitetura/decisoes.md
