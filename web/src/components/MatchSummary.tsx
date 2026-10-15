@@ -15,7 +15,11 @@ interface MatchSummaryProps {
   snakeLength: number;
   secondsPlayed: number;
   pointsPerCorrect: number;
+  tolerance: number;
+  /** Nível seguinte já liberado: habilita o botão "Próximo nível". */
+  canPlayNextLevel: boolean;
   onPlayAgain: () => void;
+  onPlayNextLevel: () => void;
   onGoHome: () => void;
   onOpenJourney: () => void;
 }
@@ -25,6 +29,7 @@ const END_REASON_TEXT: Record<MatchEndReason, string> = {
   GAMEOVER: "A cobrinha se mordeu · Partida encerrada",
   EXIT: "Você saiu · Partida encerrada",
   NO_QUESTIONS: "Você respondeu todas as afirmações · Partida encerrada",
+  GOAL: "Meta do nível alcançada · Partida encerrada",
 };
 
 /** Fim da partida: pontuação, números da rodada, próximo objetivo e o que foi analisado. */
@@ -40,7 +45,10 @@ export const MatchSummary: React.FC<MatchSummaryProps> = ({
   snakeLength,
   secondsPlayed,
   pointsPerCorrect,
+  tolerance,
+  canPlayNextLevel,
   onPlayAgain,
+  onPlayNextLevel,
   onGoHome,
   onOpenJourney,
 }) => {
@@ -63,7 +71,7 @@ export const MatchSummary: React.FC<MatchSummaryProps> = ({
     goalTitle = isLastLevel
       ? `Faltam ${missing} ${points} para vencer o nível ${level}`
       : `Faltam ${missing} ${points} para o nível ${level + 1}`;
-    goalText = `${score} de ${minScoreToAdvance} pts · Dica: ficar a até 15 pontos da referência vale +${pointsPerCorrect}.`;
+    goalText = `${score} de ${minScoreToAdvance} pts · Dica: ficar a até ${tolerance} pontos da referência vale +${pointsPerCorrect}.`;
   }
 
   return (
@@ -121,13 +129,28 @@ export const MatchSummary: React.FC<MatchSummaryProps> = ({
         </div>
 
         <div className="match-summary__actions">
-          <button type="button" className="button button--vivid button--large" onClick={onPlayAgain} autoFocus>
+          <button
+            type="button"
+            className={`button button--large ${canPlayNextLevel ? "button--ghost-light" : "button--vivid"}`}
+            onClick={onPlayAgain}
+            autoFocus={!canPlayNextLevel}
+          >
             <Icon name="replay" size={18} />
             Jogar novamente (Enter)
           </button>
+          <button
+            type="button"
+            className={`button button--large ${canPlayNextLevel ? "button--vivid" : "button--ghost-light"}`}
+            onClick={onPlayNextLevel}
+            disabled={!canPlayNextLevel}
+            autoFocus={canPlayNextLevel}
+          >
+            {canPlayNextLevel ? <Icon name="right" size={18} /> : <Icon name="lock" size={18} />}
+            Próximo nível
+          </button>
           <button type="button" className="button button--ghost-light button--large" onClick={onGoHome}>
             <Icon name="home" size={18} />
-            Ir para o Início
+            Início
           </button>
         </div>
       </section>

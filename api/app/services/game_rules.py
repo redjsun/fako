@@ -1,23 +1,17 @@
-"""Regras de pontuação e tempo da partida.
+"""Regras de pontuação e tempo da partida comuns a todos os níveis.
 
-Valores iniciais para o MVP; ajuste aqui quando o grupo fechar as regras.
+O que muda de um nível para outro (duração, tolerância, penalidade do erro...) fica na
+tabela `levels` (app/models/level.py).
 """
 
-MATCH_DURATION_SECONDS = 120
-# O cronômetro de 120 s fica no front e pausa durante a pergunta, o feedback e as pausas,
+# O cronômetro da partida fica no front e pausa durante a pergunta, o feedback e as pausas,
 # então o servidor não mede o tempo de jogo: só recusa partidas abertas há mais que isto.
 MATCH_MAX_OPEN_SECONDS = 30 * 60
-# Teto de respostas por partida (uma a cada 2 s de jogo), já que o servidor não mede o
-# tempo de jogo: limita o placar de quem chama a API direto, sem pesar para quem joga.
-MAX_ANSWERS_PER_MATCH = MATCH_DURATION_SECONDS // 2
+# Teto de respostas por partida (uma a cada 2 s da partida mais longa), já que o servidor
+# não mede o tempo de jogo: limita o placar de quem chama a API direto, sem pesar para quem joga.
+MAX_ANSWERS_PER_MATCH = 60
 
 POINTS_PER_CORRECT_ANSWER = 10
-# Consequência do erro na pontuação. A consequência na mecânica
-# (ex.: a cobra diminuir) fica no front, em web/src/game.
-POINTS_PER_WRONG_ANSWER = 0
-
-# A resposta acerta quando fica a até esta distância da confiabilidade de referência.
-RELIABILITY_TOLERANCE = 15
 
 
 def default_reliability_reference(is_true: bool) -> int:
@@ -25,5 +19,12 @@ def default_reliability_reference(is_true: bool) -> int:
     return 90 if is_true else 10
 
 
-def is_within_tolerance(reliability: int, reference: int) -> bool:
-    return abs(reliability - reference) <= RELIABILITY_TOLERANCE
+def is_within_tolerance(reliability: int, reference: int, tolerance: int) -> bool:
+    return abs(reliability - reference) <= tolerance
+
+
+def score_after_answer(score: int, is_correct: bool, wrong_answer_penalty: int) -> int:
+    """Placar depois de uma resposta; o erro tira pontos, mas o placar nunca fica negativo."""
+    if is_correct:
+        return score + POINTS_PER_CORRECT_ANSWER
+    return max(0, score - wrong_answer_penalty)

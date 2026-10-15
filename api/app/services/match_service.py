@@ -47,7 +47,7 @@ class MatchService:
             Match(
                 user_id=user.id,
                 level_id=level.id,
-                duration_seconds=game_rules.MATCH_DURATION_SECONDS,
+                duration_seconds=level.match_seconds,
             )
         )
         return MatchResponse.model_validate(match)
@@ -87,13 +87,12 @@ class MatchService:
             raise NotFoundError("Questão não encontrada")
         match.current_question_id = None
 
+        level = match.level
         is_correct = game_rules.is_within_tolerance(
-            data.reliability, question.reliability_reference
+            data.reliability, question.reliability_reference, level.reliability_tolerance
         )
-        match.score += (
-            game_rules.POINTS_PER_CORRECT_ANSWER
-            if is_correct
-            else game_rules.POINTS_PER_WRONG_ANSWER
+        match.score = game_rules.score_after_answer(
+            match.score, is_correct, level.wrong_answer_penalty
         )
         self.matches.add_answer(
             MatchAnswer(
@@ -110,7 +109,7 @@ class MatchService:
             correct_answer=question.is_true,
             reliability=data.reliability,
             reliability_reference=question.reliability_reference,
-            tolerance=game_rules.RELIABILITY_TOLERANCE,
+            tolerance=level.reliability_tolerance,
             distance=abs(data.reliability - question.reliability_reference),
             explanation=question.explanation,
             source=question.source,

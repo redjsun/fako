@@ -2,8 +2,8 @@ import { httpGet, httpPost } from "./httpClient";
 import { LOCAL_LEVELS } from "./levelService";
 import { AnswerResult, Match, MatchResult, Question } from "../types";
 
-// Mesmas regras da API (api/app/services/game_rules.py), usadas quando ela está fora do ar.
-const RELIABILITY_TOLERANCE = 15;
+// Mesmas regras da API (api/app/services/game_rules.py e o nível da partida), usadas quando
+// ela está fora do ar.
 const POINTS_PER_CORRECT_ANSWER = 10;
 
 interface LocalQuestionSeed {
@@ -129,11 +129,15 @@ let activeLocalMatch: LocalMatchSession | null = null;
 
 function answerLocally(questionId: number, reliability: number): AnswerResult {
   const question = LOCAL_QUESTIONS.find((item) => item.id === questionId) || LOCAL_QUESTIONS[0];
+  const rules = activeLocalMatch?.match.level ?? LOCAL_LEVELS[0];
   const distance = Math.abs(reliability - question.reliability_reference);
-  const isCorrect = distance <= RELIABILITY_TOLERANCE;
+  const isCorrect = distance <= rules.reliability_tolerance;
 
-  if (activeLocalMatch && isCorrect) {
-    activeLocalMatch.match.score += POINTS_PER_CORRECT_ANSWER;
+  if (activeLocalMatch) {
+    const score = activeLocalMatch.match.score;
+    activeLocalMatch.match.score = isCorrect
+      ? score + POINTS_PER_CORRECT_ANSWER
+      : Math.max(0, score - rules.wrong_answer_penalty);
   }
 
   return {
@@ -141,7 +145,7 @@ function answerLocally(questionId: number, reliability: number): AnswerResult {
     correct_answer: question.is_true,
     reliability,
     reliability_reference: question.reliability_reference,
-    tolerance: RELIABILITY_TOLERANCE,
+    tolerance: rules.reliability_tolerance,
     distance,
     explanation: question.explanation,
     source: question.source,
@@ -165,7 +169,7 @@ export const matchService = {
         level: lvlConfig,
         score: 0,
         status: "in_progress",
-        duration_seconds: 120,
+        duration_seconds: lvlConfig.match_seconds,
         started_at: new Date().toISOString(),
         ended_at: null,
       };
@@ -193,7 +197,7 @@ export const matchService = {
         level: LOCAL_LEVELS[0],
         score: 0,
         status: "in_progress",
-        duration_seconds: 120,
+        duration_seconds: LOCAL_LEVELS[0].match_seconds,
         started_at: new Date().toISOString(),
         ended_at: null,
       };
@@ -249,7 +253,7 @@ export const matchService = {
             level: LOCAL_LEVELS[0],
             score: currentScore,
             status: "finished",
-            duration_seconds: 120,
+            duration_seconds: LOCAL_LEVELS[0].match_seconds,
             started_at: new Date().toISOString(),
             ended_at: new Date().toISOString(),
           };

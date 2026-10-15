@@ -10,6 +10,7 @@ interface QuestionPopupProps {
   question: Question | null;
   reliability: number;
   secondsLeft: number;
+  tolerance: number;
   isSubmitting: boolean;
   onChangeReliability: (value: number) => void;
   onConfirm: () => void;
@@ -20,6 +21,7 @@ export const QuestionPopup: React.FC<QuestionPopupProps> = ({
   question,
   reliability,
   secondsLeft,
+  tolerance,
   isSubmitting,
   onChangeReliability,
   onConfirm,
@@ -88,7 +90,7 @@ export const QuestionPopup: React.FC<QuestionPopupProps> = ({
             <p className="question-card__help">
               Atalhos: ← → ajusta 5% · Enter confirma
               <br />
-              Você acerta se ficar a até 15 pontos da referência oficial.
+              Você acerta se ficar a até {tolerance} pontos da referência oficial.
             </p>
           </>
         ) : (

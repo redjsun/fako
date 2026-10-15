@@ -6,6 +6,7 @@ import { SnakeScene } from "./SnakeScene";
 interface TutorialScreenProps {
   questionSeconds: number;
   pointsPerCorrect: number;
+  completeLabel: string;
   onComplete: () => void;
   onSkip: () => void;
 }
@@ -118,6 +119,7 @@ const GrowthVisual: React.FC = () => (
 export const TutorialScreen: React.FC<TutorialScreenProps> = ({
   questionSeconds,
   pointsPerCorrect,
+  completeLabel,
   onComplete,
   onSkip,
 }) => {
@@ -236,7 +238,7 @@ export const TutorialScreen: React.FC<TutorialScreenProps> = ({
             onClick={() => (isLast ? onComplete() : setCurrentStep((previous) => previous + 1))}
             autoFocus
           >
-            {isLast ? "Começar a Jogar →" : "Próximo Passo →"}
+            {isLast ? completeLabel : "Próximo Passo →"}
           </button>
         </div>
       </section>

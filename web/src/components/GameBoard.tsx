@@ -3,6 +3,9 @@ import { Direction, Position } from "../types";
 
 interface GameBoardProps {
   gridSize: number;
+  rottenApples: Position[];
+  /** A maçã está para mudar de lugar: desenhada mais apagada. */
+  isAppleFading: boolean;
   snake: Position[];
   direction: Direction;
   apple: Position | null;
@@ -11,6 +14,8 @@ interface GameBoardProps {
 
 export const GameBoard: React.FC<GameBoardProps> = ({
   gridSize,
+  rottenApples,
+  isAppleFading,
   snake,
   direction,
   apple,
@@ -42,6 +47,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     const bodyColor = styles.getPropertyValue("--snake-body").trim() || "#2f6b3a";
     const appleColor = styles.getPropertyValue("--apple-body").trim() || "#dc3545";
     const leafColor = styles.getPropertyValue("--apple-leaf").trim() || "#2f6b3a";
+    const rottenColor = styles.getPropertyValue("--apple-rotten").trim() || "#6b4a2b";
 
     // 1. Xadrez do tabuleiro
     for (let x = 0; x < gridSize; x++) {
@@ -51,13 +57,15 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       }
     }
 
-    // 2. Desenhar a Maçã com brilho, cabinho e folha
-    if (apple) {
-      const ax = apple.x * cellSize;
-      const ay = apple.y * cellSize;
+    // 2. Maçãs com brilho, cabinho e folha; a podre é marrom, com manchas e sem folha
+    const drawApple = (position: Position, rotten: boolean, alpha: number) => {
+      const ax = position.x * cellSize;
+      const ay = position.y * cellSize;
       const cx = ax + cellSize / 2;
       const cy = ay + cellSize * 0.54;
       const radius = cellSize * 0.36;
+      ctx.save();
+      ctx.globalAlpha = alpha;
 
       // Sombra suave da maçã
       ctx.fillStyle = "rgba(0, 0, 0, 0.12)";
@@ -66,16 +74,30 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       ctx.fill();
 
       // Corpo da maçã
-      ctx.fillStyle = appleColor;
+      ctx.fillStyle = rotten ? rottenColor : appleColor;
       ctx.beginPath();
       ctx.arc(cx, cy, radius, 0, Math.PI * 2);
       ctx.fill();
 
-      // Brilho da maçã
-      ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
-      ctx.beginPath();
-      ctx.ellipse(cx - radius * 0.35, cy - radius * 0.35, radius * 0.28, radius * 0.18, -Math.PI / 4, 0, Math.PI * 2);
-      ctx.fill();
+      if (rotten) {
+        // Manchas da maçã podre
+        ctx.fillStyle = "rgba(0, 0, 0, 0.35)";
+        [
+          [-0.3, -0.1, 0.16],
+          [0.25, 0.2, 0.12],
+          [0.05, -0.4, 0.09],
+        ].forEach(([dx, dy, size]) => {
+          ctx.beginPath();
+          ctx.arc(cx + dx * radius, cy + dy * radius, size * cellSize, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      } else {
+        // Brilho da maçã
+        ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
+        ctx.beginPath();
+        ctx.ellipse(cx - radius * 0.35, cy - radius * 0.35, radius * 0.28, radius * 0.18, -Math.PI / 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
 
       // Cabinho de madeira
       ctx.strokeStyle = "#5a3d28";
@@ -86,12 +108,18 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       ctx.quadraticCurveTo(cx - 2, cy - radius * 1.35, cx + 4, cy - radius * 1.45);
       ctx.stroke();
 
-      // Folha verde
-      ctx.fillStyle = leafColor;
-      ctx.beginPath();
-      ctx.ellipse(cx + 6, cy - radius * 1.25, cellSize * 0.14, cellSize * 0.08, Math.PI / 6, 0, Math.PI * 2);
-      ctx.fill();
-    }
+      if (!rotten) {
+        // Folha verde
+        ctx.fillStyle = leafColor;
+        ctx.beginPath();
+        ctx.ellipse(cx + 6, cy - radius * 1.25, cellSize * 0.14, cellSize * 0.08, Math.PI / 6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    };
+
+    if (apple) drawApple(apple, false, isAppleFading ? 0.45 : 1);
+    rottenApples.forEach((rotten) => drawApple(rotten, true, 1));
 
     // 3. Desenhar a Cobrinha (corpo com cantos arredondados)
     const padding = cellSize * 0.06;
@@ -180,7 +208,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         ctx.fill();
       });
     }
-  }, [gridSize, snake, direction, apple]);
+  }, [gridSize, rottenApples, isAppleFading, snake, direction, apple]);
 
   // Gestos de Touch (Swipe)
   const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {

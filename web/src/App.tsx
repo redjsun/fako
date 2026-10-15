@@ -21,6 +21,13 @@ import { HttpError } from "./services/httpClient";
 import { matchService } from "./services/matchService";
 import { progressService } from "./services/progressService";
 import { LOCAL_LEVELS, levelService } from "./services/levelService";
+import {
+  includesCell,
+  initialSnake,
+  nextHead,
+  randomFreeCell,
+  sameCell,
+} from "./utils/board";
 import { clampReliability } from "./utils/formatters";
 import { AppHeader, HeaderTab } from "./components/AppHeader";
 import { GameScreen } from "./components/GameScreen";
@@ -33,13 +40,16 @@ import { MatchSummary } from "./components/MatchSummary";
 import { QuestionPopup, ResultPopup } from "./components/QuestionModal";
 import { TutorialScreen } from "./components/TutorialScreen";
 
-// Regras da partida exibidas ao jogador (a pontuação oficial vem da API).
-const MATCH_SECONDS = 120;
-const QUESTION_SECONDS = 45;
+// Regras da partida exibidas ao jogador (a pontuação oficial vem da API). O que muda por
+// nível (tabuleiro, velocidade, tempos, tolerância...) vem do nível da partida.
 const COUNTDOWN_SECONDS = 3;
 const POINTS_PER_CORRECT = 10;
-const GRID_SIZE = 16;
 const INITIAL_RELIABILITY = 50;
+// Blocos que a cobra cresce ao comer a maçã podre.
+const ROTTEN_APPLE_GROWTH = 2;
+// A maçã com prazo pisca nos últimos instantes antes de mudar de lugar.
+const APPLE_FADING_MS = 2000;
+const FIRST_LEVEL = LOCAL_LEVELS[0];
 
 const OPPOSITE_DIRECTIONS: Record<Direction, Direction> = {
   UP: "DOWN",
@@ -58,27 +68,6 @@ const KEY_DIRECTIONS: Record<string, Direction> = {
   a: "LEFT",
   d: "RIGHT",
 };
-
-const tickForLevel = (level: number) => Math.max(75, 160 - (level - 1) * 14);
-
-const initialSnake = (): Position[] => {
-  const middle = Math.floor(GRID_SIZE / 2);
-  return [
-    { x: middle, y: middle },
-    { x: middle - 1, y: middle },
-    { x: middle - 2, y: middle },
-  ];
-};
-
-function placeRandomApple(snake: Position[]): Position {
-  const freeCells: Position[] = [];
-  for (let x = 0; x < GRID_SIZE; x++) {
-    for (let y = 0; y < GRID_SIZE; y++) {
-      if (!snake.some((segment) => segment.x === x && segment.y === y)) freeCells.push({ x, y });
-    }
-  }
-  return freeCells.length > 0 ? freeCells[Math.floor(Math.random() * freeCells.length)] : { x: 0, y: 0 };
-}
 
 function readSavedTheme(): "light" | "dark" {
   try {
@@ -137,13 +126,16 @@ export default function App() {
   const [currentMatch, setCurrentMatch] = useState<Match | null>(null);
   const [status, setStatus] = useState<GameStatus>("COUNTDOWN");
   const [level, setLevel] = useState(1);
-  const [tickMs, setTickMs] = useState(tickForLevel(1));
-  const [matchDuration, setMatchDuration] = useState(MATCH_SECONDS);
-  const [timeLeft, setTimeLeft] = useState(MATCH_SECONDS);
+  // Regras do nível da partida em andamento
+  const [rules, setRules] = useState<Level>(FIRST_LEVEL);
+  const [matchDuration, setMatchDuration] = useState(FIRST_LEVEL.match_seconds);
+  const [timeLeft, setTimeLeft] = useState(FIRST_LEVEL.match_seconds);
   const [countdownLeft, setCountdownLeft] = useState(COUNTDOWN_SECONDS);
-  const [snake, setSnake] = useState<Position[]>(initialSnake);
+  const [snake, setSnake] = useState<Position[]>(() => initialSnake(FIRST_LEVEL.board_size));
   const [direction, setDirection] = useState<Direction>("RIGHT");
   const [apple, setApple] = useState<Position | null>(null);
+  const [rottenApples, setRottenApples] = useState<Position[]>([]);
+  const [isAppleFading, setIsAppleFading] = useState(false);
   const [score, setScore] = useState(0);
   const [answers, setAnswers] = useState<AnsweredQuestion[]>([]);
   const [ending, setEnding] = useState<MatchEnding | null>(null);
@@ -151,7 +143,7 @@ export default function App() {
   // Pergunta e resultado
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
   const [reliability, setReliability] = useState(INITIAL_RELIABILITY);
-  const [questionSecondsLeft, setQuestionSecondsLeft] = useState(QUESTION_SECONDS);
+  const [questionSecondsLeft, setQuestionSecondsLeft] = useState(FIRST_LEVEL.question_seconds);
   const [lastResult, setLastResult] = useState<AnswerResult | null>(null);
   const [isSubmittingAnswer, setIsSubmittingAnswer] = useState(false);
 
@@ -162,13 +154,17 @@ export default function App() {
   const statusRef = useRef<GameStatus>(status);
   const snakeRef = useRef<Position[]>(snake);
   const appleRef = useRef<Position | null>(apple);
+  const rottenApplesRef = useRef<Position[]>([]);
+  const rulesRef = useRef<Level>(FIRST_LEVEL);
+  // Tempo de cobra andando desde que a maçã apareceu, para a maçã que muda de lugar
+  const appleAgeMsRef = useRef(0);
   const nextDirectionRef = useRef<Direction>("RIGHT");
   const currentDirectionRef = useRef<Direction>("RIGHT");
   const growPendingRef = useRef(0);
   const matchIdRef = useRef<number | null>(null);
   const statusBeforeDialogRef = useRef<GameStatus>("PLAYING");
   const finishingRef = useRef(false);
-  const remainingMsRef = useRef(MATCH_SECONDS * 1000);
+  const remainingMsRef = useRef(FIRST_LEVEL.match_seconds * 1000);
 
   const changeStatus = useCallback((next: GameStatus) => {
     statusRef.current = next;
@@ -209,8 +205,9 @@ export default function App() {
   const maxLevels = levels.length;
   const levelConfig = (number: number) => levels.find((item) => item.number === number);
   const minScoreToAdvance = currentMatch?.level.min_score_to_advance ?? levelConfig(level)?.min_score_to_advance ?? 30;
-  const blocksFromErrors = answers.filter((answer) => !answer.isCorrect).length;
-  const acertos = answers.length - blocksFromErrors;
+  const errorCount = answers.filter((answer) => !answer.isCorrect).length;
+  const blocksFromErrors = errorCount * rules.growth_per_error;
+  const acertos = answers.length - errorCount;
 
   // Melhor partida no nível atual: base do "faltam X pts".
   const bestScoreInCurrentLevel = useMemo(
@@ -292,14 +289,19 @@ export default function App() {
       }
       if (!authService.getCurrentUser()) return; // a sessão expirou durante o pedido
 
-      const matchLevel = match?.level.number ?? levelNumber ?? 1;
-      const duration = match?.duration_seconds ?? MATCH_SECONDS;
-      const startSnake = initialSnake();
+      const levelRules =
+        match?.level ??
+        levels.find((item) => item.number === (levelNumber ?? progress.current_level)) ??
+        FIRST_LEVEL;
+      const duration = match?.duration_seconds ?? levelRules.match_seconds;
+      const boardSize = levelRules.board_size;
+      const startSnake = initialSnake(boardSize);
 
       matchIdRef.current = match?.id ?? null;
       setCurrentMatch(match);
-      setLevel(matchLevel);
-      setTickMs(tickForLevel(matchLevel));
+      setLevel(levelRules.number);
+      setRules(levelRules);
+      rulesRef.current = levelRules;
       setMatchDuration(duration);
       setTimeLeft(duration);
       remainingMsRef.current = duration * 1000;
@@ -308,18 +310,32 @@ export default function App() {
       setDirection("RIGHT");
       nextDirectionRef.current = "RIGHT";
       currentDirectionRef.current = "RIGHT";
-      const firstApple = placeRandomApple(startSnake);
+      const firstApple = randomFreeCell(boardSize, startSnake);
       setApple(firstApple);
       appleRef.current = firstApple;
+      appleAgeMsRef.current = 0;
+      setIsAppleFading(false);
+      // Maçãs podres sorteadas uma a uma, cada uma numa célula ainda livre
+      const firstRottenApples: Position[] = [];
+      for (let index = 0; index < levelRules.rotten_apples; index++) {
+        const cell = randomFreeCell(boardSize, [
+          ...startSnake,
+          ...(firstApple ? [firstApple] : []),
+          ...firstRottenApples,
+        ]);
+        if (cell) firstRottenApples.push(cell);
+      }
+      setRottenApples(firstRottenApples);
+      rottenApplesRef.current = firstRottenApples;
       setScore(0);
       setAnswers([]);
       setCurrentQuestion(null);
       setLastResult(null);
-      setCountdownLeft(COUNTDOWN_SECONDS);
       setCurrentScreen("game");
-      changeStatus("COUNTDOWN");
+      // A partida começa com a cobra andando; a contagem fica só para as retomadas
+      changeStatus("PLAYING");
     },
-    [progress.current_level, changeStatus]
+    [progress.current_level, levels, changeStatus]
   );
 
   const resumeWithCountdown = useCallback(() => {
@@ -332,7 +348,7 @@ export default function App() {
     setCurrentQuestion(null);
     setLastResult(null);
     setReliability(INITIAL_RELIABILITY);
-    setQuestionSecondsLeft(QUESTION_SECONDS);
+    setQuestionSecondsLeft(rulesRef.current.question_seconds);
     try {
       setCurrentQuestion(await matchService.getNextQuestion(matchIdRef.current ?? 0));
     } catch (error) {
@@ -349,26 +365,23 @@ export default function App() {
   const step = useCallback(() => {
     if (statusRef.current !== "PLAYING") return;
 
+    const levelRules = rulesRef.current;
+    const boardSize = levelRules.board_size;
     const currentSnake = snakeRef.current;
     const activeDirection = nextDirectionRef.current;
     currentDirectionRef.current = activeDirection;
     setDirection(activeDirection);
 
-    const delta = { UP: [0, -1], DOWN: [0, 1], LEFT: [-1, 0], RIGHT: [1, 0] }[activeDirection];
-    const head = currentSnake[0];
-    const newHead: Position = {
-      x: (head.x + delta[0] + GRID_SIZE) % GRID_SIZE,
-      y: (head.y + delta[1] + GRID_SIZE) % GRID_SIZE,
-    };
-
-    if (currentSnake.some((segment) => segment.x === newHead.x && segment.y === newHead.y)) {
+    const newHead = nextHead(currentSnake[0], activeDirection, boardSize, levelRules.solid_walls);
+    // Bateu na parede sólida ou no próprio corpo
+    if (!newHead || includesCell(currentSnake, newHead)) {
       soundEffects.playGameOver();
       finishMatch("GAMEOVER");
       return;
     }
 
     const newSnake = [newHead, ...currentSnake];
-    // A cobrinha só cresce depois de um erro
+    // A cobrinha só cresce depois de um erro (ou da maçã podre)
     if (growPendingRef.current > 0) {
       growPendingRef.current -= 1;
     } else {
@@ -377,28 +390,64 @@ export default function App() {
     snakeRef.current = newSnake;
     setSnake(newSnake);
 
-    const currentApple = appleRef.current;
-    if (currentApple && newHead.x === currentApple.x && newHead.y === currentApple.y) {
-      soundEffects.playEat();
-      const nextApple = placeRandomApple(newSnake);
+    const occupiedExcept = (...others: (Position | null)[]) => [
+      ...newSnake,
+      ...others.filter((cell): cell is Position => cell !== null),
+    ];
+    const moveApple = () => {
+      const nextApple = randomFreeCell(boardSize, occupiedExcept(...rottenApplesRef.current));
       appleRef.current = nextApple;
       setApple(nextApple);
+      appleAgeMsRef.current = 0;
+      setIsAppleFading(false);
+    };
+
+    const eatenRotten = rottenApplesRef.current.findIndex((rotten) => sameCell(newHead, rotten));
+    if (eatenRotten >= 0) {
+      soundEffects.playMistake();
+      growPendingRef.current += ROTTEN_APPLE_GROWTH;
+      // A maçã podre comida reaparece em outro lugar; as outras ficam onde estão
+      const others = rottenApplesRef.current.filter((_, index) => index !== eatenRotten);
+      const nextRotten = randomFreeCell(boardSize, occupiedExcept(appleRef.current, ...others));
+      const nextRottenApples = nextRotten ? [...others, nextRotten] : others;
+      rottenApplesRef.current = nextRottenApples;
+      setRottenApples(nextRottenApples);
+    }
+
+    const currentApple = appleRef.current;
+    if (currentApple && sameCell(newHead, currentApple)) {
+      soundEffects.playEat();
+      moveApple();
       openQuestion();
+      return;
+    }
+
+    // Maçã com prazo: muda de lugar depois de um tempo de cobra andando e pisca antes
+    const lifetimeMs = (levelRules.apple_lifetime_seconds ?? 0) * 1000;
+    if (lifetimeMs > 0 && currentApple) {
+      appleAgeMsRef.current += levelRules.tick_ms;
+      if (appleAgeMsRef.current >= lifetimeMs) moveApple();
+      else setIsAppleFading(lifetimeMs - appleAgeMsRef.current <= APPLE_FADING_MS);
     }
   }, [finishMatch, openQuestion]);
 
-  const changeDirection = useCallback((next: Direction) => {
-    if (statusRef.current !== "PLAYING") return;
-    if (OPPOSITE_DIRECTIONS[next] === currentDirectionRef.current) return;
-    nextDirectionRef.current = next;
-  }, []);
+  // Mexer a cobra durante a contagem encerra a contagem e volta ao jogo na hora
+  const changeDirection = useCallback(
+    (next: Direction) => {
+      const current = statusRef.current;
+      if (current !== "PLAYING" && current !== "COUNTDOWN") return;
+      if (OPPOSITE_DIRECTIONS[next] !== currentDirectionRef.current) nextDirectionRef.current = next;
+      if (current === "COUNTDOWN") changeStatus("PLAYING");
+    },
+    [changeStatus]
+  );
 
   // Loop da cobrinha
   useEffect(() => {
     if (currentScreen !== "game" || status !== "PLAYING") return;
-    const timer = window.setInterval(step, tickMs);
+    const timer = window.setInterval(step, rules.tick_ms);
     return () => window.clearInterval(timer);
-  }, [currentScreen, status, tickMs, step]);
+  }, [currentScreen, status, rules.tick_ms, step]);
 
   // Cronômetro da partida: só corre com a cobra andando. Acumula o tempo real em ms
   // para que trechos curtos entre uma pergunta e outra também descontem.
@@ -461,7 +510,7 @@ export default function App() {
         soundEffects.playCorrect();
       } else {
         soundEffects.playMistake();
-        growPendingRef.current += 1;
+        growPendingRef.current += rulesRef.current.growth_per_error;
       }
       changeStatus("FEEDBACK");
     } catch (error) {
@@ -485,11 +534,14 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, [status, currentQuestion, isSubmittingAnswer, questionSecondsLeft, confirmAnswer]);
 
+  // Bateu a meta do nível atual: a partida termina depois do resultado da pergunta.
+  // Rejogar um nível já vencido segue até o fim, como na regra de avanço da API.
   const continueAfterFeedback = useCallback(() => {
     setCurrentQuestion(null);
     setLastResult(null);
-    resumeWithCountdown();
-  }, [resumeWithCountdown]);
+    if (level === progress.current_level && score >= minScoreToAdvance) finishMatch("GOAL");
+    else resumeWithCountdown();
+  }, [level, progress.current_level, score, minScoreToAdvance, finishMatch, resumeWithCountdown]);
 
   // ---------------------------------------------------------------- janelas e pausa
 
@@ -538,7 +590,7 @@ export default function App() {
         return;
       }
 
-      if (current === "PLAYING") {
+      if (current === "PLAYING" || current === "COUNTDOWN") {
         if (keyDirection) {
           event.preventDefault();
           changeDirection(keyDirection);
@@ -621,14 +673,18 @@ export default function App() {
   }
 
   if (currentScreen === "tutorial") {
+    // Só o tutorial da primeira entrada leva direto ao jogo; aberto pelo painel, volta a ele.
+    const isFirstTutorial = !!currentUser && !authService.hasSeenTutorial(currentUser.username);
     return (
       <div className="fako-app screen-tutorial">
         <TutorialScreen
-          questionSeconds={QUESTION_SECONDS}
+          questionSeconds={FIRST_LEVEL.question_seconds}
           pointsPerCorrect={POINTS_PER_CORRECT}
+          completeLabel={isFirstTutorial ? "Começar a Jogar →" : "Voltar ao painel →"}
           onComplete={() => {
             markTutorialSeen();
-            startGame();
+            if (isFirstTutorial) startGame();
+            else setCurrentScreen("home");
           }}
           onSkip={() => {
             markTutorialSeen();
@@ -646,7 +702,7 @@ export default function App() {
         <div className="page-shell page-shell--game">
           <MatchHud
             level={level}
-            boardSize={GRID_SIZE}
+            boardSize={rules.board_size}
             status={status}
             timeLeft={timeLeft}
             duration={matchDuration}
@@ -667,7 +723,12 @@ export default function App() {
               snakeLength={ending.snakeLength}
               secondsPlayed={ending.secondsPlayed}
               pointsPerCorrect={POINTS_PER_CORRECT}
-              onPlayAgain={() => startGame(ending.advanced ? undefined : level)}
+              tolerance={rules.reliability_tolerance}
+              canPlayNextLevel={
+                level < maxLevels && (ending.advanced || level < progress.current_level)
+              }
+              onPlayAgain={() => startGame(level)}
+              onPlayNextLevel={() => startGame(level + 1)}
               onGoHome={handleGoHome}
               onOpenJourney={() => setCurrentScreen("journey")}
             />
@@ -678,7 +739,10 @@ export default function App() {
               score={score}
               minScoreToAdvance={minScoreToAdvance}
               isLastLevel={isLastLevel}
-              gridSize={GRID_SIZE}
+              gridSize={rules.board_size}
+              rottenApples={rottenApples}
+              isAppleFading={isAppleFading}
+              solidWalls={rules.solid_walls}
               snake={snake}
               direction={direction}
               apple={apple}
@@ -697,6 +761,7 @@ export default function App() {
             question={currentQuestion}
             reliability={reliability}
             secondsLeft={questionSecondsLeft}
+            tolerance={rules.reliability_tolerance}
             isSubmitting={isSubmittingAnswer}
             onChangeReliability={(value) => setReliability(clampReliability(value))}
             onConfirm={confirmAnswer}
@@ -725,7 +790,7 @@ export default function App() {
 
         {dialog === "howto" && (
           <HowToPlayDialog
-            questionSeconds={QUESTION_SECONDS}
+            rules={rules}
             pointsPerCorrect={POINTS_PER_CORRECT}
             onClose={closeDialog}
           />
@@ -767,7 +832,7 @@ export default function App() {
             currentLevel={progress.current_level}
             maxLevels={maxLevels}
             missingPoints={missingPoints}
-            matchSeconds={MATCH_SECONDS}
+            matchSeconds={(levelConfig(progress.current_level) ?? FIRST_LEVEL).match_seconds}
             stats={userStats}
             matchesPlayed={progress.matches_played}
             onPlay={() => startGame()}

@@ -1,6 +1,7 @@
 import React from "react";
 import { Level, UserStats } from "../types";
 import { formatMatchDate } from "../utils/formatters";
+import { describeLevelRules } from "../utils/levelRules";
 import { Icon } from "./Icon";
 
 interface JourneyScreenProps {
@@ -100,6 +101,11 @@ export const JourneyScreen: React.FC<JourneyScreenProps> = ({
                     {LEVEL_DESCRIPTIONS[index] ?? ""}
                     {isCurrent && ` · meta ${level.min_score_to_advance} pts`}
                   </p>
+                  <ul className="level-card__rules" aria-label={`Regras do nível ${level.number}`}>
+                    {describeLevelRules(level).map((rule) => (
+                      <li key={rule}>{rule}</li>
+                    ))}
+                  </ul>
                 </div>
                 <div className="level-card__footer">
                   {state === "locked" ? (

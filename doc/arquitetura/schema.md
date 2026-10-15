@@ -30,9 +30,19 @@ Nível de dificuldade da partida (`level.py`).
 | Coluna | Tipo | Notas |
 |---|---|---|
 | `number` | `int` | único, indexado |
-| `board_size` | `int` | 7×7 nos níveis 1 a 3, 6×6 nos níveis 4 a 6 |
+| `board_size` | `int` | lado do tabuleiro, em células |
 | `tick_ms` | `int` | intervalo entre movimentos da cobra; menor é mais difícil |
 | `min_score_to_advance` | `int` | pontuação mínima na partida para liberar o próximo nível |
+| `match_seconds` | `int` | duração da partida (tempo de cobra andando) |
+| `question_seconds` | `int` | tempo para responder cada afirmação |
+| `reliability_tolerance` | `int` | distância máxima da referência para a resposta acertar |
+| `wrong_answer_penalty` | `int` | pontos tirados a cada erro (o placar nunca fica negativo) |
+| `growth_per_error` | `int` | blocos que a cobra cresce a cada erro |
+| `solid_walls` | `bool` | bater na borda encerra a partida |
+| `apple_lifetime_seconds` | `int`, nulo | prazo para a maçã mudar de lugar; nulo, a maçã fica parada |
+| `rotten_apples` | `int` | quantidade de maçãs podres no tabuleiro |
+
+Valores de cada nível em [Níveis da jornada](../jogo/niveis.md).
 
 ## `questions`
 
