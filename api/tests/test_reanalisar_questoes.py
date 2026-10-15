@@ -3,6 +3,7 @@ from types import SimpleNamespace
 from app.jobs.reanalisar_questoes import reanalisar
 from app.ml.classificador import FakeClassificador
 from app.ml.llm import FakeLLMClient
+from app.models.question import QuestionOrigin
 
 
 class Registro(FakeClassificador):
@@ -15,10 +16,14 @@ class Registro(FakeClassificador):
         return super().analisar(afirmacao, limiar)
 
 
-def questao(statement, versao, claim_text=None):
+def questao(statement, versao, claim_text=None, origin=QuestionOrigin.HUMAN):
     return SimpleNamespace(
         statement=statement,
         claim_text=claim_text,
+        origin=origin,
+        is_true=False,
+        explanation="Circulou nas redes sociais. Aos Fatos checou e concluiu que é falsa.",
+        model_explanation=None,
         model_category=None,
         model_score=None,
         model_confidence=None,
@@ -57,3 +62,39 @@ def test_modelo_original_nao_chama_a_llm():
     questao_sem = questao("Manchete", None)
     assert reanalisar([questao_sem], classificador, False, FakeLLMClient()) == (1, 0)
     assert questao_sem.claim_text is None
+
+
+def test_noticia_ganha_o_por_que_da_llm_sobre_a_avaliacao_do_jogo():
+    classificador = Registro("hibrido")
+    noticia = questao(
+        "Vacina contém chip", classificador.versao, "Vacina contém chip", QuestionOrigin.NEWS
+    )
+    seed = questao(
+        "Lavar as mãos reduz doenças", classificador.versao, "Lavar as mãos reduz doenças"
+    )
+    reanalisar([noticia, seed], classificador, False, FakeLLMClient())
+    assert noticia.model_explanation.startswith("O classificador avaliou como")
+    assert "Aos Fatos checou" in noticia.model_explanation
+    assert ("Vacina contém chip", "jogador") in classificador.entradas
+    assert seed.model_explanation is None
+
+
+def test_por_que_do_jogo_so_usa_a_explicacao_do_modelo_publicado(monkeypatch):
+    from app.core.config import get_settings
+    from app.services.match_service import MatchService
+
+    monkeypatch.setenv("CLASSIFICADOR_NO_JOGO", "true")
+    get_settings.cache_clear()
+    try:
+        servico = MatchService(None, Registro())
+        atual = questao("Manchete", "fake")
+        atual.model_explanation = "O classificador avaliou como não confiável."
+        antiga = questao("Manchete", "outro-modelo")
+        antiga.model_explanation = "Explicação de outro modelo."
+        assert servico.explicacao(atual) == "O classificador avaliou como não confiável."
+        assert servico.explicacao(antiga) == antiga.explanation
+        monkeypatch.setenv("CLASSIFICADOR_NO_JOGO", "false")
+        get_settings.cache_clear()
+        assert servico.explicacao(atual) == atual.explanation
+    finally:
+        get_settings.cache_clear()

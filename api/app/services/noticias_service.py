@@ -36,6 +36,7 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.integrations.noticias_client import Noticia, NoticiasClient, NoticiasIndisponiveis
 from app.ml.classificador import (
+    Analise,
     ClassificadorClient,
     ClassificadorIndisponivel,
 )
@@ -51,6 +52,7 @@ from app.models.question import Question, QuestionOrigin, QuestionStatus
 from app.repositories.question_repository import QuestionRepository
 from app.schemas.admin_schema import NewsDiscarded, NewsImportRequest, NewsImportResponse
 from app.services import game_rules
+from app.services.classificador_service import ClassificadorService
 from app.services.content_service import ContentService, to_admin_response
 
 # Os filtros descartam boa parte das alegações checadas (a maioria é política ou depende de
@@ -76,6 +78,54 @@ def afirmacao_extraida(llm: LLMClient, manchete: str) -> str | None:
     except (LLMIndisponivel, RespostaInvalida):
         return None
     return extracao.afirmacoes[0].texto if extracao.afirmacoes else None
+
+
+AVALIACAO = {
+    "falso": "não confiável",
+    "enganoso": "enganosa",
+    "confere": "confiável",
+    "incerto": "incerto",
+}
+
+
+def seguranca(confianca: float) -> str:
+    return "alta" if confianca >= 0.75 else "média" if confianca >= 0.6 else "baixa"
+
+
+def dados_da_explicacao(
+    question: Question, analise: Analise, noticia: Noticia | None = None
+) -> dict:
+    """O que a LLM recebe para escrever o "Por quê?": a avaliação do classificador (limiar do
+    jogador), o gabarito e a fonte dele, nada mais.
+
+    A `fonte` é a explicação factual da importação ("Aos Fatos checou e concluiu que é falsa",
+    "Manchete publicada por..."); sem a notícia (questões já no banco), vem da própria questão.
+    """
+    avaliacao = AVALIACAO.get(analise.categoria, analise.categoria)
+    gabarito = "confiável" if question.is_true else "não confiável"
+    checagem = bool(noticia.veredito) if noticia else "checou e concluiu" in question.explanation
+    return {
+        "afirmacao": question.statement,
+        "classificador": {"avaliacao": avaliacao, "seguranca": seguranca(analise.confianca)},
+        "gabarito": gabarito,
+        # Enganosa conta como não confiável no jogo, que é uma barra de confiabilidade.
+        "concorda": None
+        if avaliacao == "incerto"
+        else (avaliacao == "confiável") == question.is_true,
+        "tipo": "checagem" if checagem else "manchete",
+        "fonte": explicacao(noticia) if noticia else question.explanation,
+        "veredito": noticia.veredito if noticia else None,
+        "detalhe": (noticia.descricao or None) if noticia else None,
+    }
+
+
+def explicacao_didatica(llm: LLMClient, dados: dict) -> str | None:
+    """O "Por quê?" escrito pela LLM; None se ela falhar ou citar o que não está nos dados
+    (o jogador vê a explicação factual)."""
+    try:
+        return llm.explicar_resposta(dados)
+    except (LLMIndisponivel, RespostaInvalida):
+        return None
 
 
 def explicacao(noticia: Noticia) -> str:
@@ -244,6 +294,7 @@ class NoticiasService:
             question.origin_link = fonte(noticia)
             question.origin_date = noticia.publicada_em.date() if noticia.publicada_em else None
         question.claim_text = self.afirmacao(manchete)
+
         if get_settings().noticias_publicar_direto:
             question.status = QuestionStatus.VALIDATED
             question.validated_at = datetime.now(timezone.utc)
@@ -256,7 +307,19 @@ class NoticiasService:
             question.model_score = analise.nota
             question.model_confidence = analise.confianca
             question.model_version = analise.versao_modelo
+        question.model_explanation = self.explicacao_do_jogo(question, noticia)
         return self.questions.add(question)
+
+    def explicacao_do_jogo(self, question: Question, noticia: Noticia | None = None) -> str | None:
+        """O "Por quê?" da LLM sobre a avaliação que o jogador vai ver (limiar do jogador)."""
+        if self.llm is None:
+            return None
+        analise = ClassificadorService(self.classificador).analise_do_jogo(
+            question.statement, question.claim_text
+        )
+        if analise is None:
+            return None
+        return explicacao_didatica(self.llm, dados_da_explicacao(question, analise, noticia))
 
     def afirmacao(self, manchete: str) -> str | None:
         """A afirmação no formato do treino padronizado, se o modelo publicado foi treinado nele.

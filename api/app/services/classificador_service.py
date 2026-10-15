@@ -9,6 +9,7 @@
 from app.core.config import get_settings
 from app.core.exceptions import ServiceUnavailableError
 from app.ml.classificador import (
+    Analise,
     ClassificadorClient,
     ClassificadorIndisponivel,
 )
@@ -37,16 +38,22 @@ class ClassificadorService:
             contributions=analise.contribuicoes,
         )
 
-    def palpite_do_jogo(self, statement: str, claim_text: str | None = None) -> ModelGuess | None:
-        """`claim_text` (a afirmação extraída na importação) só entra se o modelo publicado foi
-        treinado no texto padronizado; senão, o enunciado como o jogador leu."""
-        if not get_settings().classificador_no_jogo:
-            return None
+    def analise_do_jogo(self, statement: str, claim_text: str | None = None) -> Analise | None:
+        """A análise com o limiar do jogador. `claim_text` (a afirmação extraída na importação)
+        só entra se o modelo publicado foi treinado no texto padronizado ou híbrido; senão, o
+        enunciado como o jogador leu. None sem modelo."""
         padronizado = self.classificador.texto_de_entrada != "original"
         entrada = claim_text if padronizado and claim_text else statement
         try:
-            analise = self.classificador.analisar(entrada, "jogador")
+            return self.classificador.analisar(entrada, "jogador")
         except ClassificadorIndisponivel:
+            return None
+
+    def palpite_do_jogo(self, statement: str, claim_text: str | None = None) -> ModelGuess | None:
+        if not get_settings().classificador_no_jogo:
+            return None
+        analise = self.analise_do_jogo(statement, claim_text)
+        if analise is None:
             return None
         return ModelGuess(
             category=analise.categoria,

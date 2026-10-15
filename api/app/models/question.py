@@ -52,6 +52,10 @@ class Question(Entity):
     model_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     model_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     model_version: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    # O "Por quê?" do jogo: a LLM explica a avaliação do classificador (com o limiar do
+    # jogador) e o que a fonte diz dela. Gerado na importação e refeito ao trocar de modelo
+    # (jobs/reanalisar_questoes.py); sem ele, o jogador vê a explicação factual (`explanation`).
+    model_explanation: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Afirmação extraída pela LLM do enunciado (mesmo prompt da padronização do treino): a
     # entrada do classificador quando o modelo publicado foi treinado no texto padronizado.
     claim_text: Mapped[str | None] = mapped_column(Text, nullable=True)

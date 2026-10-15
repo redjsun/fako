@@ -12,6 +12,10 @@ Com um modelo padronizado ou híbrido, as questões sem `claim_text` (importadas
 era do texto original, ou criadas à mão) ganham a afirmação extraída pela LLM, com o mesmo
 prompt da importação, e são reanalisadas. É essa afirmação que o palpite do jogo usa. Sem LLM,
 ficam sem ela e o classificador recebe o enunciado.
+
+Nas notícias, o "Por quê?" (`model_explanation`, a LLM explicando a avaliação do classificador)
+é refeito junto com a análise, e também quando falta; as questões criadas à mão mantêm a
+explicação delas.
 """
 
 import argparse
@@ -22,8 +26,13 @@ from sqlalchemy import select
 from app.core.database import SessionLocal
 from app.ml.classificador import ClassificadorClient, ClassificadorIndisponivel, get_classificador
 from app.ml.llm import LLMClient, get_llm_client
-from app.models.question import Question
-from app.services.noticias_service import afirmacao_extraida
+from app.models.question import Question, QuestionOrigin
+from app.services.classificador_service import ClassificadorService
+from app.services.noticias_service import (
+    afirmacao_extraida,
+    dados_da_explicacao,
+    explicacao_didatica,
+)
 
 
 def reanalisar(
@@ -34,6 +43,7 @@ def reanalisar(
 ) -> tuple[int, int]:
     """Atualiza a análise (e a afirmação, se faltar); devolve (reanalisadas, extraídas)."""
     padronizado = classificador.texto_de_entrada != "original"
+    servico = ClassificadorService(classificador)
     reanalisadas = extraidas = 0
     for question in questoes:
         nova_afirmacao = False
@@ -41,7 +51,15 @@ def reanalisar(
             question.claim_text = afirmacao_extraida(llm, question.statement)
             nova_afirmacao = question.claim_text is not None
             extraidas += nova_afirmacao
-        if not (todas or nova_afirmacao or question.model_version != classificador.versao):
+        refazer = todas or nova_afirmacao or question.model_version != classificador.versao
+        noticia = question.origin == QuestionOrigin.NEWS
+        if noticia and llm is not None and (refazer or not question.model_explanation):
+            analise_jogo = servico.analise_do_jogo(question.statement, question.claim_text)
+            if analise_jogo is not None:
+                question.model_explanation = explicacao_didatica(
+                    llm, dados_da_explicacao(question, analise_jogo)
+                )
+        if not refazer:
             continue
         entrada = question.claim_text if padronizado and question.claim_text else question.statement
         analise = classificador.analisar(entrada, "admin")

@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.exceptions import BusinessRuleError, NotFoundError
 from app.ml.classificador import ClassificadorClient, FakeClassificador
 from app.models.match import Match, MatchAnswer, MatchStatus
@@ -124,12 +125,22 @@ class MatchService:
             reliability_reference=question.reliability_reference,
             tolerance=game_rules.RELIABILITY_TOLERANCE,
             distance=abs(data.reliability - question.reliability_reference),
-            explanation=question.explanation,
+            explanation=self.explicacao(question),
             source=question.source,
             score=match.score,
             model_guess=self.classificador.palpite_do_jogo(question.statement, question.claim_text),
             claim_origin=origem_da_afirmacao(question),
         )
+
+    def explicacao(self, question) -> str:
+        """O "Por quê?": a explicação da LLM sobre a avaliação do classificador, se foi feita
+        pelo modelo publicado (a avaliação que o jogador vê); senão, a explicação da fonte."""
+        if not get_settings().classificador_no_jogo:
+            return question.explanation
+        versao = getattr(self.classificador.classificador, "versao", None)
+        if question.model_explanation and question.model_version == versao:
+            return question.model_explanation
+        return question.explanation
 
     def finish(self, user: User, match_id: int) -> MatchResultResponse:
         match = self._get_match(user, match_id)

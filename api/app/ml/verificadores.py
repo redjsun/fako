@@ -25,7 +25,9 @@ NOME = re.compile(
 )
 INICIO_DE_FRASE = re.compile(r"(?:^|[.!?:;]\s+|[\"“(]\s*)$")
 NEGACAO = re.compile(r"\b(?:nao|nunca|jamais|nem|nenhuma?|ninguem|tampouco)\b")
-INCERTEZA = re.compile(r"certeza|incert|nao (?:da|e possivel) (?:para )?(?:saber|afirmar|dizer)")
+INCERTEZA = re.compile(
+    r"certeza|incert|seguranca|nao (?:da|e possivel) (?:para )?(?:saber|afirmar|dizer)"
+)
 
 
 def nomes(texto: str) -> list[str]:

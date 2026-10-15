@@ -42,6 +42,7 @@ VERSAO_PROMPT = {
     "extrair_afirmacoes": "extrair_afirmacoes_v1",
     "gerar_questao": "gerar_questao_v1",
     "explicar": "explicar_v1",
+    "explicar_resposta": "explicar_resposta_v1",
 }
 TENTATIVAS = 2  # a primeira e mais uma, se a resposta vier fora do esquema
 
@@ -106,6 +107,8 @@ class LLMClient(Protocol):
 
     def explicar(self, analise: Analise) -> str: ...
 
+    def explicar_resposta(self, dados: dict) -> str: ...
+
 
 def entrada_da_explicacao(analise: Analise) -> dict:
     """Só a análise estruturada; pesos por palavra (`contribuicoes`) nunca entram."""
@@ -140,6 +143,10 @@ class FakeLLMClient:
         if analise.categoria == "incerto":
             return "O modelo não tem certeza sobre esta afirmação."
         return f"A análise automática classificou esta afirmação como {analise.categoria}."
+
+    def explicar_resposta(self, dados: dict) -> str:
+        avaliacao = dados["classificador"]["avaliacao"]
+        return f"O classificador avaliou como {avaliacao}. {dados['fonte']}"
 
 
 @lru_cache
@@ -232,6 +239,20 @@ class LLMValidado:
         )
         return saida.explicacao.strip()
 
+    def explicar_resposta(self, dados: dict) -> str:
+        """O "Por quê?" do jogo: a avaliação do classificador e o que a fonte diz dela.
+        Mesmo verificador de fatos da explicação da análise; `incerto` precisa dizer que o
+        classificador não teve segurança."""
+        entrada = json.dumps(dados, ensure_ascii=False, indent=2)
+        categoria = dados["classificador"]["avaliacao"]
+        saida = self._gerar(
+            "explicar_resposta",
+            {"dados": entrada},
+            SaidaExplicacao,
+            lambda s: verificar_explicacao(s.explicacao, entrada, categoria),
+        )
+        return saida.explicacao.strip()
+
 
 MAX_TOKENS_RESPOSTA = 1024
 
@@ -294,6 +315,9 @@ class LLMAusente:
         raise LLMIndisponivel(self.motivo)
 
     def explicar(self, analise: Analise) -> str:
+        raise LLMIndisponivel(self.motivo)
+
+    def explicar_resposta(self, dados: dict) -> str:
         raise LLMIndisponivel(self.motivo)
 
 
