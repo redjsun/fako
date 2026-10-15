@@ -60,6 +60,7 @@ nav:
       - Esquema do banco: arquitetura/schema.md
   - Produto:
       - Níveis da jornada: jogo/niveis.md
+      - Conquistas: jogo/conquistas.md
       - Banco de perguntas do jogo: banco-perguntas.md
       - Notícias externas e classificador: noticias-classificador.md
   - Pesquisa e dados:
