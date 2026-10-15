@@ -83,7 +83,7 @@ de um modelo melhor.
 |---|---|
 | `CLASSIFICADOR_PROVIDER` | `fake` (sem modelo), `referencia` (TF-IDF) ou `bert` (BERTimbau em ONNX) |
 | `CLASSIFICADOR_NO_JOGO` | `false` (padrão) ou `true` |
-| `NOTICIAS_PROVIDER` | `fake` (manchetes inventadas, sem chave), `gnews`, `factcheck` ou vários separados por vírgula (`factcheck,gnews`) |
+| `NOTICIAS_PROVIDER` | `fake` (manchetes inventadas, sem chave), `gnews`, `agenciabrasil`, `factcheck` ou vários separados por vírgula (`factcheck,gnews,agenciabrasil`) |
 | `NOTICIAS_API_KEY` | chave gratuita do GNews (https://gnews.io, 100 pedidos por dia) |
 | `FACTCHECK_API_KEY` | chave da Google Fact Check Tools API, a mesma da coleta da pesquisa |
 | `NOTICIAS_PUBLICAR_DIRETO` | `false` (padrão, rascunho) ou `true` (já validadas) |
@@ -95,10 +95,15 @@ jogador acerta sem pensar. Manchetes de serviço ("onde assistir", horário, sor
 e explicativas ("Por que...", "O que se sabe...", "...: entenda", com "?" no meio) também saem. Na Fact Check
 API, as checagens mais recentes das agências brasileiras (a mesma lista de
 `pesquisa/dados/coletar_factcheck.py`): um pedido por agência, juntando as mais recentes.
+Na Agência Brasil (EBC), os feeds RSS (`ultimasnoticias`, `saude`, `geral`, `economia`,
+`educacao`, `internacional`, `meio-ambiente`, `direitos-humanos`, `justica` e `politica`, 10
+matérias cada), sem chave nem cota: lidos em ordem até juntar a quantidade pedida, com os 10 s
+entre feeds do `Crawl-delay` do robots.txt (que não tem opt-out de robôs de IA). A licença
+permite reproduzir citando a fonte, e a fonte da questão é a URL da matéria.
 
 ## Limites conhecidos
 
-- O GNews só traz matérias publicadas (verdadeiras), e a Fact Check API traz quase só falsas
+- O GNews e a Agência Brasil só trazem matérias publicadas (verdadeiras), e a Fact Check API traz quase só falsas
   (as agências checam o que circula): para ter os dois lados, use os dois provedores. Na
   publicação direta, a manchete entra verdadeira por ter sido publicada, a mesma suposição que
   o treino evita (`origem_rotulo=portal`); os filtros de portal tiram opinião e fala relatada.

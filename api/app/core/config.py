@@ -51,6 +51,8 @@ class Settings(BaseSettings):
     # a API do GNews (gnews.io, plano gratuito de 100 pedidos por dia), com noticias_api_key;
     # "factcheck" usa a Google Fact Check Tools API (checagens de agências), com
     # factcheck_api_key, a mesma chave da coleta da pesquisa.
+    # "agenciabrasil" lê os feeds RSS da Agência Brasil (EBC), sem chave: manchetes verdadeiras.
+    # "boatos" lê os boatos desmentidos pelo Boatos.org (API do WordPress), sem chave: falsos.
     # Mais de um, separados por vírgula ("factcheck,gnews"): a quantidade é dividida entre eles.
     noticias_provider: str = "fake"
     noticias_api_key: str = ""
