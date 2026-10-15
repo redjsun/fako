@@ -68,6 +68,16 @@ def onde_circulou(autor: str | None) -> str:
     return f"Afirmação de {autor}"
 
 
+def afirmacao_extraida(llm: LLMClient, manchete: str) -> str | None:
+    """A primeira afirmação extraída pelo prompt da padronização (#20); None sem afirmação
+    (opinião) ou com a LLM fora."""
+    try:
+        extracao = llm.extrair_afirmacoes(manchete)
+    except (LLMIndisponivel, RespostaInvalida):
+        return None
+    return extracao.afirmacoes[0].texto if extracao.afirmacoes else None
+
+
 def explicacao(noticia: Noticia) -> str:
     if noticia.veredito:
         data = noticia.origem_data or (noticia.publicada_em and noticia.publicada_em.date())
@@ -257,11 +267,7 @@ class NoticiasService:
         # No híbrido, a manchete (que não é texto curto de checagem) também vai pela extração.
         if self.llm is None or self.classificador.texto_de_entrada == "original":
             return None
-        try:
-            extracao = self.llm.extrair_afirmacoes(manchete)
-        except (LLMIndisponivel, RespostaInvalida):
-            return None
-        return extracao.afirmacoes[0].texto if extracao.afirmacoes else None
+        return afirmacao_extraida(self.llm, manchete)
 
     def limpar(self, dias: int) -> Limpeza:
         """Apaga as notícias importadas há mais de `dias`; arquiva as que estão em uso."""

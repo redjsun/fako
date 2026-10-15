@@ -1,6 +1,6 @@
 COMPOSE := docker compose
 
-.PHONY: help build up down restart logs ps shell-api shell-web shell-db migrate makemigration seed admin test lint format dados padronizar atalho contagens referencia bert avaliar calibrar exportar-onnx classificar publicar importar-noticias limpar-noticias amostra-questoes medir-amostra pre-anotar avaliar-extracao test-web test-ml shell-ml eda docs clean
+.PHONY: help build up down restart logs ps shell-api shell-web shell-db migrate makemigration seed admin test lint format dados padronizar atalho contagens referencia bert avaliar coletar-avaliacao avaliar-jogo calibrar exportar-onnx classificar publicar reanalisar importar-noticias limpar-noticias amostra-questoes medir-amostra pre-anotar avaliar-extracao test-web test-ml shell-ml build-ml gpu eda docs clean
 
 help: ## Lista os comandos disponíveis
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -56,7 +56,15 @@ format: ## Formata o código da API
 	$(COMPOSE) run --rm --no-deps -v ./api:/app api sh -c "pip install -q -r requirements-dev.txt && ruff format . && ruff check --fix ."
 
 PESQUISA := $(COMPOSE) --profile pesquisa run --rm --no-deps pesquisa
-ML := $(COMPOSE) --profile ml run --rm --no-deps ml
+# GPU=1 usa a GPU NVIDIA (compose.gpu.yaml, PyTorch CUDA); exige o NVIDIA Container Toolkit.
+COMPOSE_ML := $(COMPOSE)$(if $(GPU), -f compose.yaml -f compose.gpu.yaml) --profile ml
+ML := $(COMPOSE_ML) run --rm --no-deps ml
+
+build-ml: ## Constrói a imagem de treino (uso: make build-ml [GPU=1])
+	$(COMPOSE_ML) build ml
+
+gpu: ## Confere se o container de treino enxerga a GPU NVIDIA
+	$(COMPOSE) -f compose.yaml -f compose.gpu.yaml --profile ml run --rm --no-deps ml python -c "import torch; print('CUDA:', torch.cuda.is_available(), torch.cuda.get_device_name(0) if torch.cuda.is_available() else '')"
 
 dados: ## Baixa as bases para pesquisa/data/raw/ e gera dataset.jsonl e claimpt.jsonl em pesquisa/data/processed/
 	bash pesquisa/dados/baixar_dados.sh
@@ -81,7 +89,7 @@ referencia: ## Treina a referência TF-IDF ordinal (uso: make referencia [CONFIG
 
 CONFIG_BERT ?= pesquisa/ml/configs/bert.toml
 
-bert: ## Treina o BERTimbau ordinal CORAL (uso: make bert [ARGS="--sementes 42 --max-epocas 3"])
+bert: ## Treina o BERTimbau ordinal CORAL (uso: make bert [GPU=1] [ARGS="--sementes 42 --max-epocas 3"])
 	$(ML) python pesquisa/ml/treinar_bert.py --config $(CONFIG_BERT) $(ARGS)
 
 MODELO ?= models/2026-11/referencia
@@ -92,14 +100,24 @@ classificar: ## Teste manual do modelo (uso: make classificar [ARGS='"uma frase"
 avaliar: ## Avalia modelo(s) na validação (uso: make avaliar [MODELO="models/2026-11/referencia models/2026-11/bert"] [ARGS=--teste])
 	$(ML) python pesquisa/ml/avaliar.py --modelo $(MODELO) $(ARGS)
 
+coletar-avaliacao: ## Notícias recentes no formato do jogo, para o avaliar-jogo (uso: make coletar-avaliacao [ARGS="--quantidade 50"])
+	@mkdir -p pesquisa/data/avaliacao
+	$(COMPOSE) run --rm --no-deps -T -e LLM_PROVIDER=openai -e NOTICIAS_SEM_POLITICA=false api python -m app.jobs.coletar_avaliacao $(ARGS) > pesquisa/data/avaliacao/jogo-$$(date +%F-%H%M).jsonl
+
+avaliar-jogo: ## Acertos dos modelos nas notícias do jogo (uso: make avaliar-jogo [MODELO="models/2026-11/referencia models/2026-11/bert"])
+	$(ML) python pesquisa/ml/avaliar_jogo.py --modelo $(MODELO) $(ARGS)
+
 exportar-onnx: ## Exporta o BERTimbau para ONNX, para a API (uso: make exportar-onnx [MODELO=models/2026-11/bert])
 	$(ML) python pesquisa/ml/exportar_onnx.py --modelo $(MODELO)
 
-calibrar: ## Calibra as fronteiras e grava limiares.json na validação (uso: make calibrar [MODELO=models/2026-11/referencia])
-	$(ML) python pesquisa/ml/calibrar.py --modelo $(MODELO)
+calibrar: ## Calibra as fronteiras e grava limiares.json na validação (uso: make calibrar [MODELO=models/2026-11/referencia] [ARGS="--proporcao-verdadeiros 0.5"])
+	$(ML) python pesquisa/ml/calibrar.py --modelo $(MODELO) $(ARGS)
 
 publicar: ## Publica um modelo para a API em models/atual (uso: make publicar [MODELO=models/2026-11/referencia])
 	rm -rf models/atual && cp -r $(MODELO) models/atual
+
+reanalisar: ## Refaz a análise guardada nas questões com o modelo publicado (uso: make reanalisar [ARGS=--todas])
+	$(COMPOSE) exec api python -m app.jobs.reanalisar_questoes $(ARGS)
 
 importar-noticias: ## Importa as notícias do dia agora, como o agendador-api (uso: make importar-noticias [ARGS="--quantidade 5"])
 	$(COMPOSE) exec api python -m app.jobs.importar_noticias $(ARGS)
