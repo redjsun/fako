@@ -2,6 +2,8 @@
 
 Uso:
     python pesquisa/ml/calibrar.py --modelo models/2026-11/referencia
+    python pesquisa/ml/calibrar.py --modelo models/2026-11/bert --proporcao-verdadeiros 0.5 \
+        --taxa-admin 0.2 --taxa-jogador 0.1
 
 Um modelo pode dizer "90% falso" e acertar 70% das vezes: a porcentagem mostrada ao jogador
 precisa ser honesta. Na `validacao`:
@@ -14,10 +16,23 @@ precisa ser honesta. Na `validacao`:
    as brutas em `previsoes_brutas.jsonl`. Rodar de novo parte sempre das brutas.
 3. **Limiares** sobre a confiança calibrada (a maior das três probabilidades), gravados em
    `limiares.json`: o menor limiar em que no máximo 5% (admin) e 1% (jogador) dos verdadeiros
-   viram `falso`. Abaixo do limiar, a saída é `incerto`.
+   viram `falso` (`--taxa-admin` e `--taxa-jogador` trocam as metas). Abaixo do limiar, a saída
+   é `incerto`. Com as metas de 5% e 1%, ~85% das notícias do jogo saem `incerto`; com 20% e
+   10%, ~20% e ~40% (doc/avaliacao-jogo.md).
 
 Imprime o ECE da validação antes e depois e a % de `incerto` em cada limiar. O teste não é
 usado aqui.
+
+**Proporção do jogo** (`--proporcao-verdadeiros`): o Platt aprende a proporção da validação
+(~2% de verdadeiros), e o jogo tem metade de verdadeiras, sem enganosas (é binário). Calibrado
+só na validação, o modelo chama de falso quase toda manchete verdadeira do jogo
+(doc/avaliacao-jogo.md). A opção desloca o viés `b` de cada fronteira pela diferença das
+chances (correção de proporção de classes, Saerens et al., 2002):
+`b += logit(proporção no jogo) − logit(proporção na validação)`, com a proporção do jogo igual
+nas duas fronteiras (sem enganosas, ser mais que falso é ser verdadeiro). As notícias do jogo
+não entram no ajuste: só medem o resultado (`avaliar_jogo.py`). Os limiares continuam
+válidos, porque medem quantos verdadeiros viram falso, o que não depende da proporção; o ECE
+da validação piora de propósito, já que ela tem outra proporção.
 """
 
 import argparse
@@ -68,6 +83,21 @@ def calibrar(p1: np.ndarray, p2: np.ndarray, y: np.ndarray) -> dict[str, dict[st
     }
 
 
+def deslocar_proporcao(calibracao: dict, y: np.ndarray, proporcao_jogo: float) -> dict:
+    """O Platt com o viés de cada fronteira levado da proporção da validação para a do jogo."""
+    chances = {"fronteira_1": float(np.mean(y > 0)), "fronteira_2": float(np.mean(y > 1))}
+    deslocada = {}
+    for fronteira, proporcao_validacao in chances.items():
+        delta = float(logit(proporcao_jogo)[()] - logit(proporcao_validacao)[()])
+        parametros = calibracao[fronteira]
+        deslocada[fronteira] = {**parametros, "b": parametros["b"] + delta}
+    deslocada["proporcao"] = {
+        "jogo": proporcao_jogo,
+        "validacao": chances,
+    }
+    return deslocada
+
+
 def aplicar(p1: np.ndarray, p2: np.ndarray, calibracao: dict) -> tuple[np.ndarray, np.ndarray]:
     c1 = aplicar_platt(p1, calibracao["fronteira_1"])
     c2 = aplicar_platt(np.minimum(p2, p1), calibracao["fronteira_2"])
@@ -96,6 +126,13 @@ def limiares(proba: np.ndarray, y: np.ndarray, taxas: dict[str, float] = TAXAS) 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--modelo", type=Path, required=True)
+    parser.add_argument(
+        "--proporcao-verdadeiros",
+        type=float,
+        help="proporção de verdadeiras no uso (0.5 no jogo); sem ela, a da validação",
+    )
+    parser.add_argument("--taxa-admin", type=float, default=TAXAS["admin"])
+    parser.add_argument("--taxa-jogador", type=float, default=TAXAS["jogador"])
     args = parser.parse_args()
     pasta = args.modelo
     brutas = pasta / "previsoes_brutas.jsonl"
@@ -117,9 +154,12 @@ def main():
     p2 = np.array([previsoes[e.id][1] for e in validacao])
 
     calibracao = calibrar(p1, p2, y)
+    if args.proporcao_verdadeiros is not None:
+        calibracao = deslocar_proporcao(calibracao, y, args.proporcao_verdadeiros)
     c1, c2 = aplicar(p1, p2, calibracao)
     antes, depois = ece(probabilidades(p1, p2), y)[0], ece(probabilidades(c1, c2), y)[0]
-    escolhidos = limiares(probabilidades(c1, c2), y)
+    taxas = {"admin": args.taxa_admin, "jogador": args.taxa_jogador}
+    escolhidos = limiares(probabilidades(c1, c2), y, taxas)
 
     (pasta / "calibracao.json").write_text(json.dumps(calibracao, indent=2), encoding="utf-8")
     (pasta / "limiares.json").write_text(json.dumps(escolhidos, indent=2), encoding="utf-8")
@@ -138,7 +178,14 @@ def main():
         taxa = taxa_verdadeiro_vira_falso(probabilidades(c1, c2), y, limiar)
         print(
             f"limiar {uso}: {limiar:.2f} ({np.mean(confianca < limiar):.0%} incerto, "
-            f"{taxa:.1%} dos verdadeiros viram falso; meta {TAXAS[uso]:.0%})"
+            f"{taxa:.1%} dos verdadeiros viram falso; meta {taxas[uso]:.0%})"
+        )
+    if "proporcao" in calibracao:
+        validacao_v = calibracao["proporcao"]["validacao"]["fronteira_2"]
+        print(
+            f"proporção de verdadeiros: validação {validacao_v:.1%} -> uso "
+            f"{args.proporcao_verdadeiros:.0%}; {np.mean(c2 > 0.5):.0%} da validação "
+            "passa a sair verdadeiro"
         )
     print(f"Gravados {pasta}/calibracao.json, limiares.json e previsoes.jsonl calibradas")
 

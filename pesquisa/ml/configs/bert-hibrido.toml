@@ -1,0 +1,24 @@
+# Experimento 2 no texto híbrido: o texto curto onde existe e, onde não existe, a afirmação
+# extraída pela LLM (#20), com o mesmo prompt e modelo do cache. Na GPU: make bert GPU=1
+# CONFIG_BERT=pesquisa/ml/configs/bert-hibrido.toml
+nome = "bert-hibrido"
+modelo = "bert"
+saida = "models/2026-11/bert-hibrido"
+sementes = [13, 42, 7]   # média e desvio das 3
+
+[dados]
+dataset = "pesquisa/data/processed/dataset.jsonl"
+texto = "hibrido"
+prompt = "api/app/ml/prompts/extrair_afirmacoes_v1.txt"
+# modelo_llm: o LLM_MODEL do .env, o mesmo que gerou o cache (ou fixe aqui a versão)
+
+[treino]
+modelo_base = "neuralmind/bert-base-portuguese-cased"
+max_tokens = 96
+taxa_aprendizado = 3e-5
+weight_decay = 0.01
+aquecimento = 0.1
+lote = 32
+max_epocas = 4
+parada_antecipada = "f1_macro_validacao"
+paciencia = 1   # épocas sem melhora antes de parar

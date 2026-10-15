@@ -2,7 +2,14 @@ import numpy as np
 import pytest
 
 from avaliar import ece, probabilidades
-from calibrar import SEM_DECISAO, aplicar, calibrar, limiares, taxa_verdadeiro_vira_falso
+from calibrar import (
+    SEM_DECISAO,
+    aplicar,
+    calibrar,
+    deslocar_proporcao,
+    limiares,
+    taxa_verdadeiro_vira_falso,
+)
 
 
 def exemplo_superconfiante(n: int = 3000, semente: int = 0):
@@ -41,3 +48,26 @@ def test_sem_limiar_possivel_tudo_vira_incerto():
     # O único verdadeiro é previsto como falso com toda a confiança.
     proba = np.array([[1.0, 0.0, 0.0], [0.9, 0.05, 0.05]])
     assert limiares(proba, np.array([2, 0]), {"jogador": 0.0}) == {"jogador": SEM_DECISAO}
+
+
+def test_proporcao_do_jogo_desloca_so_o_vies_e_aumenta_os_verdadeiros():
+    p1, p2, y = exemplo_superconfiante(semente=2)
+    raros = (y < 2) | (np.arange(len(y)) % 10 == 0)  # verdadeiros raros, como na validação
+    p1, p2, y = p1[raros], p2[raros], y[raros]
+    calibracao = calibrar(p1, p2, y)
+    deslocada = deslocar_proporcao(calibracao, y, 0.5)
+    for fronteira in ("fronteira_1", "fronteira_2"):
+        assert deslocada[fronteira]["a"] == calibracao[fronteira]["a"]
+    assert deslocada["fronteira_2"]["b"] > calibracao["fronteira_2"]["b"]
+    assert deslocada["proporcao"]["validacao"]["fronteira_2"] == pytest.approx(np.mean(y == 2))
+    _, antes = aplicar(p1, p2, calibracao)
+    c1, depois = aplicar(p1, p2, deslocada)
+    assert np.mean(depois > 0.5) > np.mean(antes > 0.5)
+    assert np.all(c1 >= depois)
+
+
+def test_proporcao_igual_a_da_validacao_nao_muda_nada():
+    p1, p2, y = exemplo_superconfiante(semente=3)
+    calibracao = calibrar(p1, p2, y)
+    deslocada = deslocar_proporcao(calibracao, y, float(np.mean(y > 1)))
+    assert deslocada["fronteira_2"]["b"] == pytest.approx(calibracao["fronteira_2"]["b"])
