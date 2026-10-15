@@ -379,6 +379,10 @@ button:disabled {
   font-size: 17px;
 }
 
+.button--ghost-light:disabled {
+  opacity: 0.45;
+}
+
 .button--outline-strong {
   background: transparent;
   border-color: var(--brand-strong);
@@ -2453,12 +2457,12 @@ button.key-cap:disabled {
   animation: fade-in 0.18s ease;
 }
 
-/* A pergunta e o resultado deixam o HUD visível acima do véu */
+/* A pergunta e o resultado deixam o HUD visível acima do véu: o véu cobre a tela
+   inteira, o HUD (z-index 30) fica por cima dele e o popup começa logo abaixo do HUD. */
 .popup-scrim--below-hud {
-  top: 112px;
   z-index: 20;
   align-items: flex-start;
-  padding-top: 24px;
+  padding-top: var(--hud-offset, 136px);
 }
 
 .popup-scrim--strong {
@@ -3623,9 +3627,9 @@ button.key-cap:disabled {
   }
 
   .popup-scrim--below-hud {
-    top: 0;
     z-index: 50;
     align-items: center;
+    padding-top: 16px;
   }
 
   .app-header {
@@ -3889,5 +3893,31 @@ button.key-cap:disabled {
   *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* Telas grandes: amplia as telas para ocupar o espaço livre. Os pop-ups ficam fora do
+   .page-shell e mantêm o tamanho. */
+@media (min-width: 1440px) and (min-height: 820px) {
+  :root {
+    --hud-offset: 153px;
+  }
+
+  .page-shell,
+  .tutorial-card,
+  .fako-auth-card {
+    zoom: 1.15;
+  }
+}
+
+@media (min-width: 1720px) and (min-height: 940px) {
+  :root {
+    --hud-offset: 170px;
+  }
+
+  .page-shell,
+  .tutorial-card,
+  .fako-auth-card {
+    zoom: 1.3;
   }
 }

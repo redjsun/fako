@@ -73,7 +73,8 @@ export type GameStatus = "PLAYING" | "PAUSED" | "QUESTION" | "FEEDBACK" | "COUNT
 
 // EXIT: o jogador saiu pelo "Sair e salvar".
 // NO_QUESTIONS: o banco não tem mais afirmações inéditas para esta partida.
-export type MatchEndReason = "TIMEOUT" | "GAMEOVER" | "EXIT" | "NO_QUESTIONS";
+// GOAL: o placar alcançou a meta do nível.
+export type MatchEndReason = "TIMEOUT" | "GAMEOVER" | "EXIT" | "NO_QUESTIONS" | "GOAL";
 
 // Partida encerrada, guardada no histórico local do jogador.
 export interface MatchRecord {

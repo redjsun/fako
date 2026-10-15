@@ -490,11 +490,14 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, [status, currentQuestion, isSubmittingAnswer, questionSecondsLeft, confirmAnswer]);
 
+  // Bateu a meta do nível atual: a partida termina depois do resultado da pergunta.
+  // Rejogar um nível já vencido segue até o fim, como na regra de avanço da API.
   const continueAfterFeedback = useCallback(() => {
     setCurrentQuestion(null);
     setLastResult(null);
-    resumeWithCountdown();
-  }, [resumeWithCountdown]);
+    if (level === progress.current_level && score >= minScoreToAdvance) finishMatch("GOAL");
+    else resumeWithCountdown();
+  }, [level, progress.current_level, score, minScoreToAdvance, finishMatch, resumeWithCountdown]);
 
   // ---------------------------------------------------------------- janelas e pausa
 
@@ -676,7 +679,11 @@ export default function App() {
               snakeLength={ending.snakeLength}
               secondsPlayed={ending.secondsPlayed}
               pointsPerCorrect={POINTS_PER_CORRECT}
-              onPlayAgain={() => startGame(ending.advanced ? undefined : level)}
+              canPlayNextLevel={
+                level < maxLevels && (ending.advanced || level < progress.current_level)
+              }
+              onPlayAgain={() => startGame(level)}
+              onPlayNextLevel={() => startGame(level + 1)}
               onGoHome={handleGoHome}
               onOpenJourney={() => setCurrentScreen("journey")}
             />
