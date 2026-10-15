@@ -25,11 +25,20 @@ export interface AnsweredQuestion {
   isCorrect: boolean;
 }
 
+// Regras de um nível da jornada (api/app/models/level.py; tabela em doc/jogo/niveis.md).
 export interface Level {
   number: number;
   board_size: number;
   tick_ms: number;
   min_score_to_advance: number;
+  match_seconds: number;
+  question_seconds: number;
+  reliability_tolerance: number;
+  wrong_answer_penalty: number;
+  growth_per_error: number;
+  solid_walls: boolean;
+  apple_lifetime_seconds: number | null;
+  rotten_apples: number;
 }
 
 export type MatchStatus = "in_progress" | "finished";

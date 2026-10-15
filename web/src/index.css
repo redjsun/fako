@@ -52,6 +52,7 @@
   --snake-head: #17532a;
   --snake-body: #257a3e;
   --apple-body: #dc2626;
+  --apple-rotten: #6b4a2b;
   --apple-leaf: #257a3e;
   --apple-stem: #5a3d28;
 
@@ -116,6 +117,7 @@
     --snake-head: #8fe0a0;
     --snake-body: #4cc067;
     --apple-body: #ff5c5c;
+    --apple-rotten: #8a6a45;
     --apple-leaf: #6fe68f;
     --button-strong-bg: #2f9e44;
     --button-dark-bg: #2f9e44;
@@ -155,6 +157,7 @@
   --snake-head: #8fe0a0;
   --snake-body: #4cc067;
   --apple-body: #ff5c5c;
+  --apple-rotten: #8a6a45;
   --apple-leaf: #6fe68f;
   --button-strong-bg: #2f9e44;
   --button-dark-bg: #2f9e44;
@@ -1246,6 +1249,19 @@ button:disabled {
   font-family: var(--font-display);
   font-size: 20px;
   font-weight: 700;
+}
+
+.level-card__rules {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.level-card__rules li::before {
+  content: "· ";
 }
 
 .level-card__text p {
@@ -2343,6 +2359,12 @@ button.key-cap:disabled {
   overflow: hidden;
 }
 
+/* Paredes sólidas: a borda do tabuleiro fica mais grossa e escura, porque bater nela encerra
+   a partida. */
+.board-frame--solid {
+  border: 4px solid var(--brand-strong);
+}
+
 .canvas-wrapper,
 .game-canvas {
   display: block;
@@ -3114,8 +3136,8 @@ button.key-cap:disabled {
 
 .fako-auth-card {
   display: flex;
-  width: min(990px, 100%);
-  min-height: 610px;
+  width: min(920px, 100%);
+  min-height: 560px;
   background: var(--surface-default);
   border-radius: var(--radius-24);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.42), 0 4px 12px rgba(0, 0, 0, 0.2);
@@ -3897,15 +3919,14 @@ button.key-cap:disabled {
 }
 
 /* Telas grandes: amplia as telas para ocupar o espaço livre. Os pop-ups ficam fora do
-   .page-shell e mantêm o tamanho. */
+   .page-shell e mantêm o tamanho; o card de login também fica no tamanho original. */
 @media (min-width: 1440px) and (min-height: 820px) {
   :root {
     --hud-offset: 153px;
   }
 
   .page-shell,
-  .tutorial-card,
-  .fako-auth-card {
+  .tutorial-card {
     zoom: 1.15;
   }
 }
@@ -3916,8 +3937,7 @@ button.key-cap:disabled {
   }
 
   .page-shell,
-  .tutorial-card,
-  .fako-auth-card {
+  .tutorial-card {
     zoom: 1.3;
   }
 }

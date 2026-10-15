@@ -15,6 +15,7 @@ interface MatchSummaryProps {
   snakeLength: number;
   secondsPlayed: number;
   pointsPerCorrect: number;
+  tolerance: number;
   /** Nível seguinte já liberado: habilita o botão "Próximo nível". */
   canPlayNextLevel: boolean;
   onPlayAgain: () => void;
@@ -44,6 +45,7 @@ export const MatchSummary: React.FC<MatchSummaryProps> = ({
   snakeLength,
   secondsPlayed,
   pointsPerCorrect,
+  tolerance,
   canPlayNextLevel,
   onPlayAgain,
   onPlayNextLevel,
@@ -69,7 +71,7 @@ export const MatchSummary: React.FC<MatchSummaryProps> = ({
     goalTitle = isLastLevel
       ? `Faltam ${missing} ${points} para vencer o nível ${level}`
       : `Faltam ${missing} ${points} para o nível ${level + 1}`;
-    goalText = `${score} de ${minScoreToAdvance} pts · Dica: ficar a até 15 pontos da referência vale +${pointsPerCorrect}.`;
+    goalText = `${score} de ${minScoreToAdvance} pts · Dica: ficar a até ${tolerance} pontos da referência vale +${pointsPerCorrect}.`;
   }
 
   return (
