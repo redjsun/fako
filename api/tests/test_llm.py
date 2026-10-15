@@ -139,6 +139,7 @@ def test_pedido_openai_envia_temperatura_esquema_e_chave(monkeypatch):
     assert requisicao.full_url == "http://llm.teste/v1/chat/completions"
     assert requisicao.get_header("Authorization") == "Bearer chave"
     assert corpo["temperature"] == 0.3 and corpo["reasoning_effort"] == "none"
+    assert corpo["max_tokens"] == 1024
     assert corpo["response_format"]["json_schema"]["schema"] == {"type": "object"}
     assert timeout == 5
 

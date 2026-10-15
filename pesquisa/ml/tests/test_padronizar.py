@@ -248,6 +248,7 @@ def test_extrator_openai_envia_o_prompt_o_esquema_e_le_o_uso(prompt):
     corpo = pedido["corpo"]
     assert corpo["model"] == "qwen-x"
     assert corpo["temperature"] == 0
+    assert corpo["max_tokens"] == 1024
     assert corpo["messages"][0]["content"] == "Extraia as afirmações de: texto do registro"
     assert corpo["response_format"]["type"] == "json_schema"
     assert corpo["response_format"]["json_schema"]["schema"] == ESQUEMA_AFIRMACOES

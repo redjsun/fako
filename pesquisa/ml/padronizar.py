@@ -72,6 +72,7 @@ SPLITS_PADRAO = ("treino", "validacao", "teste")
 
 # Cerca de 4 mil tokens em português: controla custo e tempo das matérias longas.
 MAX_CARACTERES = 16_000
+MAX_TOKENS_RESPOSTA = 1024
 TENTATIVAS = 4
 ESPERA_INICIAL = 2.0  # segundos; dobra a cada nova tentativa
 STATUS_TRANSITORIOS = {429, 500, 502, 503, 504}
@@ -254,6 +255,10 @@ def extrator_openai(
             "model": modelo,
             "messages": [{"role": "user", "content": prompt.preencher(texto[:max_caracteres])}],
             "temperature": 0,
+            # Teto da resposta: uma extração tem ~160 tokens; sem ele, um texto que leva o modelo
+            # a repetir (temperatura 0 repete sempre igual) prende a GPU por minutos a cada nova
+            # tentativa. A resposta cortada não é JSON válido: vira falha e o lote segue.
+            "max_tokens": MAX_TOKENS_RESPOSTA,
             **(extra or {}),
         }
         if esquema:

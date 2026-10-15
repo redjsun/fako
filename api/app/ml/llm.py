@@ -233,6 +233,9 @@ class LLMValidado:
         return saida.explicacao.strip()
 
 
+MAX_TOKENS_RESPOSTA = 1024
+
+
 def pedido_openai(
     base_url: str,
     modelo: str,
@@ -253,6 +256,9 @@ def pedido_openai(
             "model": modelo,
             "messages": [{"role": "user", "content": prompt}],
             "temperature": temperatura,
+            # Teto da resposta: as saídas têm algumas centenas de tokens; sem ele, um texto que
+            # leva o modelo a repetir prende a GPU até o tempo limite.
+            "max_tokens": MAX_TOKENS_RESPOSTA,
             **(extra or {}),
         }
         if esquema:
