@@ -1,4 +1,5 @@
-import { Achievement, AnsweredQuestion, MatchRecord, User, UserStats } from "../types";
+import { AnsweredQuestion, MatchRecord, User, UserStats } from "../types";
+import { defaultAchievements, unlockAchievements } from "../utils/achievements";
 import {
   httpGet,
   httpPost,
@@ -13,39 +14,6 @@ const STATS_STORAGE_KEY_PREFIX = "fako_stats_";
 
 const HISTORY_LIMIT = 10;
 
-const DEFAULT_ACHIEVEMENTS: Achievement[] = [
-  {
-    id: "first_check",
-    title: "Primeira Checagem",
-    description: "Avaliou a primeira afirmação no FAKO.",
-    unlocked: false,
-  },
-  {
-    id: "bullseye",
-    title: "Na Mosca!",
-    description: "Acertou a referência exata de uma afirmação.",
-    unlocked: false,
-  },
-  {
-    id: "level_up",
-    title: "Subindo de Nível",
-    description: "Alcançou o nível 2.",
-    unlocked: false,
-  },
-  {
-    id: "imune",
-    title: "Muralha Antifake",
-    description: "Acertou 5 afirmações seguidas na mesma partida.",
-    unlocked: false,
-  },
-  {
-    id: "master",
-    title: "Mestre dos Fatos",
-    description: "Chegou ao nível 6.",
-    unlocked: false,
-  },
-];
-
 function defaultStats(): UserStats {
   return {
     highScore: 0,
@@ -55,7 +23,7 @@ function defaultStats(): UserStats {
     totalErros: 0,
     bestStreak: 0,
     hasSeenTutorial: false,
-    achievements: DEFAULT_ACHIEVEMENTS.map((achievement) => ({ ...achievement })),
+    achievements: defaultAchievements(),
     history: [],
   };
 }
@@ -248,21 +216,7 @@ class AuthService {
   // unlockedLevel: nível atual depois da partida (sobe quando o jogador bate a meta).
   public recordMatchFinished(username: string, record: MatchRecord, unlockedLevel: number): UserStats {
     const current = this.getUserStats(username);
-    const achievements = current.achievements.map((achievement) => ({ ...achievement }));
-    const unlock = (id: string) => {
-      const achievement = achievements.find((item) => item.id === id);
-      if (achievement && !achievement.unlocked) {
-        achievement.unlocked = true;
-        achievement.unlockedAt = Date.now();
-      }
-    };
-
     const streak = longestStreak(record.answers);
-    if (record.answers.length > 0) unlock("first_check");
-    if (record.answers.some((answer) => answer.reliability === answer.reference)) unlock("bullseye");
-    if (Math.max(record.level, unlockedLevel) >= 2) unlock("level_up");
-    if (streak >= 5) unlock("imune");
-    if (Math.max(record.level, unlockedLevel) >= 6) unlock("master");
 
     const updated: UserStats = {
       highScore: Math.max(current.highScore, record.score),
@@ -272,9 +226,10 @@ class AuthService {
       totalErros: current.totalErros + record.erros,
       bestStreak: Math.max(current.bestStreak, streak),
       hasSeenTutorial: true,
-      achievements,
+      achievements: current.achievements,
       history: [record, ...current.history].slice(0, HISTORY_LIMIT),
     };
+    updated.achievements = unlockAchievements(updated, record);
     this.saveUserStats(username, updated);
     return updated;
   }

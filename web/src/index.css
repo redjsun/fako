@@ -1316,6 +1316,12 @@ button:disabled {
   white-space: nowrap;
 }
 
+.achievement-list__description {
+  margin-top: -4px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
 .tip-box {
   display: flex;
   align-items: center;

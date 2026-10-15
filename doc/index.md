@@ -31,6 +31,8 @@ Use as abas no topo para navegar, ou veja o índice completo abaixo.
 
 | Documento | Conteúdo |
 |---|---|
+| [Níveis da jornada](jogo/niveis.md) | Regras de cada um dos 6 níveis: tabuleiro, tempos, paredes, maçãs e meta |
+| [Conquistas](jogo/conquistas.md) | As 8 conquistas da Jornada, como cada uma é liberada e como adicionar outras |
 | [Banco de perguntas do jogo](banco-perguntas.md) | Afirmação, contexto, notícias de API externa rotuladas, checagens e revisão humana |
 | [Notícias externas e classificador](noticias-classificador.md) | Importação de manchetes (GNews), referência TF-IDF e rascunhos para revisão |
 
