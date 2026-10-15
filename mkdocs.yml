@@ -68,6 +68,7 @@ nav:
       - Dataset de verdadeiros confiáveis: dataset-verdadeiras.md
       - Guia de classificação e anotação: guia-classificacao.md
       - Padronização do texto curto pela LLM: padronizacao.md
+      - Avaliação nas notícias do jogo: avaliacao-jogo.md
       - Planejamento de coleta e retreino: planejamento-retreino.md
   - Modelo:
       - Relatório técnico do classificador: relatorio-tecnico.md

@@ -203,6 +203,19 @@ def motivo_descarte(
 
 # Vereditos das agências (preparar_dados.py). Os enganosos e os ambíguos não têm lado no jogo.
 VEREDITOS_FALSO = {"falso", "fake", "montagem", "predominantemente falso"}
+# Meias-verdades: a veracidade "enganoso" do treino (fora do jogo binário, entram na avaliação).
+VEREDITOS_ENGANOSO = {
+    "enganoso",
+    "distorcido",
+    "fora de contexto",
+    "sem contexto",
+    "falta contexto",
+    "exagerado",
+    "impreciso",
+    "não é bem assim",
+    "parcialmente falso",
+    "verdadeiro, mas...",
+}
 VEREDITOS_VERDADEIRO = {"verdadeiro", "comprovado", "fato"}
 
 
@@ -210,6 +223,14 @@ def normalizar_veredito(bruto: str | None) -> str | None:
     """Ex.: "Não_é_bem_assim" -> "não é bem assim"; "enganoso - texto..." -> "enganoso"."""
     veredito = (bruto or "").strip().lower().replace("_", " ").split(" - ")[0].strip()
     return veredito or None
+
+
+def veracidade_pelo_veredito(veredito: str | None) -> str | None:
+    """Os três níveis do treino (falso, enganoso, verdadeiro); None nos ambíguos."""
+    if veredito in VEREDITOS_ENGANOSO:
+        return "enganoso"
+    lado = verdadeira_pelo_veredito(veredito)
+    return None if lado is None else ("verdadeiro" if lado else "falso")
 
 
 def verdadeira_pelo_veredito(veredito: str | None) -> bool | None:
