@@ -315,9 +315,9 @@ export default function App() {
       setAnswers([]);
       setCurrentQuestion(null);
       setLastResult(null);
-      setCountdownLeft(COUNTDOWN_SECONDS);
       setCurrentScreen("game");
-      changeStatus("COUNTDOWN");
+      // A partida começa com a cobra andando; a contagem fica só para as retomadas
+      changeStatus("PLAYING");
     },
     [progress.current_level, changeStatus]
   );
@@ -387,11 +387,16 @@ export default function App() {
     }
   }, [finishMatch, openQuestion]);
 
-  const changeDirection = useCallback((next: Direction) => {
-    if (statusRef.current !== "PLAYING") return;
-    if (OPPOSITE_DIRECTIONS[next] === currentDirectionRef.current) return;
-    nextDirectionRef.current = next;
-  }, []);
+  // Mexer a cobra durante a contagem encerra a contagem e volta ao jogo na hora
+  const changeDirection = useCallback(
+    (next: Direction) => {
+      const current = statusRef.current;
+      if (current !== "PLAYING" && current !== "COUNTDOWN") return;
+      if (OPPOSITE_DIRECTIONS[next] !== currentDirectionRef.current) nextDirectionRef.current = next;
+      if (current === "COUNTDOWN") changeStatus("PLAYING");
+    },
+    [changeStatus]
+  );
 
   // Loop da cobrinha
   useEffect(() => {
@@ -538,7 +543,7 @@ export default function App() {
         return;
       }
 
-      if (current === "PLAYING") {
+      if (current === "PLAYING" || current === "COUNTDOWN") {
         if (keyDirection) {
           event.preventDefault();
           changeDirection(keyDirection);
