@@ -24,8 +24,8 @@ lendo o código, não só os planos. Serve para auditar se o catálogo de
 | RF12 | | `GameBoard.tsx` | Implementado |
 | RF14 | | `GameBoard.tsx` | Implementado |
 | RF15 | | `api/app/models/level.py`, `controllers/level_controller.py`, `components/JourneyScreen.tsx` | Implementado |
-| RF16 | | `Level.board_size` (model e seeds) | Implementado |
-| RF17 | | `Level.tick_ms` (model e seeds) | Implementado |
+| RF16 | | `Level.board_size` (model, seeds e migration `regras_por_nivel`), `web/src/App.tsx` | Implementado |
+| RF17 | | `Level.tick_ms` e as colunas de RF31 a RF36 em `api/app/models/level.py`, `App.tsx` | Implementado |
 | RF18 | | `Match.score` (model), `game_rules.py` | Implementado |
 | RF19 | | `models/progress.py` (`UserProgress`), `progress_controller.py` | Implementado |
 | RF20 | | `components/MatchSummary.tsx`, `POST /matches/{id}/finish` | Implementado |
@@ -39,6 +39,14 @@ lendo o código, não só os planos. Serve para auditar se o catálogo de
 | RF28 | #28 | | Planejado |
 | RF29 | perguntas norteadoras, questão 6 | `api/app/models/question.py` (`QuestionOrigin`: `human`, `ai`, `news`) | Parcial: o campo já existe, falta o fluxo de revisão do RF27 para explorá-lo |
 | RF30 | [Decisão 04](decisoes-de-produto.md#04-api-de-noticias-e-noticias-nao-checadas) | `doc/noticias-classificador.md`, `QuestionOrigin.NEWS` | Em implementação |
+| RF31 | | `Level.match_seconds`/`question_seconds`, `match_service.py` (`start`), `App.tsx` | Implementado |
+| RF32 | | `Level.reliability_tolerance`, `game_rules.is_within_tolerance`, `QuestionModal.tsx` | Implementado |
+| RF33 | | `Level.wrong_answer_penalty`/`growth_per_error`, `game_rules.score_after_answer`, `App.tsx` | Implementado |
+| RF34 | | `Level.solid_walls`, `web/src/utils/board.ts` (`nextHead`) | Implementado |
+| RF35 | | `Level.apple_lifetime_seconds`, `App.tsx`, `GameBoard.tsx` | Implementado |
+| RF36 | | `Level.rotten_apples`, `App.tsx`, `GameBoard.tsx` | Implementado |
+| RF37 | | `App.tsx` (`continueAfterFeedback`), `MatchSummary.tsx` | Implementado |
+| RF38 | | `MatchSummary.tsx` | Implementado |
 
 ## Requisitos não funcionais
 
