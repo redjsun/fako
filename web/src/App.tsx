@@ -621,14 +621,18 @@ export default function App() {
   }
 
   if (currentScreen === "tutorial") {
+    // Só o tutorial da primeira entrada leva direto ao jogo; aberto pelo painel, volta a ele.
+    const isFirstTutorial = !!currentUser && !authService.hasSeenTutorial(currentUser.username);
     return (
       <div className="fako-app screen-tutorial">
         <TutorialScreen
           questionSeconds={QUESTION_SECONDS}
           pointsPerCorrect={POINTS_PER_CORRECT}
+          completeLabel={isFirstTutorial ? "Começar a Jogar →" : "Voltar ao painel →"}
           onComplete={() => {
             markTutorialSeen();
-            startGame();
+            if (isFirstTutorial) startGame();
+            else setCurrentScreen("home");
           }}
           onSkip={() => {
             markTutorialSeen();
