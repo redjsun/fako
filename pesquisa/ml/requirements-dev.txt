@@ -1,5 +1,0 @@
--r requirements.txt
-pytest>=8.0
-pytest-cov>=5.0
-ruff==0.8.4  # a mesma da API: outra versão pode mudar a formatação e reprovar o CI
-pip-audit>=2.7

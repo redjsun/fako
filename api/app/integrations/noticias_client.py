@@ -233,7 +233,7 @@ class BoatosClient:
 
     Tudo o que o site publica é boato. O título é do checador ("...não passa de encenação"),
     então a alegação vem do parágrafo "Boato – ..." do início do texto, na voz de quem espalhou
-    o boato (o mesmo de pesquisa/dados/coletar_boatos.py). Publicação sem esse parágrafo fica de
+    o boato. Publicação sem esse parágrafo fica de
     fora. O robots.txt não tem opt-out de robôs de IA.
     """
 
@@ -295,7 +295,7 @@ class FactCheckClient:
     https://developers.google.com/fact-check/tools/api. A API exige um termo de busca ou um
     site de agência; sem termo, cada agência devolve as checagens mais recentes primeiro. Junta
     as de todas as agências e fica com as mais recentes. Mesma lista de agências da coleta
-    (pesquisa/dados/coletar_factcheck.py), só as que aparecem na API.
+    do dataset de treino, só as que aparecem na API.
     """
 
     URL = "https://factchecktools.googleapis.com/v1alpha1/claims:search"

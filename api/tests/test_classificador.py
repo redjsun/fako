@@ -63,7 +63,7 @@ def test_sem_modelo_publicado_falha_de_forma_controlada(tmp_path, monkeypatch):
 
 
 def publicar_modelo_minimo(pasta):
-    """Um referencia.joblib no formato de treinar_referencia.py, com frases inventadas."""
+    """Um referencia.joblib no formato do modelo publicado, com frases inventadas."""
     textos = [
         "vacina tem chip para controlar a população",
         "remédio caseiro cura doença grave em um dia",

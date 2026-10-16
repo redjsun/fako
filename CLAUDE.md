@@ -9,19 +9,12 @@ um classificador de veracidade treinado com bases brasileiras de fake news. Todo
 | Pasta | O que é |
 |---|---|
 | `api/` | FastAPI + SQLAlchemy 2 + Alembic + PostgreSQL. Camadas `controller → service → repository → model` (`doc/arquitetura/visao-geral.md`) |
-| `api/app/ml/` | Uso dos modelos pela API: classificador, LLM, embeddings, verificadores e os prompts versionados (`prompts/`, lidos também pela pesquisa). Sem PyTorch; o treino fica em `pesquisa/ml/` |
+| `api/app/ml/` | Uso dos modelos pela API: classificador (`conjunto`, `bert`, `referencia`), LLM, embeddings, verificadores e os prompts versionados (`prompts/`). Sem PyTorch: o BERTimbau roda em ONNX |
 | `web/` | React 18 + Vite + TypeScript. `view → controller (hook) → service → API`; HTTP só via `services/httpClient.ts` |
-| `pesquisa/` | Tudo de dados e treinamento. Imagem e serviço `pesquisa` no compose (`Dockerfile`, `requirements.txt`) |
-| `pesquisa/dados/` | Download, coleta (scrapers e Fact Check API) e preparo dos dados |
-| `pesquisa/ml/` | Experimentos de ML. `dados.py` é a única porta de entrada dos dados de treino (splits, limpeza, alvos, pesos); `padronizar.py` (LLM), `atalho.py` (teste de atalho), `avaliar.py` (métricas comuns, lê `previsoes.jsonl` de cada modelo). Container `ml` no compose (PyTorch CPU; CUDA com `GPU=1`, via `compose.gpu.yaml`) |
-| `pesquisa/ml/configs/` | Uma configuração TOML por execução de treino (dados, hiperparâmetros, sementes, saída), lida por `configuracao.py`; o hash dela vai para o `config.json` do modelo |
-| `pesquisa/ml/tests/fixtures/` | `dataset_smoke.jsonl`: afirmações inventadas para o teste de ponta a ponta no CI (nunca texto de veículo) |
-| `pesquisa/anotacoes/` | Anotações da equipe (#5), versionadas: só `id` e rótulos, nunca o texto |
-| `pesquisa/notebooks/` | EDA (`eda_1_datasets.ipynb`, `eda_2_conjunto.ipynb`) |
-| `pesquisa/data/` | Fora do Git. `raw/` (bases e coletas, com cache) e `processed/` (`dataset.jsonl`) |
-| `models/` | Fora do Git. Modelos treinados, lidos pela API |
-| `ml/` | Legado: BERTimbau Y1/Y2 lido por `api/app/integrations/bertimbau_engine.py` (`POST /ai/analyze`). Serviço `ml-legado`; código novo vai para `pesquisa/ml/` |
-| `doc/` | Todos os docs do projeto, inclusive os de pesquisa; site gerado com MkDocs (`mkdocs.yml`, registrar ali cada doc novo) |
+| `models/` | Fora do Git. O modelo publicado, em `models/atual`, baixado da Release do GitHub (`make modelo`) |
+| `doc/` | Todos os docs do projeto, inclusive os relatórios da pesquisa; site gerado com MkDocs (`mkdocs.yml`, registrar ali cada doc novo) |
+
+O treino do classificador não fica no repositório; só o modelo pronto, na Release.
 
 ## Comandos
 
@@ -29,45 +22,23 @@ Tudo roda por Docker Compose (o Docker Desktop precisa estar aberto). `make help
 
 - `make up` / `make down`: API em `:8000` (docs em `/docs`), web em `:5173`, banco em `127.0.0.1:5432` (`POSTGRES_HOST_PORT`)
   (todas as portas só em `127.0.0.1`)
+- `make modelo`: baixa o modelo publicado para `models/atual` (`CLASSIFICADOR_PROVIDER=conjunto`)
 - `make test`, `make lint`, `make format`: API (ruff + pytest num banco `fako_test` separado)
-- `make test-ml`: lint de `pesquisa/ml/` e `pesquisa/dados/`, e testes de `pesquisa/ml/`
 - `make test-web`: tipos, lint (ESLint) e testes (Vitest) do frontend
-- `make dados`: baixa as bases para `pesquisa/data/raw/` e gera `pesquisa/data/processed/dataset.jsonl`.
-  Os coletores (`pesquisa/dados/coletar_*.py`) rodam à parte e são lentos (~1 req/s, com cache)
-- `make padronizar`, `make atalho`, `make contagens`, `make shell-ml`: experimentos de `pesquisa/ml/`
-- `make bert GPU=1`: treino na GPU NVIDIA (exige o NVIDIA Container Toolkit no host; `make gpu` confere)
-- `make eda`: Jupyter Lab em `:8888`, com token (`JUPYTER_TOKEN` ou o do log)
-- `make agendador`: coleta diária (profile próprio, fora do `make up`)
+- `make reanalisar`: refaz o palpite e o "Por quê?" das questões ao trocar de modelo
 - `make docs`: documentação em `:8001`
 
 Segredos ficam em `.env` (copiar de `.env.example`, nunca versionar): `JWT_SECRET` (obrigatório,
-32+ bytes), `POSTGRES_PASSWORD`, `JUPYTER_TOKEN`, `FACTCHECK_API_KEY`, `NOTICIAS_API_KEY`, `LLM_*`,
+32+ bytes), `POSTGRES_PASSWORD`, `FACTCHECK_API_KEY`, `NOTICIAS_API_KEY`, `LLM_*`,
 `CLASSIFICADOR_*`.
-
-## Dados
-
-- `dataset.jsonl`: uma linha por registro; campos documentados no topo de
-  `pesquisa/dados/preparar_dados.py`. `texto_curto` é a entrada do classificador; `veracidade` é
-  ordinal: `falso` < `enganoso` < `verdadeiro`.
-- Dois protocolos de split: `split` (A, referência) e `split_produto` (B, o modelo do jogo:
-  `treino`/`validacao`/`teste`, mais `reserva` e `fora`, que não entram).
-- Cada classe vem de fontes com "cara" própria (ponto final, minúsculas, manchete). Fonte,
-  autor e data **nunca** entram no modelo; o teste de atalho (`pesquisa/ml/atalho.py`) mede o piso.
-- O dataset selecionado não usa `origem_rotulo=portal` (verdadeiro por suposição): os portais
-  viram `reserva` no protocolo B.
-- Durante o desenvolvimento só se olha a `validacao`; o `teste` é olhado uma vez por modelo.
 
 ## Convenções de código
 
-- Python 3.12, ruff com linha de 100 (`api/pyproject.toml`, `pesquisa/ml/pyproject.toml`).
+- Python 3.12, ruff com linha de 100 (`api/pyproject.toml`).
 - Nomes de variáveis, funções e mensagens em português, sem abreviar.
-- `pesquisa/dados/preparar_*.py` e `pesquisa/ml/padronizar.py` usam só a biblioteca padrão.
-- Na pesquisa, a raiz dos caminhos é `pesquisa/` (`RAIZ = Path(__file__).parent.parent`);
-  os comandos rodam a partir da raiz do repositório, no host e no container.
-- Novo código em `pesquisa/ml/` vem com testes em `pesquisa/ml/tests/` (rodam no CI, job "ML").
-- Todo script de treino lê uma configuração de `pesquisa/ml/configs/` e grava as previsões com
-  `avaliar.gravar_previsoes()` (`id`, `split`, `p1`, `p2`), para o `avaliar.py` medir todos do mesmo jeito.
 - Na API, cada modelo é um adaptador de `ClassificadorClient` (`api/app/ml/classificador.py`).
+- O gabarito do jogo vem sempre da fonte (checagem ou veículo); o classificador e a LLM só
+  explicam e dão palpite.
 
 ## Fluxo de trabalho
 

@@ -25,7 +25,6 @@ class Settings(BaseSettings):
 
     # LLM (ml/llm.py): "fake" roda sem chamadas externas; "openai" usa um
     # endpoint compatível com a API de chat da OpenAI (Ollama, LiteLLM ou provedor hospedado).
-    # LLM_BASE_URL, LLM_MODEL, LLM_API_KEY e LLM_EXTRA_BODY são os mesmos da pesquisa.
     llm_provider: str = "fake"
     llm_base_url: str = ""
     llm_model: str = ""
@@ -55,7 +54,7 @@ class Settings(BaseSettings):
     # Notícias externas (integrations/noticias_client.py): "fake" roda sem chave; "gnews" usa
     # a API do GNews (gnews.io, plano gratuito de 100 pedidos por dia), com noticias_api_key;
     # "factcheck" usa a Google Fact Check Tools API (checagens de agências), com
-    # factcheck_api_key, a mesma chave da coleta da pesquisa.
+    # factcheck_api_key.
     # "agenciabrasil" lê os feeds RSS da Agência Brasil (EBC), sem chave: manchetes verdadeiras.
     # "boatos" lê os boatos desmentidos pelo Boatos.org (API do WordPress), sem chave: falsos.
     # Mais de um, separados por vírgula ("factcheck,gnews"): a quantidade é dividida entre eles.
