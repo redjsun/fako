@@ -12,7 +12,7 @@ chat, não uma biblioteca: a chamada é HTTP direto, sem dependência nova).
 | Reescrever uma checagem como questão (#21) | `gerar_questao` | `gerar_questao_v1.txt` | `{statement, category}` |
 | Extrair afirmações com quem disse (#19) | `extrair_afirmacoes` | `extrair_afirmacoes_v1.txt` | `{e_opiniao, afirmacoes: [{texto, quem_disse}]}` |
 | Explicar a análise ao jogador (#21) | `explicar` | `explicar_v1.txt` | `{explicacao}` |
-| O "Por quê?" do jogo: a avaliação do classificador e o que a fonte diz dela | `explicar_resposta` | `explicar_resposta_v1.txt` | `{explicacao}` |
+| O "Por quê?" do jogo: a avaliação do classificador e o que a fonte diz dela | `explicar_resposta` | `explicar_resposta_v2.txt` | `{explicacao}` |
 | Pré-anotar tipo e sinais (#21) | `pesquisa/dados/pre_anotar.py` | `pre_anotar_v1.txt` | `{tipo, 4 sinais}` |
 
 Os prompts ficam em `api/app/ml/prompts/`, com a versão no nome; a pesquisa lê os mesmos
@@ -25,10 +25,17 @@ que dependem dela respondem 503.
 
 ## O "Por quê?" do jogo
 
-Na importação de cada notícia (e no `make reanalisar`, ao trocar de modelo), a LLM escreve o
-`model_explanation`: a avaliação do classificador com o limiar do jogador ("avaliou como não
-confiável, com segurança alta"), o que a fonte diz (a agência que checou ou o veículo que
-publicou; se discordar do classificador, a resposta certa é a da fonte) e uma dica prática. Os
+Na importação de cada notícia (e no `make reanalisar`, ao trocar de modelo), o
+`model_explanation` é montado em duas partes. A primeira frase sai do código, com a avaliação do
+classificador no limiar do jogador ("O classificador do jogo avaliou esta afirmação como não
+confiável, com alta segurança", ou "não teve segurança para avaliar"). O resto é da LLM: o que a
+fonte concluiu (a agência que checou ou o veículo que publicou; se discordar do classificador,
+começa com "Mas" e vale a fonte) e uma dica prática ligada ao jeito da afirmação.
+
+Além do verificador de fatos, `verificar_por_que` recusa os vícios vistos na `v1`: tratar a
+circulação nas redes como motivo ("pois circulou"), dizer que "não há informações"
+(contradiz o gabarito), começar a dica com "Dica" e falar em "checagem" numa manchete de
+veículo. Os
 dados de entrada vêm de `dados_da_explicacao()` (`services/noticias_service.py`). O
 classificador não mostra os motivos da avaliação, então o prompt proíbe inventá-los. O jogo
 mostra esse texto no "Por quê?" só se ele foi gerado pelo modelo publicado e se

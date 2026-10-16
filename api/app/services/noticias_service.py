@@ -106,7 +106,7 @@ def dados_da_explicacao(
     checagem = bool(noticia.veredito) if noticia else "checou e concluiu" in question.explanation
     return {
         "afirmacao": question.statement,
-        "classificador": {"avaliacao": avaliacao, "seguranca": seguranca(analise.confianca)},
+        "ja_escrito": frase_do_classificador(avaliacao, seguranca(analise.confianca)),
         "gabarito": gabarito,
         # Enganosa conta como não confiável no jogo, que é uma barra de confiabilidade.
         "concorda": None
@@ -114,16 +114,24 @@ def dados_da_explicacao(
         else (avaliacao == "confiável") == question.is_true,
         "tipo": "checagem" if checagem else "manchete",
         "fonte": explicacao(noticia) if noticia else question.explanation,
-        "veredito": noticia.veredito if noticia else None,
-        "detalhe": (noticia.descricao or None) if noticia else None,
+        "detalhe": ((noticia.descricao or None) if noticia else question.source_detail),
     }
 
 
+def frase_do_classificador(avaliacao: str, nivel: str) -> str:
+    """A primeira frase do "Por quê?", escrita aqui e não pela LLM, para não variar."""
+    if avaliacao == "incerto":
+        return "O classificador do jogo não teve segurança para avaliar esta afirmação."
+    return (
+        f"O classificador do jogo avaliou esta afirmação como {avaliacao}, com {nivel} segurança."
+    )
+
+
 def explicacao_didatica(llm: LLMClient, dados: dict) -> str | None:
-    """O "Por quê?" escrito pela LLM; None se ela falhar ou citar o que não está nos dados
-    (o jogador vê a explicação factual)."""
+    """O "Por quê?": a frase do classificador e o resto escrito pela LLM; None se ela falhar ou
+    citar o que não está nos dados (o jogador vê a explicação factual)."""
     try:
-        return llm.explicar_resposta(dados)
+        return f"{dados['ja_escrito']} {llm.explicar_resposta(dados)}"
     except (LLMIndisponivel, RespostaInvalida):
         return None
 
@@ -294,6 +302,7 @@ class NoticiasService:
             question.origin_link = fonte(noticia)
             question.origin_date = noticia.publicada_em.date() if noticia.publicada_em else None
         question.claim_text = self.afirmacao(manchete)
+        question.source_detail = (noticia.descricao or "").strip()[:1000] or None
 
         if get_settings().noticias_publicar_direto:
             question.status = QuestionStatus.VALIDATED

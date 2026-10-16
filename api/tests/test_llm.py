@@ -192,3 +192,17 @@ def test_explicacao_com_fato_inventado_tenta_de_novo_e_depois_descarta():
     pedido = PedidoRoteirizado(*['{"explicacao": "A NASA desmentiu em 1969 essa afirmação."}'] * 2)
     with pytest.raises(RespostaInvalida, match="NASA"):
         LLMValidado(pedido).explicar(analise)
+
+
+def test_conexao_derrubada_no_meio_vira_llm_indisponivel(monkeypatch):
+    import http.client
+
+    from app.ml.llm import LLMIndisponivel, pedido_openai
+
+    def derrubar(*args, **kwargs):
+        raise http.client.RemoteDisconnected("Remote end closed connection without response")
+
+    monkeypatch.setattr("urllib.request.urlopen", derrubar)
+    pedir = pedido_openai("http://llm.teste/v1", "modelo")
+    with pytest.raises(LLMIndisponivel):
+        pedir("prompt", {})

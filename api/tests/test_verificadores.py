@@ -79,3 +79,22 @@ def test_cosseno():
     assert cosseno([1, 0], [1, 0]) == pytest.approx(1)
     assert cosseno([1, 0], [0, 1]) == pytest.approx(0)
     assert cosseno([0, 0], [1, 0]) == 0
+
+
+def test_por_que_recusa_os_vicios_proibidos_no_prompt():
+    from app.ml.verificadores import verificar_por_que
+
+    assert (
+        verificar_por_que(
+            "A checagem confirma: a Aos Fatos concluiu que não é confiável. "
+            "Procure a fala completa no vídeo original."
+        )
+        is None
+    )
+    assert verificar_por_que("Não é confiável, pois circulou nas redes sociais.")
+    assert verificar_por_que("A fonte publicou, mas não há informações suficientes.")
+    assert verificar_por_que("A Aos Fatos concluiu que é falsa. A dica é: confira a fonte.")
+    assert verificar_por_que("A Aos Fatos concluiu que é falsa. Dica: confira a fonte.")
+    manchete = "E a fonte confirma: a Agência Brasil publicou em 14/10/2026."
+    assert verificar_por_que(manchete, "manchete") is None
+    assert verificar_por_que("A checagem confirma: a Agência Brasil publicou.", "manchete")

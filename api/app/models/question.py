@@ -56,6 +56,9 @@ class Question(Entity):
     # jogador) e o que a fonte diz dela. Gerado na importação e refeito ao trocar de modelo
     # (jobs/reanalisar_questoes.py); sem ele, o jogador vê a explicação factual (`explanation`).
     model_explanation: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # O que a fonte diz além do veredito: o título da checagem ou o resumo da matéria. Entra no
+    # "Por quê?" (detalhe para a LLM), também quando ele é refeito depois da importação.
+    source_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Afirmação extraída pela LLM do enunciado (mesmo prompt da padronização do treino): a
     # entrada do classificador quando o modelo publicado foi treinado no texto padronizado.
     claim_text: Mapped[str | None] = mapped_column(Text, nullable=True)

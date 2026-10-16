@@ -24,6 +24,7 @@ def questao(statement, versao, claim_text=None, origin=QuestionOrigin.HUMAN):
         is_true=False,
         explanation="Circulou nas redes sociais. Aos Fatos checou e concluiu que é falsa.",
         model_explanation=None,
+        source_detail=None,
         model_category=None,
         model_score=None,
         model_confidence=None,
@@ -73,7 +74,9 @@ def test_noticia_ganha_o_por_que_da_llm_sobre_a_avaliacao_do_jogo():
         "Lavar as mãos reduz doenças", classificador.versao, "Lavar as mãos reduz doenças"
     )
     reanalisar([noticia, seed], classificador, False, FakeLLMClient())
-    assert noticia.model_explanation.startswith("O classificador avaliou como")
+    assert noticia.model_explanation.startswith(
+        "O classificador do jogo não teve segurança para avaliar esta afirmação."
+    )
     assert "Aos Fatos checou" in noticia.model_explanation
     assert ("Vacina contém chip", "jogador") in classificador.entradas
     assert seed.model_explanation is None
@@ -98,3 +101,23 @@ def test_por_que_do_jogo_so_usa_a_explicacao_do_modelo_publicado(monkeypatch):
         assert servico.explicacao(atual) == atual.explanation
     finally:
         get_settings.cache_clear()
+
+
+def test_detalhe_guardado_entra_no_por_que_refeito():
+    from app.services.noticias_service import dados_da_explicacao
+
+    noticia = questao("Vacina contém chip", "fake", origin=QuestionOrigin.NEWS)
+    noticia.source_detail = "Vacinas não têm chips de rastreamento"
+    analise = Registro().analisar("Vacina contém chip", "jogador")
+    dados = dados_da_explicacao(noticia, analise)
+    assert dados["detalhe"] == "Vacinas não têm chips de rastreamento"
+    assert dados["tipo"] == "checagem" and dados["gabarito"] == "não confiável"
+
+
+def test_salva_em_lotes_para_nao_perder_o_trabalho():
+    from app.jobs.reanalisar_questoes import LOTE
+
+    salvamentos = []
+    questoes = [questao(f"Manchete {i}", "antiga") for i in range(2 * LOTE + 3)]
+    reanalisar(questoes, Registro(), False, salvar=lambda: salvamentos.append(1))
+    assert len(salvamentos) == 2

@@ -18,6 +18,7 @@ Se o provedor não estiver configurado, `get_llm_client()` devolve um cliente qu
 `LLMIndisponivel`, e a API sobe mesmo assim.
 """
 
+import http.client
 import json
 import re
 import urllib.error
@@ -34,7 +35,7 @@ from pydantic import BaseModel, Field, ValidationError, model_validator
 from app.core.config import get_settings
 from app.core.exceptions import ServiceUnavailableError
 from app.ml.classificador import Analise
-from app.ml.verificadores import verificar_explicacao
+from app.ml.verificadores import verificar_explicacao, verificar_por_que
 
 PASTA_PROMPTS = Path(__file__).resolve().parent / "prompts"
 # Versão em uso de cada prompt; mudar a versão é criar um arquivo novo, nunca editar o antigo.
@@ -42,7 +43,7 @@ VERSAO_PROMPT = {
     "extrair_afirmacoes": "extrair_afirmacoes_v1",
     "gerar_questao": "gerar_questao_v1",
     "explicar": "explicar_v1",
-    "explicar_resposta": "explicar_resposta_v1",
+    "explicar_resposta": "explicar_resposta_v2",
 }
 TENTATIVAS = 2  # a primeira e mais uma, se a resposta vier fora do esquema
 
@@ -145,8 +146,7 @@ class FakeLLMClient:
         return f"A análise automática classificou esta afirmação como {analise.categoria}."
 
     def explicar_resposta(self, dados: dict) -> str:
-        avaliacao = dados["classificador"]["avaliacao"]
-        return f"O classificador avaliou como {avaliacao}. {dados['fonte']}"
+        return dados["fonte"]
 
 
 @lru_cache
@@ -240,16 +240,16 @@ class LLMValidado:
         return saida.explicacao.strip()
 
     def explicar_resposta(self, dados: dict) -> str:
-        """O "Por quê?" do jogo: a avaliação do classificador e o que a fonte diz dela.
-        Mesmo verificador de fatos da explicação da análise; `incerto` precisa dizer que o
-        classificador não teve segurança."""
+        """O resto do "Por quê?" do jogo, depois da frase do classificador (`ja_escrito`): o
+        que a fonte concluiu e uma dica. Mesmo verificador de fatos da explicação da análise,
+        mais os vícios que o prompt proíbe (`verificar_por_que`)."""
         entrada = json.dumps(dados, ensure_ascii=False, indent=2)
-        categoria = dados["classificador"]["avaliacao"]
         saida = self._gerar(
             "explicar_resposta",
             {"dados": entrada},
             SaidaExplicacao,
-            lambda s: verificar_explicacao(s.explicacao, entrada, categoria),
+            lambda s: verificar_explicacao(s.explicacao, entrada, "")
+            or verificar_por_que(s.explicacao, dados["tipo"]),
         )
         return saida.explicacao.strip()
 
@@ -294,7 +294,9 @@ def pedido_openai(
             return dados["choices"][0]["message"]["content"]
         except urllib.error.HTTPError as erro:
             raise LLMIndisponivel(f"LLM respondeu {erro.code}") from erro
-        except (urllib.error.URLError, TimeoutError) as erro:
+        except (urllib.error.URLError, OSError, http.client.HTTPException) as erro:
+            # OSError cobre o tempo esgotado e a conexão derrubada no meio da resposta
+            # (RemoteDisconnected, ConnectionResetError), como num reinício do Ollama.
             raise LLMIndisponivel(f"LLM fora do ar: {erro}") from erro
         except (ValueError, KeyError, IndexError, TypeError) as erro:
             raise LLMIndisponivel(f"Resposta inesperada do provedor: {erro}") from erro

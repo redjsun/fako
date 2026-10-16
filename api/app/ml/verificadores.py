@@ -58,6 +58,24 @@ def verificar_explicacao(explicacao: str, entrada: str, categoria: str) -> str |
     return None
 
 
+# O que o "Por quê?" não pode dizer: a circulação nas redes como causa da conclusão, a falta
+# de informação como argumento (contradiz o gabarito da fonte) e o rótulo da dica copiado.
+VICIOS_POR_QUE = (
+    (re.compile(r"\b(?:pois|porque)\b[^.]*\bcircul", re.I), "trata a circulação como motivo"),
+    (re.compile(r"nao ha (?:informac|provas|dados)", re.I), "diz que faltam informações"),
+    (re.compile(r"(?:^|[.!?]\s+)(?:a\s+)?dica\b", re.I), "começa a dica com o rótulo"),
+)
+
+
+def verificar_por_que(texto: str, tipo: str = "checagem") -> str | None:
+    for padrao, motivo in VICIOS_POR_QUE:
+        if padrao.search(sem_acento(texto)):
+            return motivo
+    if tipo == "manchete" and "checagem" in sem_acento(texto).lower():
+        return "fala em checagem numa manchete de veículo"
+    return None
+
+
 def verificar_reescrita(
     original: str, reescrita: str, embeddings: EmbeddingsClient, limiar: float
 ) -> str | None:

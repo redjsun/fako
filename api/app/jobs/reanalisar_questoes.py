@@ -34,18 +34,23 @@ from app.services.noticias_service import (
     explicacao_didatica,
 )
 
+LOTE = 10  # questões por commit: uma queda no meio não desfaz o que já foi feito
+
 
 def reanalisar(
     questoes: list[Question],
     classificador: ClassificadorClient,
     todas: bool,
     llm: LLMClient | None = None,
+    salvar=lambda: None,
 ) -> tuple[int, int]:
     """Atualiza a análise (e a afirmação, se faltar); devolve (reanalisadas, extraídas)."""
     padronizado = classificador.texto_de_entrada != "original"
     servico = ClassificadorService(classificador)
     reanalisadas = extraidas = 0
-    for question in questoes:
+    for posicao, question in enumerate(questoes, start=1):
+        if posicao % LOTE == 0:
+            salvar()
         nova_afirmacao = False
         if padronizado and llm is not None and not question.claim_text:
             question.claim_text = afirmacao_extraida(llm, question.statement)
@@ -77,11 +82,12 @@ def main() -> None:
     args = parser.parse_args()
     try:
         classificador = get_classificador()
-        with SessionLocal.begin() as db:
+        with SessionLocal() as db:
             questoes = list(db.scalars(select(Question).order_by(Question.id)))
             reanalisadas, extraidas = reanalisar(
-                questoes, classificador, args.todas, get_llm_client()
+                questoes, classificador, args.todas, get_llm_client(), salvar=db.commit
             )
+            db.commit()
     except ClassificadorIndisponivel as erro:
         sys.exit(f"Classificador indisponível: {erro}")
     print(
