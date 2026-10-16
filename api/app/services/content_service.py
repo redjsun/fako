@@ -78,5 +78,6 @@ class ContentService:
             raise BusinessRuleError("Só rascunhos podem ser revisados")
 
         question.status = QuestionStatus.VALIDATED if data.approve else QuestionStatus.REJECTED
-        question.validated_at = datetime.now(timezone.utc)
+        # Só a aprovação conta como validação; a rejeitada fica sem data de publicação.
+        question.validated_at = datetime.now(timezone.utc) if data.approve else None
         return to_admin_response(question)

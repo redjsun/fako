@@ -6,6 +6,8 @@
   devolve None e o jogo segue sem palpite.
 """
 
+import logging
+
 from app.core.config import get_settings
 from app.core.exceptions import ServiceUnavailableError
 from app.integrations.classificador_client import (
@@ -16,6 +18,8 @@ from app.integrations.normalizacao import limpar
 from app.schemas.admin_schema import ClassifierAnalyzeResponse
 from app.schemas.match_schema import ModelGuess
 
+logger = logging.getLogger("fako.api.classificador_service")
+
 
 class ClassificadorService:
     def __init__(self, classificador: ClassificadorClient) -> None:
@@ -25,7 +29,9 @@ class ClassificadorService:
         try:
             analise = self.classificador.analisar(statement, "admin")
         except ClassificadorIndisponivel as erro:
-            raise ServiceUnavailableError(f"Classificador indisponível: {erro}") from erro
+            # O motivo (caminho do modelo, exceção do carregamento) fica no log.
+            logger.warning("Classificador indisponível: %s", erro)
+            raise ServiceUnavailableError("Classificador indisponível") from erro
         return ClassifierAnalyzeResponse(
             statement=statement,
             normalized_statement=limpar(statement),
@@ -43,6 +49,10 @@ class ClassificadorService:
         try:
             analise = self.classificador.analisar(statement, "jogador")
         except ClassificadorIndisponivel:
+            return None
+        except Exception:
+            # O palpite é um extra: um erro do modelo não pode derrubar a resposta do jogador.
+            logger.exception("O classificador falhou ao dar o palpite do jogo")
             return None
         return ModelGuess(
             category=analise.categoria,

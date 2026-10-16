@@ -1,9 +1,8 @@
 """Rotas de progresso da jornada."""
 
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
 
-from app.core.database import get_db
+from app.core.database import SessaoDaRequisicao
 from app.core.deps import get_current_user
 from app.models.user import User
 from app.schemas.progress_schema import ProgressResponse
@@ -12,7 +11,7 @@ from app.services.progress_service import ProgressService
 router = APIRouter(prefix="/progress", tags=["progress"])
 
 
-def get_service(db: Session = Depends(get_db)) -> ProgressService:
+def get_service(db: SessaoDaRequisicao) -> ProgressService:
     return ProgressService(db)
 
 
