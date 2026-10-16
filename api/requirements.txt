@@ -5,7 +5,7 @@ pydantic-settings==2.7.0
 sqlalchemy==2.0.36
 psycopg[binary]==3.2.3
 alembic==1.14.0
-bcrypt==4.2.1
+bcrypt==5.0.0
 pyjwt==2.15.1
 # Referência TF-IDF: a mesma versão do treino (imagem ml), senão o joblib não carrega
 scikit-learn==1.9.1
