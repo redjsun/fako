@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+# Só leitura do repositório; nenhum job publica nada.
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -33,10 +37,12 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgresql+psycopg://fako:fako@localhost:5432/fako_test
+      # Segredo só de teste (a API recusa subir sem um JWT_SECRET de 32+ bytes).
+      JWT_SECRET: ci-somente-teste-nao-usar-em-producao-0123456789
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
           cache: pip
@@ -51,61 +57,115 @@ jobs:
       - name: Formatação
         run: ruff format --check .
 
+      - name: Migrações
+        run: alembic upgrade head
+
       - name: Testes
-        run: pytest -v
+        run: pytest -v --cov=app --cov-report=term-missing --cov-fail-under=80
+
+      - name: Auditoria de dependências
+        run: pip-audit
+        continue-on-error: true
 
   ml:
+    # O nome é a checagem exigida pelos rulesets da develop e da main: não renomear.
+    # O treino não fica no repositório; aqui são testados o uso do modelo publicado pela API
+    # (classificador, conjunto, ONNX, normalização) e a LLM (extração, explicação, verificadores).
     name: ML (lint e testes)
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: pesquisa/ml
+        working-directory: api
+    env:
+      JWT_SECRET: ci-somente-teste-nao-usar-em-producao-0123456789
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
           cache: pip
-          cache-dependency-path: pesquisa/ml/requirements*.txt
-
+          cache-dependency-path: api/requirements*.txt
       - name: Instalar dependências
         run: pip install -r requirements-dev.txt
-
       - name: Lint
-        run: ruff check .
-
+        run: ruff check app/ml
       - name: Formatação
-        run: ruff format --check .
-
+        run: ruff format --check app/ml
       - name: Testes
-        run: pytest -v
+        run: >-
+          pytest -v tests/test_classificador.py tests/test_conjunto.py tests/test_bert_onnx.py
+          tests/test_normalizacao.py tests/test_llm.py tests/test_verificadores.py
 
   web:
+    # O nome é a checagem exigida pelos rulesets da develop e da main: não renomear.
     name: Web (build)
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: web
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
 
       - name: Instalar dependências
-        run: npm install
+        run: npm ci
+
+      - name: Verificação de tipos
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Testes
+        run: npm run test
 
       - name: Build
         run: npm run build
+
+      - name: Auditoria de dependências
+        run: npm audit --audit-level=high
+        continue-on-error: true
+
+  docs:
+    name: Docs (build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependências
+        run: pip install -r requirements-docs.txt
+
+      - name: Build
+        run: mkdocs build --strict
+
+      - name: Verificar links externos
+        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        with:
+          args: --no-progress "doc/**/*.md" README.md
+        continue-on-error: true
 
   docker:
     name: Docker (build das imagens)
     runs-on: ubuntu-latest
     needs: [api, web]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      # bake-action lê o cache (x-bake) do compose.yaml e expõe o token do cache do GitHub.
       - name: Build
-        run: docker compose build
+        uses: docker/bake-action@59cb1203cd42bcefd40a1b6d73b589e48c86040e # v7.5.0
+        with:
+          source: .
+          files: compose.yaml
+          targets: api,web

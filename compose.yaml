@@ -1,3 +1,5 @@
+# Ambiente de desenvolvimento. As portas publicadas escutam só em 127.0.0.1: nada fica exposto
+# na rede local. As credenciais padrão do banco (fako/fako) servem só para dev; troque-as no .env.
 services:
   db:
     image: postgres:16-alpine
@@ -8,7 +10,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fako}
       POSTGRES_DB: ${POSTGRES_DB:-fako}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
@@ -18,7 +20,13 @@ services:
       retries: 10
 
   api:
-    build: ./api
+    build:
+      context: ./api
+      x-bake:
+        cache-from:
+          - type=gha,scope=api
+        cache-to:
+          - type=gha,scope=api,mode=max
     container_name: fakenews-api
     restart: unless-stopped
     env_file:
@@ -26,101 +34,92 @@ services:
         required: false
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-fako}:${POSTGRES_PASSWORD:-fako}@db:5432/${POSTGRES_DB:-fako}
+    # Para alcançar uma LLM local no host (Ollama) também no Linux.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     volumes:
       - ./api/app:/app/app
       - ./api/migrations:/app/migrations
       - ./models:/app/models:ro   # modelos publicados (MODELS_DIR), só leitura
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Rotina diária da API nos horários de api/crontab (supercronic): importa as notícias do dia
+  # e apaga as vencidas. Mesma imagem e mesmo .env da API.
+  agendador-api:
+    build:
+      context: ./api
+      x-bake:
+        cache-from:
+          - type=gha,scope=api
+        cache-to:
+          - type=gha,scope=api,mode=max
+    container_name: fakenews-agendador-api
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-fako}:${POSTGRES_PASSWORD:-fako}@db:5432/${POSTGRES_DB:-fako}
+      TZ: America/Sao_Paulo
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: supercronic /app/crontab
+    volumes:
+      - ./api/app:/app/app
+      - ./api/crontab:/app/crontab:ro
+      - ./models:/app/models:ro
     depends_on:
       db:
         condition: service_healthy
 
   web:
-    build: ./web
+    build:
+      context: ./web
+      x-bake:
+        cache-from:
+          - type=gha,scope=web
+        cache-to:
+          - type=gha,scope=web,mode=max
     container_name: fakenews-web
     restart: unless-stopped
     environment:
       API_URL: http://api:8000   # destino do proxy /api do Vite
     ports:
-      - "5173:5173"
+      - "127.0.0.1:5173:5173"
     volumes:
       - ./web:/app
       - /app/node_modules
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:5173/"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
     depends_on:
       - api
 
-  # Pesquisa: EDA, preparo dos dados e experimentos de ML (pasta pesquisa/).
-  pesquisa:
-    build: ./pesquisa
-    container_name: fakenews-pesquisa
-    profiles: ["pesquisa"]
-    env_file:
-      - path: .env
-        required: false
-    # Para alcançar uma LLM local no host (Ollama) também no Linux.
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    ports:
-      - "8888:8888"
-    volumes:
-      - ./pesquisa:/work/pesquisa
-      - ./api/app/prompts:/work/api/app/prompts
-
-  # Coleta diária e preparo dos dados nos horários de pesquisa/crontab (supercronic).
-  agendador:
-    build: ./pesquisa
-    container_name: fakenews-agendador
-    restart: unless-stopped
-    env_file:
-      - path: .env
-        required: false
-    environment:
-      TZ: America/Sao_Paulo
-    command: supercronic /work/pesquisa/crontab
-    volumes:
-      - ./pesquisa:/work/pesquisa
-      - ./models:/work/models
-
-  # Treino e experimentos de ML: imagem com PyTorch CPU e transformers, fora da API.
-  ml:
-    build: ./pesquisa/ml
-    container_name: fakenews-ml
-    profiles: ["ml"]
-    env_file:
-      - path: .env
-        required: false
-    environment:
-      # Pesos baixados do Hugging Face (BERTimbau) ficam em models/, fora do Git
-      HF_HOME: /work/models/.cache/huggingface
-    volumes:
-      - ./pesquisa:/work/pesquisa
-      - ./api/app/prompts:/work/api/app/prompts
-      - ./models:/work/models
-
-  # Ambiente do ml/ antigo (BERTimbau Y1/Y2 lido por api/app/integrations/bertimbau_engine.py).
-  ml-legado:
-    build: ./ml
-    container_name: fakenews-ml-legado
-    profiles:
-      - ml-legado
-    volumes:
-      - ./ml:/work/ml
-      - ./data:/work/data
-      - ./scripts:/work/scripts
-      - ./anotacoes:/work/anotacoes
-      - ./models:/work/models
-
   # Documentação do projeto (MkDocs + Material), servida com live-reload.
+  # A versão segue requirements-docs.txt (a mesma do CI). O repositório entra só leitura.
   docs:
-    image: squidfunk/mkdocs-material
+    image: squidfunk/mkdocs-material:9.7.7
     container_name: fakenews-docs
     profiles: ["docs"]
     ports:
-      - "8001:8000"
+      - "127.0.0.1:8001:8000"
     volumes:
-      - .:/docs
+      - .:/docs:ro
 
 volumes:
   db_data:
+  ollama_data:

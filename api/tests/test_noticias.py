@@ -1,12 +1,11 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app.core.config import get_settings
 from app.core.deps import get_current_admin
-from app.integrations.classificador_client import FakeClassificador, get_classificador
 from app.integrations.noticias_client import (
     FactCheckClient,
     GNewsClient,
@@ -15,6 +14,7 @@ from app.integrations.noticias_client import (
     get_noticias_clients,
 )
 from app.main import app
+from app.ml.classificador import FakeClassificador, get_classificador
 from app.models.user import User
 
 
@@ -88,6 +88,24 @@ def test_importa_noticias_como_rascunho_normalizado_com_analise(admin_client: Te
     assert resposta.json()["imported"] == []
 
 
+def test_url_longa_reimportada_com_manchete_editada(admin_client: TestClient):
+    marca = uuid.uuid4().hex[:6]
+    url = f"https://jornal.teste/{marca}/{'a' * 600}"
+    original = noticia(f"Prefeitura abre {marca} vagas em creches municipais")
+    editada = noticia(f"Prefeitura amplia para {marca} as vagas em creches")
+    original.url = editada.url = url
+
+    for lote in ([original], [editada]):
+        app.dependency_overrides[get_noticias_clients] = lambda lote=lote: [NoticiasDeTeste(lote)]
+        resposta = admin_client.post(
+            "/admin/news/import", json={"category": "saude", "quantity": 1}
+        )
+
+    corpo = resposta.json()
+    assert corpo["imported"] == []
+    assert [d["reason"] for d in corpo["discarded"]] == ["já importada"]
+
+
 def test_importa_checagens_com_o_lado_do_veredito(admin_client: TestClient):
     marca = uuid.uuid4().hex[:6]
     checagens = [
@@ -104,7 +122,10 @@ def test_importa_checagens_com_o_lado_do_veredito(admin_client: TestClient):
     corpo = resposta.json()
     falsa, verdadeira = corpo["imported"]
     assert falsa["is_true"] is False and verdadeira["is_true"] is True
-    assert falsa["explanation"] == "Checado por Agência Teste em 03/10/2026: falso."
+    assert falsa["explanation"] == (
+        "Circulou nas redes sociais em 03/10/2026. Agência Teste checou e concluiu que é falsa."
+    )
+    assert falsa["origin_author"] == "redes sociais" and falsa["origin_link"] is None
     assert falsa["category"] == "conhecimentos-gerais"
     assert [d["reason"] for d in corpo["discarded"]] == ["veredito sem lado no jogo (exagerado)"]
 
@@ -158,6 +179,8 @@ def test_factcheck_sem_chave_responde_indisponivel(admin_client: TestClient, mon
 def test_factcheck_converte_alegacao_com_a_checagem_da_agencia_pedida():
     claim = {
         "text": "Vacina contém chip",
+        "claimant": "Posts no Facebook",
+        "claimDate": "2026-09-30T00:00:00Z",
         "claimReview": [
             {"publisher": {"name": "Outra", "site": "outra.org"}, "textualRating": "Verdadeiro"},
             {
@@ -170,6 +193,8 @@ def test_factcheck_converte_alegacao_com_a_checagem_da_agencia_pedida():
     }
     convertida = FactCheckClient.checagem(claim, "aosfatos.org")
     assert convertida.veiculo == "Aos Fatos" and convertida.url == "https://aosfatos.org/x"
+    assert convertida.origem_autor == "Facebook"
+    assert convertida.origem_data == date(2026, 9, 30)
     assert convertida.veredito == "falso" and convertida.verdadeira is False
     assert FactCheckClient.checagem({"text": "sem checagem"}, "aosfatos.org") is None
 
@@ -195,9 +220,9 @@ def test_gnews_intercala_os_topicos(monkeypatch):
 
     monkeypatch.setattr(cliente, "do_topico", do_topico)
     monkeypatch.setattr(cliente, "PAUSA", 0)
-    titulos = [n.titulo.split(" - ")[0] for n in cliente.buscar(4)]
-    assert pedidos == ["health", "science", "technology"]
-    assert titulos == ["health 0", "science 0", "technology 0", "health 1"]
+    titulos = [n.titulo.split(" - ")[0] for n in cliente.buscar(8)]
+    assert pedidos == list(GNewsClient.TOPICOS)
+    assert titulos == [f"{topico} 0" for topico in GNewsClient.TOPICOS] + ["health 1", "science 1"]
 
 
 def test_gnews_converte_artigo():

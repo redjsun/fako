@@ -12,7 +12,7 @@ informação?" num slider de 0 a 100 (acerta a até 15 pontos da referência). A
 a fonte só aparecem depois da resposta (`web/src/components/QuestionModal.tsx`).
 
 **A afirmação mostrada é o mesmo texto que o classificador recebe e o mesmo formato do
-treino.** Ela sai do prompt de extração (`api/app/prompts/extrair_afirmacoes_vN.txt`, #19),
+treino.** Ela sai do prompt de extração (`api/app/ml/prompts/extrair_afirmacoes_vN.txt`, #19),
 que também padroniza o treino (`doc/padronizacao.md`):
 
 - uma frase, de 12 a 25 palavras, autocontida: quem (nome completo e cargo), o quê e os
@@ -57,7 +57,7 @@ Gerais está desatualizado nisso).
 
 | Origem | Referência |
 |---|---|
-| notícia da API | nota do classificador, `100 × (P1 + P2) / 2` (`api/app/integrations/classificador_client.py`), conferida pelo revisor |
+| notícia da API | nota do classificador, `100 × (P1 + P2) / 2` (`api/app/ml/classificador.py`), conferida pelo revisor |
 | checagem com veredito falso | ~10 |
 | checagem com veredito enganoso (fora de contexto, exagerado...) | ~50 |
 

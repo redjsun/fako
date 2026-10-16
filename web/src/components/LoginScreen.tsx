@@ -1,5 +1,11 @@
 import React, { useState } from "react";
-import { authService } from "../services/authService";
+import {
+  PASSWORD_MIN,
+  USERNAME_MAX,
+  USERNAME_MIN,
+  authService,
+  registrationError,
+} from "../services/authService";
 import { User } from "../types";
 import fakoSnakeImg from "../assets/fako-snake.png";
 import { FakoLogo } from "./FakoLogo";
@@ -8,12 +14,15 @@ interface LoginScreenProps {
   onLoginSuccess: (user: User) => void;
   theme: "light" | "dark";
   onToggleTheme: () => void;
+  // Aviso vindo do app, ex.: sessão expirada.
+  notice?: string | null;
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({
   onLoginSuccess,
   theme,
   onToggleTheme,
+  notice = null,
 }) => {
   const [tab, setTab] = useState<"login" | "register">("login");
   const [username, setUsername] = useState("");
@@ -22,7 +31,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   const [rememberMe, setRememberMe] = useState(false);
   const [isAccordionOpen, setIsAccordionOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [infoNotice, setInfoNotice] = useState<string | null>(null);
+  const [infoNotice, setInfoNotice] = useState<string | null>(notice);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -34,16 +43,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       setError("Por favor, digite seu nome de usuário.");
       return;
     }
-    if (!password.trim()) {
+    if (!password) {
       setError("Por favor, digite sua senha.");
       return;
     }
-    if (tab === "register" && !/^[A-Za-z0-9._-]{3,}$/.test(username.trim())) {
-      setError("O usuário precisa de pelo menos 3 caracteres: letras, números, . - _");
-      return;
-    }
-    if (tab === "register" && password.trim().length < 6) {
-      setError("A senha deve ter pelo menos 6 caracteres.");
+    const invalid = tab === "register" ? registrationError(username, password) : null;
+    if (invalid) {
+      setError(invalid);
       return;
     }
 
@@ -51,14 +57,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
     try {
       if (tab === "login") {
-        const result = await authService.login(username.trim(), password);
+        const result = await authService.login(username.trim(), password, rememberMe);
         if (result.success && result.user) {
           onLoginSuccess(result.user);
         } else {
           setError(result.error || "Nome de usuário ou senha incorretos.");
         }
       } else {
-        const result = await authService.register(username.trim(), password);
+        const result = await authService.register(username.trim(), password, rememberMe);
         if (result.success && result.user) {
           onLoginSuccess(result.user);
         } else {
@@ -81,7 +87,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       if (result.success && result.user) {
         onLoginSuccess(result.user);
       } else {
-        setError("Não foi possível entrar como visitante.");
+        setError(result.error || "Não foi possível entrar como visitante.");
       }
     } catch {
       setError("Erro ao acessar como visitante.");
@@ -92,8 +98,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
   const handleForgotPassword = () => {
     setError(null);
+    // A API ainda não tem recuperação de senha
     setInfoNotice(
-      "Para este ambiente de testes, acesse como visitante ou cadastre uma nova conta na aba 'Criar conta'."
+      "Ainda não dá para recuperar a senha pelo jogo. Peça a um administrador do FAKO para redefini-la, ou crie uma nova conta."
     );
   };
 
@@ -291,13 +298,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                     if (error) setError(null);
                   }}
                   autoComplete="username"
+                  maxLength={USERNAME_MAX}
                   aria-describedby={tab === "register" ? "fako-username-hint" : undefined}
                   required
                 />
               </div>
               {tab === "register" && (
                 <p id="fako-username-hint" className="fako-field-hint">
-                  Mínimo de 3 caracteres (letras, números, . - _).
+                  De {USERNAME_MIN} a {USERNAME_MAX} caracteres (letras, números, . - _).
                 </p>
               )}
             </div>
@@ -349,7 +357,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               </div>
               {tab === "register" && (
                 <p id="fako-password-hint" className="fako-field-hint">
-                  Mínimo de 6 caracteres.
+                  Mínimo de {PASSWORD_MIN} caracteres.
                 </p>
               )}
             </div>

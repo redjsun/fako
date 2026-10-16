@@ -1,6 +1,6 @@
 import React from "react";
-import { AnswerResult, Question } from "../types";
-import { reliabilityLabel } from "../utils/formatters";
+import { AnswerResult, ClaimOrigin, ModelGuess, Question } from "../types";
+import { reliabilityLabel, wrongAnswerEffect } from "../utils/formatters";
 import { Icon } from "./Icon";
 import { ReliabilityBar } from "./ReliabilityBar";
 
@@ -10,6 +10,7 @@ interface QuestionPopupProps {
   question: Question | null;
   reliability: number;
   secondsLeft: number;
+  tolerance: number;
   isSubmitting: boolean;
   onChangeReliability: (value: number) => void;
   onConfirm: () => void;
@@ -20,6 +21,7 @@ export const QuestionPopup: React.FC<QuestionPopupProps> = ({
   question,
   reliability,
   secondsLeft,
+  tolerance,
   isSubmitting,
   onChangeReliability,
   onConfirm,
@@ -88,7 +90,7 @@ export const QuestionPopup: React.FC<QuestionPopupProps> = ({
             <p className="question-card__help">
               Atalhos: ← → ajusta 5% · Enter confirma
               <br />
-              Você acerta se ficar a até 15 pontos da referência oficial.
+              Você acerta se ficar a até {tolerance} pontos da referência oficial.
             </p>
           </>
         ) : (
@@ -105,10 +107,14 @@ interface ResultPopupProps {
   statement: string;
   result: AnswerResult;
   pointsPerCorrect: number;
+  // Regras do nível: quantos blocos a cobra cresce e quantos pontos perde no erro.
+  growthPerError: number;
+  wrongAnswerPenalty: number;
   onContinue: () => void;
 }
 
 function distanceMessage(result: AnswerResult): string {
+  if (result.timed_out) return "A resposta chegou depois do tempo da pergunta e contou como erro.";
   if (result.distance === 0) return "Cravou a referência. Na mosca!";
   const points = result.distance === 1 ? "ponto" : "pontos";
   return result.is_correct
@@ -117,13 +123,86 @@ function distanceMessage(result: AnswerResult): string {
 }
 
 /** Popup do resultado: sua resposta × referência, explicação, fonte e efeito na cobrinha. */
+function formatDate(isoDate: string): string {
+  const [year, month, day] = isoDate.split("-");
+  return `${day}/${month}/${year}`;
+}
+
+// "https://www.aosfatos.org/noticias/..." -> "aosfatos.org"; texto que não é URL fica como está.
+function sourceLabel(source: string): string {
+  try {
+    return new URL(source).hostname.replace(/^www\d?\./, "");
+  } catch {
+    return source;
+  }
+}
+
+function isUrl(text: string): boolean {
+  return /^https?:\/\//.test(text);
+}
+
+// Onde a alegação circulou (ou o veículo que publicou a manchete): o destaque da resposta.
+const OriginCard: React.FC<{ origin: ClaimOrigin }> = ({ origin }) => {
+  const when = origin.when ? ` em ${formatDate(origin.when)}` : "";
+  const isPlace = origin.kind === "alegacao" && origin.author === "redes sociais";
+  return (
+    <div className="result-card__why result-card__origin">
+      <h3>
+        <Icon name="book" size={18} />
+        {origin.kind === "alegacao" ? "Onde circulou" : "Onde foi publicada"}
+      </h3>
+      <p>
+        {isPlace ? "Nas " : ""}
+        <strong>{origin.author}</strong>
+        {when}
+      </p>
+      {origin.link && (
+        <p className="result-card__source">
+          <a href={origin.link} target="_blank" rel="noopener noreferrer">
+            {origin.kind === "materia" ? "Ler a matéria" : "Ver a publicação original"}
+          </a>
+        </p>
+      )}
+    </div>
+  );
+};
+
+const GUESS_LABELS: Record<ModelGuess["category"], string> = {
+  falso: "Falso",
+  enganoso: "Enganoso",
+  confere: "Confere",
+  incerto: "Incerto",
+};
+
+// O que o classificador achou da afirmação; não muda a correção, que vem da checagem.
+const ModelGuessCard: React.FC<{ guess: ModelGuess }> = ({ guess }) => (
+  <div className="result-card__why result-card__model">
+    <h3>
+      <Icon name="bulb" size={18} />
+      O que o classificador achou
+    </h3>
+    <p>
+      <strong>{GUESS_LABELS[guess.category] ?? guess.category}</strong>
+      {guess.category === "incerto"
+        ? " — o modelo não tem certeza sobre esta afirmação."
+        : ` — nota ${Math.round(guess.score ?? 0)} de 100, com ${Math.round(
+            guess.confidence * 100
+          )}% de confiança.`}
+    </p>
+    <p className="result-card__source">Modelo: {guess.model_version}</p>
+  </div>
+);
+
 export const ResultPopup: React.FC<ResultPopupProps> = ({
   statement,
   result,
   pointsPerCorrect,
+  growthPerError,
+  wrongAnswerPenalty,
   onContinue,
 }) => {
   const tone = result.is_correct ? "success" : "danger";
+  const wrongEffect = wrongAnswerEffect(growthPerError, wrongAnswerPenalty);
 
   return (
     <div className="popup-scrim popup-scrim--below-hud">
@@ -142,7 +221,7 @@ export const ResultPopup: React.FC<ResultPopupProps> = ({
             <p>{distanceMessage(result)}</p>
           </div>
           <span className="result-card__badge">
-            {result.is_correct ? `+${pointsPerCorrect} pts` : "+1 bloco"}
+            {result.is_correct ? `+${pointsPerCorrect} pts` : wrongEffect}
           </span>
         </header>
 
@@ -159,30 +238,44 @@ export const ResultPopup: React.FC<ResultPopupProps> = ({
             />
           </div>
 
+          {result.claim_origin && <OriginCard origin={result.claim_origin} />}
+
           <div className="result-card__why">
             <h3>
               <Icon name="bulb" size={18} />
               Por quê?
             </h3>
             <p>{result.explanation}</p>
-            {result.source && (
+            {result.source && result.claim_origin?.kind !== "materia" && (
               <p className="result-card__source">
                 <Icon name="book" size={14} />
-                Fonte: {result.source}
+                {result.claim_origin ? "Checagem: " : "Fonte: "}
+                {isUrl(result.source) ? (
+                  <a href={result.source} target="_blank" rel="noopener noreferrer">
+                    {sourceLabel(result.source)}
+                  </a>
+                ) : (
+                  result.source
+                )}
               </p>
             )}
           </div>
+
+          {result.model_guess && <ModelGuessCard guess={result.model_guess} />}
 
           <div className="result-card__snake">
             <span className="result-card__snake-blocks" aria-hidden="true">
               <span />
               <span />
               <span />
-              {!result.is_correct && <span className="is-new" />}
+              {!result.is_correct &&
+                Array.from({ length: growthPerError }, (_, index) => <span key={index} className="is-new" />)}
             </span>
             {result.is_correct
               ? "A cobrinha não cresceu. Continue assim!"
-              : "A cobrinha cresceu +1 bloco. Leia com calma!"}
+              : `A cobrinha cresceu ${wrongAnswerEffect(growthPerError, 0)}${
+                  wrongAnswerPenalty > 0 ? ` e você perdeu ${wrongAnswerPenalty} pts` : ""
+                }. Leia com calma!`}
           </div>
 
           <button

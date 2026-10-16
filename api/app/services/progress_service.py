@@ -1,5 +1,6 @@
 """Consulta e atualização do progresso do jogador."""
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.progress import UserProgress
@@ -10,13 +11,22 @@ from app.schemas.progress_schema import ProgressResponse
 
 class ProgressService:
     def __init__(self, db: Session) -> None:
+        self.db = db
         self.progress = ProgressRepository(db)
 
-    def get_or_create(self, user_id: int) -> UserProgress:
-        progress = self.progress.get_by_user(user_id)
-        if progress is None:
-            progress = self.progress.add(UserProgress(user_id=user_id))
-        return progress
+    def get_or_create(self, user_id: int, bloquear: bool = False) -> UserProgress:
+        progress = self.progress.get_by_user(user_id, bloquear)
+        if progress is not None:
+            return progress
+        # Dois pedidos simultâneos podem tentar criar o progresso; o índice único barra o
+        # segundo, que passa a usar o do primeiro.
+        try:
+            with self.db.begin_nested():
+                return self.progress.add(UserProgress(user_id=user_id))
+        except IntegrityError:
+            progress = self.progress.get_by_user(user_id, bloquear)
+            assert progress is not None
+            return progress
 
     def get(self, user: User) -> ProgressResponse:
         return ProgressResponse.model_validate(self.get_or_create(user.id))

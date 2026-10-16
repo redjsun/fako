@@ -33,6 +33,10 @@ def to_admin_response(question: Question) -> QuestionAdminResponse:
         model_score=question.model_score,
         model_confidence=question.model_confidence,
         model_version=question.model_version,
+        claim_text=question.claim_text,
+        origin_author=question.origin_author,
+        origin_link=question.origin_link,
+        origin_date=question.origin_date,
     )
 
 
@@ -78,5 +82,6 @@ class ContentService:
             raise BusinessRuleError("Só rascunhos podem ser revisados")
 
         question.status = QuestionStatus.VALIDATED if data.approve else QuestionStatus.REJECTED
-        question.validated_at = datetime.now(timezone.utc)
+        # Só a aprovação conta como validação; a rejeitada fica sem data de publicação.
+        question.validated_at = datetime.now(timezone.utc) if data.approve else None
         return to_admin_response(question)

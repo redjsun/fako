@@ -30,9 +30,19 @@ Nível de dificuldade da partida (`level.py`).
 | Coluna | Tipo | Notas |
 |---|---|---|
 | `number` | `int` | único, indexado |
-| `board_size` | `int` | 7×7 nos níveis 1 a 3, 6×6 nos níveis 4 a 6 |
+| `board_size` | `int` | lado do tabuleiro, em células |
 | `tick_ms` | `int` | intervalo entre movimentos da cobra; menor é mais difícil |
 | `min_score_to_advance` | `int` | pontuação mínima na partida para liberar o próximo nível |
+| `match_seconds` | `int` | duração da partida (tempo de cobra andando) |
+| `question_seconds` | `int` | tempo para responder cada afirmação |
+| `reliability_tolerance` | `int` | distância máxima da referência para a resposta acertar |
+| `wrong_answer_penalty` | `int` | pontos tirados a cada erro (o placar nunca fica negativo) |
+| `growth_per_error` | `int` | blocos que a cobra cresce a cada erro |
+| `solid_walls` | `bool` | bater na borda encerra a partida |
+| `apple_lifetime_seconds` | `int`, nulo | prazo para a maçã mudar de lugar; nulo, a maçã fica parada |
+| `rotten_apples` | `int` | quantidade de maçãs podres no tabuleiro |
+
+Valores de cada nível em [Níveis da jornada](../jogo/niveis.md).
 
 ## `questions`
 
@@ -66,10 +76,12 @@ Partida do jogador (`match.py`).
 | `user_id` | `FK → users.id` | indexado |
 | `level_id` | `FK → levels.id` | |
 | `score` | `int` | pontuação acumulada na partida (RF18) |
-| `duration_seconds` | `int` | duração máxima de 120 segundos |
-| `status` | `enum` (`MatchStatus`) | `in_progress` ou `finished` |
+| `duration_seconds` | `int` | tempo de cobra andando, copiado de `levels.match_seconds` quando a partida começa |
+| `status` | `enum` (`MatchStatus`) | `in_progress`, `finished` ou `abandoned` (deixada aberta quando o jogador começou outra; não conta pontos) |
 | `started_at` | `DateTime` | |
 | `ended_at` | `DateTime`, opcional | |
+| `current_question_id` | `FK → questions.id`, opcional | pergunta servida e ainda sem resposta: a única que a partida aceita responder, e a que `next-question` devolve até ser respondida |
+| `current_question_served_at` | `DateTime`, opcional | quando a pergunta atual foi servida; a resposta vale até o tempo de pergunta do nível mais 30 s de folga |
 
 ## `match_answers`
 
@@ -81,7 +93,10 @@ Confiabilidade (0 a 100) dada pelo jogador a uma questão durante a partida.
 | `question_id` | `FK → questions.id` | |
 | `answer` | `bool` | leitura binária da resposta (`reliability >= 50`), mantida para relatórios |
 | `reliability` | `int`, opcional | valor de 0 a 100 marcado na barra |
-| `is_correct` | `bool` | distância até `reliability_reference` dentro da tolerância (`game_rules.py`) |
+| `is_correct` | `bool` | distância até `reliability_reference` dentro da tolerância (`game_rules.py`); falso se a resposta chegou depois do tempo |
+
+Restrição única `uq_match_answers_match_question` em (`match_id`, `question_id`): cada questão é
+respondida uma vez por partida.
 
 ## `user_progress`
 
@@ -101,6 +116,7 @@ Progresso consolidado do jogador na jornada (`progress.py`), um registro por jog
 - `questions.category_id → categories.id` (N para 1)
 - `matches.user_id → users.id` (N para 1)
 - `matches.level_id → levels.id` (N para 1)
+- `matches.current_question_id → questions.id` (N para 1, opcional)
 - `match_answers.match_id → matches.id` (N para 1)
 - `match_answers.question_id → questions.id` (N para 1)
 - `user_progress.user_id → users.id` (1 para 1)

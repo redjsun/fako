@@ -1,0 +1,8 @@
+# Tarefas do serviço agendador-api (supercronic), no fuso de TZ (America/Sao_Paulo no compose).
+# Os comandos rodam em /app, a pasta da API no container.
+
+# Notícias do dia (NOTICIAS_PROVIDER).
+0 6 * * * python -m app.jobs.importar_noticias
+
+# Apaga as notícias importadas há mais de NOTICIAS_RETENCAO_DIAS; arquiva as respondidas.
+30 5 * * * python -m app.jobs.limpar_noticias

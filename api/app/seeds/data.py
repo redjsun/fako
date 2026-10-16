@@ -6,15 +6,32 @@ CATEGORIES = [
     {"name": "Conhecimentos Gerais", "slug": "conhecimentos-gerais"},
 ]
 
-# Níveis 1–3 em 7×7, níveis 4–6 em 6×6; a cobra acelera a cada nível.
-LEVELS = [
-    {"number": 1, "board_size": 7, "tick_ms": 400, "min_score_to_advance": 30},
-    {"number": 2, "board_size": 7, "tick_ms": 350, "min_score_to_advance": 40},
-    {"number": 3, "board_size": 7, "tick_ms": 300, "min_score_to_advance": 50},
-    {"number": 4, "board_size": 6, "tick_ms": 300, "min_score_to_advance": 50},
-    {"number": 5, "board_size": 6, "tick_ms": 250, "min_score_to_advance": 60},
-    {"number": 6, "board_size": 6, "tick_ms": 200, "min_score_to_advance": 70},
+# Regras de cada nível (doc/jogo/niveis.md). A dificuldade cresce pela mecânica, não pelas
+# afirmações: tabuleiro menor, cobra mais rápida, menos tempo, menos tolerância, erro mais
+# caro, paredes sólidas e maçãs que somem ou estragam.
+_LEVEL_COLUMNS = (
+    "number",
+    "board_size",
+    "tick_ms",
+    "min_score_to_advance",
+    "match_seconds",
+    "question_seconds",
+    "reliability_tolerance",
+    "wrong_answer_penalty",
+    "growth_per_error",
+    "solid_walls",
+    "apple_lifetime_seconds",
+    "rotten_apples",
+)
+_LEVEL_ROWS = [
+    (1, 16, 160, 30, 120, 45, 15, 0, 1, False, None, 0),
+    (2, 16, 145, 40, 120, 40, 15, 0, 1, False, None, 0),
+    (3, 14, 130, 50, 110, 35, 12, 0, 2, False, None, 0),
+    (4, 14, 125, 50, 100, 30, 10, 5, 2, True, 12, 0),
+    (5, 12, 115, 60, 90, 25, 10, 5, 2, True, 10, 2),
+    (6, 12, 105, 70, 90, 20, 8, 10, 3, True, 8, 4),
 ]
+LEVELS = [dict(zip(_LEVEL_COLUMNS, row, strict=True)) for row in _LEVEL_ROWS]
 
 QUESTIONS = [
     {

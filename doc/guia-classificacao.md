@@ -3,7 +3,7 @@
 > **Status:** os dados e a divisão em treino, validação e teste (seções 3 e 5) estão
 > implementados em `pesquisa/dados/preparar_dados.py`. O classificador (seção 4) e a anotação
 > (seções 7 e 8) são planejados: `pesquisa/ml/` ainda não existe e `/admin/ai/classify` usa o
-> `FakeAIClient`. Revisão de 05/10/2026 do guia original (PDF), alinhada ao que o projeto
+> classificador fake. Revisão de 05/10/2026 do guia original (PDF), alinhada ao que o projeto
 > tem hoje.
 
 Baseado no framework de desordem informacional de Wardle e Derakhshan (2017, relatório

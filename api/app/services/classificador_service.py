@@ -6,15 +6,20 @@
   devolve None e o jogo segue sem palpite.
 """
 
+import logging
+
 from app.core.config import get_settings
 from app.core.exceptions import ServiceUnavailableError
-from app.integrations.classificador_client import (
+from app.ml.classificador import (
+    Analise,
     ClassificadorClient,
     ClassificadorIndisponivel,
 )
-from app.integrations.normalizacao import limpar
+from app.ml.normalizacao import limpar
 from app.schemas.admin_schema import ClassifierAnalyzeResponse
 from app.schemas.match_schema import ModelGuess
+
+logger = logging.getLogger("fako.api.classificador_service")
 
 
 class ClassificadorService:
@@ -25,7 +30,9 @@ class ClassificadorService:
         try:
             analise = self.classificador.analisar(statement, "admin")
         except ClassificadorIndisponivel as erro:
-            raise ServiceUnavailableError(f"Classificador indisponível: {erro}") from erro
+            # O motivo (caminho do modelo, exceção do carregamento) fica no log.
+            logger.warning("Classificador indisponível: %s", erro)
+            raise ServiceUnavailableError("Classificador indisponível") from erro
         return ClassifierAnalyzeResponse(
             statement=statement,
             normalized_statement=limpar(statement),
@@ -37,12 +44,26 @@ class ClassificadorService:
             contributions=analise.contribuicoes,
         )
 
-    def palpite_do_jogo(self, statement: str) -> ModelGuess | None:
+    def analise_do_jogo(self, statement: str, claim_text: str | None = None) -> Analise | None:
+        """A análise com o limiar do jogador. `claim_text` (a afirmação extraída na importação)
+        só entra se o modelo publicado foi treinado no texto padronizado ou híbrido; senão, o
+        enunciado como o jogador leu. None sem modelo."""
+        padronizado = self.classificador.texto_de_entrada != "original"
+        entrada = claim_text if padronizado and claim_text else statement
+        try:
+            return self.classificador.analisar(entrada, "jogador", enunciado=statement)
+        except ClassificadorIndisponivel:
+            return None
+        except Exception:
+            # O palpite é um extra: um erro do modelo não pode derrubar a resposta do jogador.
+            logger.exception("O classificador falhou ao dar o palpite do jogo")
+            return None
+
+    def palpite_do_jogo(self, statement: str, claim_text: str | None = None) -> ModelGuess | None:
         if not get_settings().classificador_no_jogo:
             return None
-        try:
-            analise = self.classificador.analisar(statement, "jogador")
-        except ClassificadorIndisponivel:
+        analise = self.analise_do_jogo(statement, claim_text)
+        if analise is None:
             return None
         return ModelGuess(
             category=analise.categoria,

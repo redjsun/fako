@@ -1,8 +1,20 @@
 # Planejamento: coleta contínua e retreino do classificador
 
 > **Status:** a coleta diária está implementada (serviço `agendador` e `pesquisa/crontab`,
-> issue #4). O retreino mensal depende de termos o primeiro modelo treinado e avaliado
-> (`pesquisa/ml/treinar.py` e `pesquisa/ml/avaliar.py` ainda não existem).
+> issue #4). O treino e a avaliação já existem, mas rodam à mão: `pesquisa/ml/treinar_referencia.py`
+> (`make referencia`), `pesquisa/ml/treinar_bert.py` (`make bert`) e `pesquisa/ml/avaliar.py`
+> (`make avaliar`). A publicação ainda é uma cópia sem portão de qualidade (`make publicar`, issue
+> #14), e por isso o retreino mensal automático não está agendado.
+>
+> - Se a coleta falhar (por exemplo, sem `FACTCHECK_API_KEY`), o `crontab` registra `[ERRO]` no
+>   log e o `preparar_dados` roda mesmo assim. O dataset é gravado num arquivo temporário e
+>   trocado de uma vez, então um treino rodando às 3h não lê um arquivo pela metade.
+> - O `avaliar.py` confere o `dataset_sha256` do modelo com o dataset atual e aborta se forem
+>   diferentes; `--aceitar-dataset-diferente` segue mesmo assim e avisa no relatório.
+> - O conjunto de teste só é olhado sob pedido: `--teste` nos scripts legados (`ml/tfidf.py`,
+>   `ml/bertimbau.py`) e `INCLUIR_TESTE = True` no notebook `avaliacao_modelos.ipynb`.
+> - Os scripts de treino gravam o SHA-256 dos artefatos no `config.json`, e quem carrega um
+>   modelo confere o hash antes do `joblib.load`. Modelos antigos, sem hash, carregam com aviso.
 
 ## Por que retreinar
 
@@ -51,17 +63,20 @@ O `pesquisa/crontab` hoje:
 0 3 * * * python pesquisa/dados/coletar_factcheck.py --incremental && python pesquisa/dados/preparar_dados.py
 ```
 
-Quando o retreino existir, entra uma linha mensal, por exemplo
-`0 5 1 * * python pesquisa/dados/preparar_dados.py && python pesquisa/ml/treinar.py && python pesquisa/ml/avaliar.py --publicar-se-melhor`.
+Quando a publicação com portão existir (#14), entra uma linha mensal, por exemplo
+`0 5 1 * * python pesquisa/dados/preparar_dados.py && python pesquisa/ml/treinar_referencia.py --config pesquisa/ml/configs/referencia.toml && python pesquisa/ml/publicar.py`
+(`publicar.py` é o script previsto em #14, que roda o `avaliar.py` e só publica se o modelo novo for melhor).
 O treino precisa do PyTorch da imagem `pesquisa/ml/`: nesse momento o agendador passa a usar
 essa imagem ou ganha um segundo serviço.
 
 O serviço no `compose.yaml` usa a imagem de `pesquisa/` (o `Dockerfile` instala o binário do
-supercronic, conferido por SHA-1) e sobe com `docker compose up`:
+supercronic, conferido por SHA-1). Ele fica no profile `agendador` e sobe só na máquina que faz
+a coleta, com `make agendador` (um `make up` comum não regenera o `dataset.jsonl` de madrugada):
 
 ```yaml
   agendador:
     build: ./pesquisa
+    profiles: ["agendador"]
     restart: unless-stopped
     env_file: .env                     # FACTCHECK_API_KEY
     environment:
@@ -69,11 +84,13 @@ supercronic, conferido por SHA-1) e sobe com `docker compose up`:
     command: supercronic /work/pesquisa/crontab
     volumes:
       - ./pesquisa:/work/pesquisa
-      - ./models:/work/models          # a API lê o modelo publicado daqui
 ```
 
+Quando o retreino entrar, o serviço que treina passa a montar `./models` para gravar o modelo
+publicado, que a API lê.
+
 Para testar um horário próximo sem mexer no `crontab`:
-`docker compose run --rm agendador supercronic -test /work/pesquisa/crontab` confere a sintaxe,
+`docker compose --profile agendador run --rm agendador supercronic -test /work/pesquisa/crontab` confere a sintaxe,
 e um `crontab` temporário com `* * * * *` roda a tarefa no minuto seguinte.
 
 ### Fontes da coleta diária

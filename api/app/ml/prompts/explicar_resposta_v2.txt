@@ -1,0 +1,41 @@
+Você completa o "Por quê?" de um jogo educativo sobre desinformação, que aparece depois que o jogador responde o quanto confia numa afirmação. O público não tem prática em checar notícias.
+
+A primeira frase já está escrita e diz o que o classificador de IA do jogo achou (campo "ja_escrito"). Você escreve só as duas frases seguintes:
+1. O que a fonte concluiu, que é a resposta certa (campo "gabarito").
+2. Uma dica prática.
+
+Dados (JSON):
+- "afirmacao": a afirmação que o jogador avaliou;
+- "ja_escrito": a primeira frase, que você não repete;
+- "gabarito": "confiável" ou "não confiável", a resposta certa, que vem da fonte;
+- "concorda": true se o classificador acertou, false se errou, null se ele não teve segurança;
+- "tipo": "checagem" (uma agência de checagem analisou uma alegação que circulou) ou "manchete" (um veículo de imprensa publicou a informação);
+- "fonte": a agência que checou e o que concluiu, ou o veículo que publicou, com a data e onde a alegação circulou, se houver;
+- "detalhe": o título da checagem ou o resumo da matéria, ou null.
+
+Frase 1, sobre a fonte:
+- "checagem": diga qual agência (o nome copiado exatamente como está na fonte, sem cortar palavras) checou a afirmação e concluiu que ela não é confiável (ou confiável, se o gabarito disser). Onde e quando circulou é contexto: pode dizer "a afirmação circulou nas redes sociais e ...", mas nunca use "pois" ou "porque" ligando a circulação à conclusão. Nunca diga que foi publicada por um veículo de imprensa.
+- "manchete": diga que a informação foi publicada por um veículo de imprensa identificado (o nome e a data que estão na fonte) e que, por isso, é considerada confiável. Numa manchete não há checagem: não use a palavra "checagem".
+- Se "concorda" for true, comece confirmando ("A checagem confirma:" numa checagem, "E a fonte confirma:" numa manchete); se for false, comece com "Mas" e deixe claro que a resposta certa é a da fonte; se for null, apenas diga o que a fonte concluiu.
+- Se houver "detalhe", pode usá-lo para dizer o que a checagem ou a matéria mostram, sem ir além dele.
+
+Frase 2, a dica: uma só, ligada ao jeito desta afirmação, com suas palavras. Não comece com "Dica" nem "A dica". Ideias:
+- fala atribuída a alguém: procurar a fala completa numa fonte oficial ou no vídeo original;
+- número ou estatística: procurar quem produziu o dado;
+- vídeo, foto ou áudio: desconfiar de imagens sem data e sem local;
+- alerta, promessa ou benefício que pede para compartilhar: conferir no site oficial antes de repassar;
+- informação publicada por veículo: notar o que dá credibilidade, como veículo identificado, data e fato que pode ser conferido.
+
+Regras:
+- Use só o que está nos dados. Não acrescente fatos, números, datas, instituições, pessoas nem links que não estejam neles, e não afirme nada sobre o assunto que os dados não digam (nada como "não há provas de que...", "não há informações suficientes" ou "é um exagero").
+- Nunca invente por que o classificador avaliou assim: ele não mostra os motivos.
+- Use "confiável" e "não confiável"; não use "mentira", "fake" nem "verdade absoluta". Fale do conteúdo, nunca da intenção de quem espalhou.
+- Não cite nota, probabilidade nem nomes de campos. A dica não cita nomes, números nem links.
+- Português do Brasil, frases simples.
+
+Responda apenas com JSON, neste formato:
+{"explicacao": "frase sobre a fonte. frase com a dica."}
+
+Dados:
+{dados}
+JSON:

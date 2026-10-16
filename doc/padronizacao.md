@@ -18,8 +18,8 @@ A afirmação padronizada é também a pergunta do jogo, sem outra reescrita: ve
 ## Como roda
 
 ```bash
-make padronizar ARGS="--limite 50"   # amostra, com api/app/prompts/extrair_afirmacoes_v1.txt
-make padronizar ARGS="--paralelo 8"  # lote todo; outra versão: PROMPT=api/app/prompts/..._v2.txt
+make padronizar ARGS="--limite 50"   # amostra, com api/app/ml/prompts/extrair_afirmacoes_v1.txt
+make padronizar ARGS="--paralelo 8"  # lote todo; outra versão: PROMPT=api/app/ml/prompts/..._v2.txt
 ```
 
 - **Entrada:** os registros de `pesquisa/data/processed/dataset.jsonl` com `split_produto` em
@@ -27,7 +27,7 @@ make padronizar ARGS="--paralelo 8"  # lote todo; outra versão: PROMPT=api/app/
   no mesmo formato. `reserva` e `fora` (~42 mil) não entram no modelo do jogo e ficam de fora
   (`--splits todos` inclui). Usa o `texto_curto`; sem ele (Fake.br, verdadeiras do
   FakeTrue.Br, a maior parte das mensagens), usa o `texto`.
-- **Prompt:** o arquivo `api/app/prompts/extrair_afirmacoes_vN.txt` da #19, o mesmo do
+- **Prompt:** o arquivo `api/app/ml/prompts/extrair_afirmacoes_vN.txt` da #19, o mesmo do
   uso. O texto do registro entra no marcador `{texto}` (ou no fim, se o prompt não tiver o
   marcador). A resposta segue o esquema da #19, `{"e_opiniao": ..., "afirmacoes":
   [{"texto": ..., "quem_disse": ...}]}`; lista vazia quer dizer opinião. O cache guarda o
@@ -73,6 +73,47 @@ make padronizar ARGS="--paralelo 8"  # lote todo; outra versão: PROMPT=api/app/
   rodada.
 - **Custo:** cada rodada acrescenta o tempo, o número de chamadas e os tokens (quando o
   endpoint informa) em `padronizado_<versao>.rodadas.jsonl`.
+
+### Lote de outubro de 2026 e o texto híbrido
+
+Medido com `qwen3:8b` no Ollama do host (Mac M4, 24 GB): **cerca de 6 s por item**. A resposta
+domina o tempo (o prompt tem ~900 tokens); cortar o texto de entrada (`--max-caracteres 1500`)
+não ajudou, e nem o paralelismo: com `OLLAMA_NUM_PARALLEL=4` e `--paralelo 4`, 7,3 s por item,
+porque os pedidos dividem a mesma banda de memória da GPU. Padronizar os ~28 mil registros
+levaria ~44 h.
+
+Por isso o primeiro modelo usa o **texto híbrido** (`texto = "hibrido"`, em
+`configs/referencia-hibrido.toml`): o `texto_curto` onde ele existe (as checagens já são
+alegações curtas) e a afirmação extraída só nos registros sem ele, os 12 mil do Fake.br e das
+mensagens, que antes ficavam fora. Eles trazem ~6,4 mil verdadeiros e os falsos das mesmas
+bases (só os verdadeiros ensinariam que "texto do Fake.br = verdadeiro"). No jogo, a manchete
+passa pela mesma extração (`Question.claim_text`). O lote:
+
+```bash
+make padronizar ARGS="--splits validacao,teste --sem-texto-curto"     # 1.124 itens, ~2 h
+make padronizar ARGS="--splits treino --sem-texto-curto --limite 4000" # amostra pelo hash, ~7 h
+```
+
+A amostra do `--limite` é reproduzível (hash do id) e mantém juntos os pares do Fake.br. O
+resto do treino sem texto curto, e a versão 100% padronizada (que exige padronizar também os
+10,5 mil com texto curto, ~18 h), continuam depois com os mesmos comandos, retomando do cache.
+
+## Calibração e limiares (#12)
+
+`make calibrar MODELO=models/2026-11/<modelo>` (`pesquisa/ml/calibrar.py`) ajusta Platt por
+fronteira na `validacao`, grava `calibracao.json` (aplicado pela API) e `limiares.json`
+(admin: até 5% dos verdadeiros viram falso; jogador: até 1%), e regrava `previsoes.jsonl`
+calibradas, com as brutas em `previsoes_brutas.jsonl`.
+
+Na referência sobre o **texto original** (14/10/2026): ECE da validação de 0,192 para 0,007; o
+modelo estava cerca de 4 vezes confiante demais (`a` = 0,27 na fronteira 1). Com os limiares
+honestos, admin 0,65 e jogador 0,69, ficam incertas 82% e 91% das frases da validação. O
+modelo não separa bem as classes, e a validação tem só 60 verdadeiros em 2.497 (2%).
+
+**Cuidado com a proporção das classes.** A calibração aprende a proporção da validação (2% de
+verdadeiros no texto original); no jogo, a importação diária traz metade verdadeiras. Com o
+texto padronizado, os registros só com `texto` entram, e a validação passa a ter ~435
+verdadeiros, o que diminui essa diferença.
 
 ## Regra para várias afirmações ou nenhuma
 

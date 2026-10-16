@@ -1,54 +1,32 @@
-import { Achievement, AnsweredQuestion, MatchRecord, User, UserStats } from "../types";
-import { httpGet, httpPost, setAuthToken, getAuthToken } from "./httpClient";
+import { AnsweredQuestion, MatchRecord, User, UserStats } from "../types";
+import { defaultAchievements, unlockAchievements } from "../utils/achievements";
+import {
+  guestToken,
+  httpGet,
+  httpPost,
+  setAuthToken,
+  getAuthToken,
+  isApiUnavailable,
+  setUnauthorizedHandler,
+} from "./httpClient";
+import { readSession, removeSession, writeSession } from "./sessionStore";
 
 const SESSION_STORAGE_KEY = "fako_active_session";
 const STATS_STORAGE_KEY_PREFIX = "fako_stats_";
 
 const HISTORY_LIMIT = 10;
 
-const DEFAULT_ACHIEVEMENTS: Achievement[] = [
-  {
-    id: "first_check",
-    title: "Primeira Checagem",
-    description: "Avaliou a primeira afirmação no FAKO.",
-    unlocked: false,
-  },
-  {
-    id: "bullseye",
-    title: "Na Mosca!",
-    description: "Acertou a referência exata de uma afirmação.",
-    unlocked: false,
-  },
-  {
-    id: "level_up",
-    title: "Subindo de Nível",
-    description: "Alcançou o nível 2.",
-    unlocked: false,
-  },
-  {
-    id: "imune",
-    title: "Muralha Antifake",
-    description: "Acertou 5 afirmações seguidas na mesma partida.",
-    unlocked: false,
-  },
-  {
-    id: "master",
-    title: "Mestre dos Fatos",
-    description: "Chegou ao nível 6.",
-    unlocked: false,
-  },
-];
-
 function defaultStats(): UserStats {
   return {
     highScore: 0,
+    totalScore: 0,
     maxLevel: 1,
     gamesPlayed: 0,
     totalAcertos: 0,
     totalErros: 0,
     bestStreak: 0,
     hasSeenTutorial: false,
-    achievements: DEFAULT_ACHIEVEMENTS.map((achievement) => ({ ...achievement })),
+    achievements: defaultAchievements(),
     history: [],
   };
 }
@@ -64,46 +42,66 @@ function longestStreak(answers: AnsweredQuestion[]): number {
   return best;
 }
 
-const USERS_DB_STORAGE_KEY = "fako_local_users";
+const OFFLINE_ERROR =
+  "Servidor indisponível no momento. Entre como visitante para jogar sem conta.";
 
-interface LocalUserRecord {
-  id: number;
-  username: string;
-  password?: string;
-  is_admin?: boolean;
-  createdAt?: number;
+// Versões anteriores guardavam aqui as contas com a senha em texto puro.
+try {
+  localStorage.removeItem("fako_local_users");
+} catch {
+  // Sem armazenamento local, não há o que limpar
+}
+
+// Limites do cadastro na API (api/app/schemas/auth_schema.py). A senha conta bytes: o bcrypt
+// só usa os primeiros 72.
+export const USERNAME_MIN = 3;
+export const USERNAME_MAX = 50;
+export const PASSWORD_MIN = 8;
+const PASSWORD_MAX_BYTES = 72;
+const USERNAME_PATTERN = /^[A-Za-z0-9._-]+$/;
+
+function passwordBytes(password: string): number {
+  return new TextEncoder().encode(password).length;
+}
+
+// Mensagem do primeiro problema do cadastro, ou null quando está tudo certo.
+export function registrationError(username: string, password: string): string | null {
+  const cleanUser = username.trim();
+  if (cleanUser.length < USERNAME_MIN || cleanUser.length > USERNAME_MAX || !USERNAME_PATTERN.test(cleanUser)) {
+    return `O usuário precisa ter de ${USERNAME_MIN} a ${USERNAME_MAX} caracteres: letras, números, . - _`;
+  }
+  if (password.length < PASSWORD_MIN) {
+    return `A senha deve ter pelo menos ${PASSWORD_MIN} caracteres.`;
+  }
+  if (passwordBytes(password) > PASSWORD_MAX_BYTES) {
+    return `A senha pode ter no máximo ${PASSWORD_MAX_BYTES} caracteres (acentos e emojis contam mais).`;
+  }
+  return null;
+}
+
+function authError(error: unknown, fallback: string): string {
+  if (isApiUnavailable(error)) return OFFLINE_ERROR;
+  return error instanceof Error && error.message ? error.message : fallback;
 }
 
 class AuthService {
-  private getLocalUsers(): LocalUserRecord[] {
-    try {
-      const data = localStorage.getItem(USERS_DB_STORAGE_KEY);
-      return data ? JSON.parse(data) : [];
-    } catch {
-      return [];
-    }
+  private async startSession(remember: boolean): Promise<User> {
+    const userResp = await httpGet<User>("/users/me");
+    const sessionUser: User = {
+      id: userResp.id,
+      username: userResp.username,
+      is_admin: userResp.is_admin,
+      createdAt: Date.now(),
+    };
+    writeSession(SESSION_STORAGE_KEY, JSON.stringify(sessionUser), remember);
+    return sessionUser;
   }
 
-  private saveLocalUser(user: LocalUserRecord): void {
-    try {
-      const list = this.getLocalUsers();
-      const existingIdx = list.findIndex(
-        (u) => u.username.toLowerCase() === user.username.toLowerCase()
-      );
-      if (existingIdx >= 0) {
-        list[existingIdx] = { ...list[existingIdx], ...user };
-      } else {
-        list.push(user);
-      }
-      localStorage.setItem(USERS_DB_STORAGE_KEY, JSON.stringify(list));
-    } catch {
-      // Ignora erro de localStorage
-    }
-  }
-
+  // remember: "Lembrar de mim"; sem ele, a sessão some ao fechar o navegador.
   public async login(
     username: string,
-    password: string
+    password: string,
+    remember = false
   ): Promise<{ success: boolean; error?: string; user?: User }> {
     const cleanUser = username.trim();
     if (!cleanUser || !password) {
@@ -115,144 +113,60 @@ class AuthService {
         username: cleanUser,
         password,
       });
-      setAuthToken(tokenResp.access_token);
-
-      const userResp = await httpGet<User>("/users/me");
-      const sessionUser: User = {
-        id: userResp.id,
-        username: userResp.username,
-        is_admin: userResp.is_admin,
-        createdAt: Date.now(),
-      };
-
-      // Salva também no banco local para permitir acesso offline posterior
-      this.saveLocalUser({
-        id: sessionUser.id || Date.now(),
-        username: sessionUser.username,
-        password,
-        is_admin: sessionUser.is_admin,
-        createdAt: sessionUser.createdAt,
-      });
-
-      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionUser));
-      return { success: true, user: sessionUser };
-    } catch (apiErr) {
-      // Fallback: se a API estiver offline ou inacessível, valida localmente
-      const localUsers = this.getLocalUsers();
-      const existing = localUsers.find(
-        (u) => u.username.toLowerCase() === cleanUser.toLowerCase()
-      );
-
-      if (existing) {
-        if (!existing.password || existing.password === password) {
-          const sessionUser: User = {
-            id: existing.id,
-            username: existing.username,
-            is_admin: existing.is_admin,
-            createdAt: existing.createdAt || Date.now(),
-          };
-          setAuthToken(`local-token-${existing.id}`);
-          localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionUser));
-          return { success: true, user: sessionUser };
-        } else {
-          return { success: false, error: "Senha incorreta. Verifique e tente novamente." };
-        }
-      }
-
-      // Se a API retornou mensagem explícita de credenciais inválidas
-      const msg = apiErr instanceof Error ? apiErr.message : "";
-      if (
-        msg.toLowerCase().includes("incorret") ||
-        msg.toLowerCase().includes("inválid") ||
-        msg.toLowerCase().includes("invalid")
-      ) {
-        return { success: false, error: msg };
-      }
-
-      return {
-        success: false,
-        error: "Usuário não encontrado. Se ainda não tem cadastro, acesse a aba 'Criar conta' ou entre como visitante.",
-      };
+      setAuthToken(tokenResp.access_token, remember);
+      return { success: true, user: await this.startSession(remember) };
+    } catch (error) {
+      setAuthToken(null);
+      return { success: false, error: authError(error, "Usuário ou senha incorretos.") };
     }
   }
 
   public async register(
     username: string,
-    password: string
+    password: string,
+    remember = false
   ): Promise<{ success: boolean; error?: string; user?: User }> {
     const cleanUser = username.trim();
-    if (cleanUser.length < 3) {
-      return { success: false, error: "O nome de usuário deve ter pelo menos 3 caracteres." };
-    }
-    if (password.length < 6) {
-      return { success: false, error: "A senha deve ter pelo menos 6 caracteres." };
-    }
+    const invalid = registrationError(cleanUser, password);
+    if (invalid) return { success: false, error: invalid };
 
     try {
       const tokenResp = await httpPost<{ access_token: string }>("/auth/register", {
         username: cleanUser,
         password,
       });
-      setAuthToken(tokenResp.access_token);
-
-      const userResp = await httpGet<User>("/users/me");
-      const sessionUser: User = {
-        id: userResp.id,
-        username: userResp.username,
-        is_admin: userResp.is_admin,
-        createdAt: Date.now(),
-      };
-
-      this.saveLocalUser({
-        id: sessionUser.id || Date.now(),
-        username: sessionUser.username,
-        password,
-        is_admin: sessionUser.is_admin,
-        createdAt: sessionUser.createdAt,
-      });
-
-      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionUser));
-      return { success: true, user: sessionUser };
-    } catch (apiErr) {
-      // Se a API estiver indisponível ou retornar erro de rede, realiza o cadastro local
-      const localUsers = this.getLocalUsers();
-      const alreadyExists = localUsers.some(
-        (u) => u.username.toLowerCase() === cleanUser.toLowerCase()
-      );
-
-      if (alreadyExists) {
-        return { success: false, error: "Este nome de usuário já está em uso. Escolha outro ou faça login." };
-      }
-
-      const msg = apiErr instanceof Error ? apiErr.message : "";
-      if (msg.toLowerCase().includes("já existe") || msg.toLowerCase().includes("already registered")) {
-        return { success: false, error: msg };
-      }
-
-      const newLocalUser: LocalUserRecord = {
-        id: Date.now(),
-        username: cleanUser,
-        password,
-        is_admin: false,
-        createdAt: Date.now(),
-      };
-      this.saveLocalUser(newLocalUser);
-
-      const sessionUser: User = {
-        id: newLocalUser.id,
-        username: newLocalUser.username,
-        is_admin: false,
-        createdAt: newLocalUser.createdAt,
-      };
-
-      setAuthToken(`local-token-${newLocalUser.id}`);
-      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionUser));
-      return { success: true, user: sessionUser };
+      setAuthToken(tokenResp.access_token, remember);
+      return { success: true, user: await this.startSession(remember) };
+    } catch (error) {
+      setAuthToken(null);
+      return { success: false, error: authError(error, "Não foi possível criar a conta.") };
     }
   }
 
   public async loginAsGuest(): Promise<{ success: boolean; error?: string; user?: User }> {
-    // Modo Visitante é 100% autônomo, instantâneo e offline-first
+    // Visitante joga com as notícias e o classificador da API: cria uma conta temporária, com
+    // nome e senha aleatórios que ninguém precisa guardar (a sessão vale até fechar o navegador).
+    const sufixo = Array.from(crypto.getRandomValues(new Uint8Array(4)), (b) =>
+      b.toString(16).padStart(2, "0")
+    ).join("");
+    const senha = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) =>
+      b.toString(16).padStart(2, "0")
+    ).join("");
+    try {
+      const tokenResp = await httpPost<{ access_token: string }>("/auth/register", {
+        username: `visitante_${sufixo}`,
+        password: senha,
+      });
+      setAuthToken(tokenResp.access_token, false);
+      return { success: true, user: await this.startSession(false) };
+    } catch (error) {
+      setAuthToken(null);
+      if (!isApiUnavailable(error)) {
+        return { success: false, error: authError(error, "Não foi possível entrar como visitante.") };
+      }
+    }
+
+    // API fora do ar: modo offline, com o banco local de perguntas e sem o classificador.
     const guestNum = Math.floor(1000 + Math.random() * 9000);
     const sessionUser: User = {
       id: guestNum,
@@ -261,8 +175,9 @@ class AuthService {
       createdAt: Date.now(),
     };
 
-    setAuthToken(`guest-token-${guestNum}`);
-    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionUser));
+    // A sessão do visitante vale só até fechar o navegador.
+    setAuthToken(guestToken(guestNum), false);
+    writeSession(SESSION_STORAGE_KEY, JSON.stringify(sessionUser), false);
     return { success: true, user: sessionUser };
   }
 
@@ -270,37 +185,25 @@ class AuthService {
     try {
       const token = getAuthToken();
       if (!token) return null;
-      const session = localStorage.getItem(SESSION_STORAGE_KEY);
+      const session = readSession(SESSION_STORAGE_KEY);
       return session ? JSON.parse(session) : null;
     } catch {
       return null;
     }
   }
 
-  public async fetchCurrentUser(): Promise<User | null> {
-    try {
-      const token = getAuthToken();
-      if (!token) return null;
-      if (token.startsWith("guest-") || token.startsWith("local-")) {
-        return this.getCurrentUser();
-      }
-      const userResp = await httpGet<User>("/users/me");
-      const sessionUser: User = {
-        id: userResp.id,
-        username: userResp.username,
-        is_admin: userResp.is_admin,
-        createdAt: Date.now(),
-      };
-      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionUser));
-      return sessionUser;
-    } catch {
-      return this.getCurrentUser();
-    }
+  // Encerra a sessão e avisa quando a API recusa o token da conta.
+  public onSessionExpired(callback: () => void): () => void {
+    setUnauthorizedHandler(() => {
+      this.logout();
+      callback();
+    });
+    return () => setUnauthorizedHandler(null);
   }
 
   public logout(): void {
     setAuthToken(null);
-    localStorage.removeItem(SESSION_STORAGE_KEY);
+    removeSession(SESSION_STORAGE_KEY);
   }
 
   public getUserStats(username: string): UserStats {
@@ -317,6 +220,7 @@ class AuthService {
         return {
           ...base,
           highScore: saved.highScore ?? 0,
+          totalScore: saved.totalScore ?? 0,
           maxLevel: saved.maxLevel ?? 1,
           gamesPlayed: saved.gamesPlayed ?? 0,
           totalAcertos: saved.totalAcertos ?? 0,
@@ -344,33 +248,21 @@ class AuthService {
   // unlockedLevel: nível atual depois da partida (sobe quando o jogador bate a meta).
   public recordMatchFinished(username: string, record: MatchRecord, unlockedLevel: number): UserStats {
     const current = this.getUserStats(username);
-    const achievements = current.achievements.map((achievement) => ({ ...achievement }));
-    const unlock = (id: string) => {
-      const achievement = achievements.find((item) => item.id === id);
-      if (achievement && !achievement.unlocked) {
-        achievement.unlocked = true;
-        achievement.unlockedAt = Date.now();
-      }
-    };
-
     const streak = longestStreak(record.answers);
-    if (record.answers.length > 0) unlock("first_check");
-    if (record.answers.some((answer) => answer.reliability === answer.reference)) unlock("bullseye");
-    if (Math.max(record.level, unlockedLevel) >= 2) unlock("level_up");
-    if (streak >= 5) unlock("imune");
-    if (Math.max(record.level, unlockedLevel) >= 6) unlock("master");
 
     const updated: UserStats = {
       highScore: Math.max(current.highScore, record.score),
+      totalScore: current.totalScore + record.score,
       maxLevel: Math.max(current.maxLevel, record.level, unlockedLevel),
       gamesPlayed: current.gamesPlayed + 1,
       totalAcertos: current.totalAcertos + record.acertos,
       totalErros: current.totalErros + record.erros,
       bestStreak: Math.max(current.bestStreak, streak),
       hasSeenTutorial: true,
-      achievements,
+      achievements: current.achievements,
       history: [record, ...current.history].slice(0, HISTORY_LIMIT),
     };
+    updated.achievements = unlockAchievements(updated, record);
     this.saveUserStats(username, updated);
     return updated;
   }

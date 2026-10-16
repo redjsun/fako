@@ -1,9 +1,9 @@
 """Questão do banco de conteúdo, com a confiabilidade de referência da afirmação."""
 
 import enum
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Date, DateTime, Enum, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Entity, enum_values
@@ -16,6 +16,8 @@ class QuestionStatus(str, enum.Enum):
     DRAFT = "draft"
     VALIDATED = "validated"
     REJECTED = "rejected"
+    # Notícia vencida que algum jogador respondeu: sai do jogo, fica para o histórico.
+    ARCHIVED = "archived"
 
 
 class QuestionOrigin(str, enum.Enum):
@@ -50,5 +52,21 @@ class Question(Entity):
     model_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     model_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     model_version: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    # O "Por quê?" do jogo: a LLM explica a avaliação do classificador (com o limiar do
+    # jogador) e o que a fonte diz dela. Gerado na importação e refeito ao trocar de modelo
+    # (jobs/reanalisar_questoes.py); sem ele, o jogador vê a explicação factual (`explanation`).
+    model_explanation: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # O que a fonte diz além do veredito: o título da checagem ou o resumo da matéria. Entra no
+    # "Por quê?" (detalhe para a LLM), também quando ele é refeito depois da importação.
+    source_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Afirmação extraída pela LLM do enunciado (mesmo prompt da padronização do treino): a
+    # entrada do classificador quando o modelo publicado foi treinado no texto padronizado.
+    claim_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Onde a alegação circulou (quem publicou e quando), mostrado ao jogador depois da resposta.
+    # Nas manchetes, o próprio veículo, com o link da matéria; nas checagens não há link do
+    # post (as agências não linkam o boato), e a checagem fica em `source`, como apoio.
+    origin_author: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    origin_link: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    origin_date: Mapped[date | None] = mapped_column(Date, nullable=True)
 
     category: Mapped[Category] = relationship()
