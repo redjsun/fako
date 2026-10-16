@@ -8,9 +8,13 @@ class SoundEffectsService {
   private isMuted: boolean = false;
 
   constructor() {
-    const saved = localStorage.getItem("fako_sound_muted");
-    if (saved !== null) {
-      this.isMuted = saved === "true";
+    try {
+      const saved = localStorage.getItem("fako_sound_muted");
+      if (saved !== null) {
+        this.isMuted = saved === "true";
+      }
+    } catch {
+      // Armazenamento bloqueado: começa com som
     }
   }
 
@@ -32,7 +36,11 @@ class SoundEffectsService {
 
   public toggleMute(): boolean {
     this.isMuted = !this.isMuted;
-    localStorage.setItem("fako_sound_muted", String(this.isMuted));
+    try {
+      localStorage.setItem("fako_sound_muted", String(this.isMuted));
+    } catch {
+      // A preferência fica só nesta sessão
+    }
     return this.isMuted;
   }
 

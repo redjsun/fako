@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { includesCell, nextHead, randomFreeCell } from "./board";
+import { hitsBody, includesCell, nextHead, randomFreeCell } from "./board";
 
 describe("nextHead", () => {
   it("anda uma célula na direção", () => {
@@ -32,5 +32,27 @@ describe("randomFreeCell", () => {
 
   it("devolve null com o tabuleiro cheio", () => {
     expect(randomFreeCell(1, [{ x: 0, y: 0 }])).toBeNull();
+  });
+});
+
+describe("hitsBody", () => {
+  // Cobra em quadrado: a cabeça em (1,0) e a cauda em (0,0), logo à esquerda dela.
+  const snake = [
+    { x: 1, y: 0 },
+    { x: 1, y: 1 },
+    { x: 0, y: 1 },
+    { x: 0, y: 0 },
+  ];
+
+  it("ir para a célula da cauda sem crescer não é mordida", () => {
+    expect(hitsBody(snake, { x: 0, y: 0 }, false)).toBe(false);
+  });
+
+  it("ir para a célula da cauda crescendo é mordida", () => {
+    expect(hitsBody(snake, { x: 0, y: 0 }, true)).toBe(true);
+  });
+
+  it("bater no meio do corpo é sempre mordida", () => {
+    expect(hitsBody(snake, { x: 1, y: 1 }, false)).toBe(true);
   });
 });

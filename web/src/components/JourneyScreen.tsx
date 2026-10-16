@@ -13,6 +13,7 @@ interface JourneyScreenProps {
   matchesPlayed: number;
   bestScoreInLevel: number;
   stats: UserStats;
+  isGuest: boolean;
   onPlayLevel: (level: number) => void;
 }
 
@@ -42,6 +43,7 @@ export const JourneyScreen: React.FC<JourneyScreenProps> = ({
   matchesPlayed,
   bestScoreInLevel,
   stats,
+  isGuest,
   onPlayLevel,
 }) => {
   const answered = stats.totalAcertos + stats.totalErros;
@@ -58,7 +60,11 @@ export const JourneyScreen: React.FC<JourneyScreenProps> = ({
       <section className="journey-layout__map" aria-labelledby="journey-heading">
         <header className="page-heading">
           <h1 id="journey-heading">Minha jornada</h1>
-          <p>Seu progresso fica salvo na sua conta. Continue de onde parou.</p>
+          <p>
+            {isGuest
+              ? "Como visitante, seu progresso fica só neste navegador e some ao sair. Crie uma conta para guardá-lo."
+              : "Seu progresso fica salvo na sua conta. Continue de onde parou."}
+          </p>
         </header>
 
         <ol className="level-grid">

@@ -1322,6 +1322,31 @@ button:disabled {
   color: var(--text-secondary);
 }
 
+.app-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--accent-amber-soft);
+  border: 1px solid var(--accent-amber);
+  border-radius: var(--radius-12);
+  padding: 10px 12px;
+  color: var(--warning-text);
+  font-size: 14px;
+}
+
+.app-notice span {
+  flex: 1;
+}
+
+.app-notice__close {
+  display: inline-flex;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 4px;
+}
+
 .tip-box {
   display: flex;
   align-items: center;

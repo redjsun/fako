@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { clampReliability, formatClock, formatMatchDate, reliabilityLabel } from "./formatters";
+import {
+  clampReliability,
+  formatClock,
+  formatMatchDate,
+  reliabilityLabel,
+  wrongAnswerEffect,
+} from "./formatters";
 
 describe("formatClock", () => {
   it("formata minutos e segundos com dois dígitos", () => {
@@ -58,5 +64,12 @@ describe("formatMatchDate", () => {
   it("usa dia/mês para datas mais antigas", () => {
     const oldDate = new Date("2024-03-10T18:05:00");
     expect(formatMatchDate(oldDate.getTime())).toMatch(/^10\/03, \d{2}:\d{2}$/);
+  });
+});
+
+describe("wrongAnswerEffect", () => {
+  it("mostra os blocos do nível e a perda de pontos quando há", () => {
+    expect(wrongAnswerEffect(1, 0)).toBe("+1 bloco");
+    expect(wrongAnswerEffect(3, 10)).toBe("+3 blocos · −10 pts");
   });
 });

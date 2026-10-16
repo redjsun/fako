@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { authService } from "./authService";
+import { authService, registrationError } from "./authService";
 import type { AnsweredQuestion, MatchRecord } from "../types";
 
 function makeRecord(overrides: Partial<MatchRecord> = {}): MatchRecord {
@@ -88,5 +88,22 @@ describe("authService.recordMatchFinished", () => {
     }
     expect(stats.history).toHaveLength(10);
     expect(stats.history[0].finishedAt).toBe(11);
+  });
+});
+
+describe("registrationError", () => {
+  it("aceita usuário e senha dentro dos limites da API", () => {
+    expect(registrationError("ana.silva", "senha-forte")).toBeNull();
+  });
+
+  it("recusa usuário curto, longo ou com caracteres fora do padrão", () => {
+    expect(registrationError("an", "senha-forte")).toMatch(/usuário/);
+    expect(registrationError("a".repeat(51), "senha-forte")).toMatch(/usuário/);
+    expect(registrationError("ana silva", "senha-forte")).toMatch(/usuário/);
+  });
+
+  it("recusa senha com menos de 8 caracteres ou mais de 72 bytes", () => {
+    expect(registrationError("ana", "1234567")).toMatch(/pelo menos 8/);
+    expect(registrationError("ana", "ç".repeat(40))).toMatch(/no máximo 72/);
   });
 });
