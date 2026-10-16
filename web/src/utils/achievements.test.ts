@@ -5,6 +5,7 @@ import { ACHIEVEMENT_RULES, achievementProgress, defaultAchievements, unlockAchi
 function makeStats(overrides: Partial<UserStats> = {}): UserStats {
   return {
     highScore: 0,
+    totalScore: 0,
     maxLevel: 1,
     gamesPlayed: 0,
     totalAcertos: 0,

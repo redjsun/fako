@@ -146,6 +146,8 @@ export const GameScreen: React.FC<GameScreenProps> = ({
               aria-label="Cima"
               disabled={!canSteer}
               onPointerDown={() => onDirection("UP")}
+              // Enter/Espaço no botão (o toque e o mouse já viraram no onPointerDown)
+              onClick={(event) => event.detail === 0 && onDirection("UP")}
             >
               <Icon name="up" size={18} />
             </button>
@@ -158,6 +160,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                   aria-label={key.label}
                   disabled={!canSteer}
                   onPointerDown={() => onDirection(key.direction)}
+                  onClick={(event) => event.detail === 0 && onDirection(key.direction)}
                 >
                   <Icon name={key.icon} size={18} />
                 </button>
