@@ -94,6 +94,17 @@ def test_carregar_preenche_alvos_pesos_e_checado(dataset, tmp_path):
     assert c.checado is False and c.tipo is None and c.tipo_sugerido == "fabricado"
 
 
+def test_checado_vale_para_checagem_ja_anotada_pela_equipe(tmp_path):
+    caminho = tmp_path / "dataset.jsonl"
+    registros = [
+        registro("a", origem="equipe", veredito_original="falso"),
+        registro("b", origem="mensagem", veredito_original="falso"),
+    ]
+    caminho.write_text("".join(json.dumps(r) + "\n" for r in registros), encoding="utf-8")
+    a, b = carregar(dataset=caminho, anotacoes=tmp_path / "x.csv").splits["treino"]
+    assert (a.checado, b.checado) == (True, False)
+
+
 def test_incluir_portal_so_para_diagnostico(dataset, tmp_path):
     conjunto = carregar(dataset=dataset, anotacoes=tmp_path / "x.csv", incluir_portal=True)
     assert "d" in ids(conjunto)["treino"]

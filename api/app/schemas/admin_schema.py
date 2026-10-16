@@ -6,15 +6,20 @@ from pydantic import BaseModel, Field
 
 from app.models.question import QuestionOrigin, QuestionStatus
 
+# Limites de tamanho dos textos da curadoria: a afirmação é lida em segundos no jogo.
+MAXIMO_AFIRMACAO = 1000
+MAXIMO_EXPLICACAO = 2000
+MAXIMO_SLUG = 80  # Category.slug
+
 
 class QuestionCreateRequest(BaseModel):
-    statement: str = Field(min_length=5)
+    statement: str = Field(min_length=5, max_length=MAXIMO_AFIRMACAO)
     is_true: bool
     # Se omitida, deriva de is_true (90 ou 10).
     reliability_reference: int | None = Field(default=None, ge=0, le=100)
-    explanation: str = Field(min_length=5)
+    explanation: str = Field(min_length=5, max_length=MAXIMO_EXPLICACAO)
     source: str = Field(min_length=2, max_length=500)
-    category: str  # Slug da categoria
+    category: str = Field(max_length=MAXIMO_SLUG)  # Slug da categoria
 
 
 class QuestionReviewRequest(BaseModel):
@@ -45,12 +50,12 @@ class QuestionAdminResponse(BaseModel):
 
 
 class AIGenerateRequest(BaseModel):
-    category: str  # Slug da categoria
+    category: str = Field(max_length=MAXIMO_SLUG)  # Slug da categoria
     quantity: int = Field(default=3, ge=1, le=10)
 
 
 class AIClassifyRequest(BaseModel):
-    statement: str = Field(min_length=5)
+    statement: str = Field(min_length=5, max_length=MAXIMO_AFIRMACAO)
 
 
 class AIClassifyResponse(BaseModel):
@@ -61,7 +66,7 @@ class AIClassifyResponse(BaseModel):
 
 class NewsImportRequest(BaseModel):
     # As notícias vêm de todos os assuntos; a categoria só existe porque a questão exige uma.
-    category: str = "conhecimentos-gerais"  # Slug da categoria
+    category: str = Field(default="conhecimentos-gerais", max_length=MAXIMO_SLUG)  # Slug
     quantity: int = Field(default=5, ge=1, le=10)
 
 
@@ -76,7 +81,7 @@ class NewsImportResponse(BaseModel):
 
 
 class ClassifierAnalyzeRequest(BaseModel):
-    statement: str = Field(min_length=5, max_length=1000)
+    statement: str = Field(min_length=5, max_length=MAXIMO_AFIRMACAO)
 
 
 class ClassifierAnalyzeResponse(BaseModel):

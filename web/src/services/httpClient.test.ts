@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { HttpError, httpGet, httpPost, setAuthToken, setUnauthorizedHandler } from "./httpClient";
+import {
+  HttpError,
+  getAuthToken,
+  guestToken,
+  httpGet,
+  httpPost,
+  setAuthToken,
+  setUnauthorizedHandler,
+} from "./httpClient";
 
 function respondWith(status: number, body: unknown = { detail: "Não autenticado" }) {
   vi.stubGlobal(
@@ -13,6 +21,7 @@ describe("httpClient com token recusado (401)", () => {
 
   beforeEach(() => {
     localStorage.clear();
+    sessionStorage.clear();
     handler.mockReset();
     setUnauthorizedHandler(handler);
   });
@@ -44,5 +53,46 @@ describe("httpClient com token recusado (401)", () => {
 
     await expect(httpPost("/auth/login", {})).rejects.toThrow("Usuário ou senha inválidos");
     expect(handler).not.toHaveBeenCalled();
+  });
+});
+
+describe("httpClient", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("não manda o token do visitante para a API", async () => {
+    setAuthToken(guestToken(42), false);
+    const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await httpGet("/levels");
+
+    const headers = (fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].headers as Headers;
+    expect(headers.has("Authorization")).toBe(false);
+  });
+
+  it("traduz o 429 e a validação do Pydantic para o jogador", async () => {
+    respondWith(429, {});
+    await expect(httpPost("/auth/login", {})).rejects.toThrow("Muitas tentativas");
+
+    respondWith(422, { detail: [{ msg: "String should have at least 8 characters" }] });
+    await expect(httpPost("/auth/register", {})).rejects.toThrow("dados enviados são inválidos");
+  });
+
+  it("sem 'Lembrar de mim' o token fica só no sessionStorage", () => {
+    setAuthToken("jwt", false);
+    expect(sessionStorage.getItem("fako_token")).toBe("jwt");
+    expect(localStorage.getItem("fako_token")).toBeNull();
+
+    setAuthToken("jwt-2", true);
+    expect(localStorage.getItem("fako_token")).toBe("jwt-2");
+    expect(sessionStorage.getItem("fako_token")).toBeNull();
+    expect(getAuthToken()).toBe("jwt-2");
   });
 });

@@ -30,7 +30,8 @@ Regras:
   original (vazia: fica a original) e a origem vira `equipe`. Sátira (`fora_escopo`) sai,
   como no preparar_dados.py.
 - Alvos ordinais: `y1` = veracidade > falso e `y2` = veracidade > enganoso.
-- `checado`: há veredito de agência (`veredito_original`), para a fatia "só checados".
+- `checado`: há veredito de agência (`veredito_original`), para a fatia "só checados", também
+  nos registros que a equipe anotou depois.
 - Peso por `origem_rotulo`, de ORIGEM_ROTULO_PESO em preparar_dados.py.
 - Fonte, autor, data e categoria nunca viram variáveis do modelo: servem só para split,
   métricas e pesos.
@@ -56,6 +57,7 @@ ANOTACOES = RAIZ / "anotacoes" / "consolidado.csv"
 SPLITS = ("treino", "validacao", "teste")
 CLASSES = ("falso", "enganoso", "verdadeiro")
 ORDEM = {c: i for i, c in enumerate(CLASSES)}
+ORIGENS_CHECADAS = ("agencia", "equipe")
 
 
 def _preparar_dados():
@@ -215,7 +217,9 @@ def exemplo(registro: dict, texto: str, anotacao: dict | None) -> Exemplo | None
         base=registro["base"],
         origem_rotulo=origem,
         peso=ORIGEM_ROTULO_PESO.get(origem, 1.0),
-        checado=registro["origem_rotulo"] == "agencia" and bool(registro.get("veredito_original")),
+        # Anotados pela equipe chegam com origem `equipe` no dataset, mas o veredito continua o da agência.
+        checado=registro["origem_rotulo"] in ORIGENS_CHECADAS
+        and bool(registro.get("veredito_original")),
     )
 
 

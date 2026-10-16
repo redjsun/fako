@@ -20,6 +20,11 @@ export default tseslint.config(
     rules: {
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "warn",
+      // Regras do React Compiler (react-hooks v7) que já pegaram bugs de estado no App
+      "react-hooks/refs": "error",
+      "react-hooks/set-state-in-effect": "error",
+      "react-hooks/immutability": "error",
+      "react-hooks/purity": "error",
       "react-refresh/only-export-components": [
         "warn",
         { allowConstantExport: true },

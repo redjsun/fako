@@ -1,6 +1,6 @@
 import React from "react";
 import { AnswerResult, ClaimOrigin, ModelGuess, Question } from "../types";
-import { reliabilityLabel } from "../utils/formatters";
+import { reliabilityLabel, wrongAnswerEffect } from "../utils/formatters";
 import { Icon } from "./Icon";
 import { ReliabilityBar } from "./ReliabilityBar";
 
@@ -10,6 +10,7 @@ interface QuestionPopupProps {
   question: Question | null;
   reliability: number;
   secondsLeft: number;
+  tolerance: number;
   isSubmitting: boolean;
   onChangeReliability: (value: number) => void;
   onConfirm: () => void;
@@ -20,6 +21,7 @@ export const QuestionPopup: React.FC<QuestionPopupProps> = ({
   question,
   reliability,
   secondsLeft,
+  tolerance,
   isSubmitting,
   onChangeReliability,
   onConfirm,
@@ -88,7 +90,7 @@ export const QuestionPopup: React.FC<QuestionPopupProps> = ({
             <p className="question-card__help">
               Atalhos: ← → ajusta 5% · Enter confirma
               <br />
-              Você acerta se ficar a até 15 pontos da referência oficial.
+              Você acerta se ficar a até {tolerance} pontos da referência oficial.
             </p>
           </>
         ) : (
@@ -105,10 +107,14 @@ interface ResultPopupProps {
   statement: string;
   result: AnswerResult;
   pointsPerCorrect: number;
+  // Regras do nível: quantos blocos a cobra cresce e quantos pontos perde no erro.
+  growthPerError: number;
+  wrongAnswerPenalty: number;
   onContinue: () => void;
 }
 
 function distanceMessage(result: AnswerResult): string {
+  if (result.timed_out) return "A resposta chegou depois do tempo da pergunta e contou como erro.";
   if (result.distance === 0) return "Cravou a referência. Na mosca!";
   const points = result.distance === 1 ? "ponto" : "pontos";
   return result.is_correct
@@ -191,9 +197,12 @@ export const ResultPopup: React.FC<ResultPopupProps> = ({
   statement,
   result,
   pointsPerCorrect,
+  growthPerError,
+  wrongAnswerPenalty,
   onContinue,
 }) => {
   const tone = result.is_correct ? "success" : "danger";
+  const wrongEffect = wrongAnswerEffect(growthPerError, wrongAnswerPenalty);
 
   return (
     <div className="popup-scrim popup-scrim--below-hud">
@@ -212,7 +221,7 @@ export const ResultPopup: React.FC<ResultPopupProps> = ({
             <p>{distanceMessage(result)}</p>
           </div>
           <span className="result-card__badge">
-            {result.is_correct ? `+${pointsPerCorrect} pts` : "+1 bloco"}
+            {result.is_correct ? `+${pointsPerCorrect} pts` : wrongEffect}
           </span>
         </header>
 
@@ -259,11 +268,14 @@ export const ResultPopup: React.FC<ResultPopupProps> = ({
               <span />
               <span />
               <span />
-              {!result.is_correct && <span className="is-new" />}
+              {!result.is_correct &&
+                Array.from({ length: growthPerError }, (_, index) => <span key={index} className="is-new" />)}
             </span>
             {result.is_correct
               ? "A cobrinha não cresceu. Continue assim!"
-              : "A cobrinha cresceu +1 bloco. Leia com calma!"}
+              : `A cobrinha cresceu ${wrongAnswerEffect(growthPerError, 0)}${
+                  wrongAnswerPenalty > 0 ? ` e você perdeu ${wrongAnswerPenalty} pts` : ""
+                }. Leia com calma!`}
           </div>
 
           <button

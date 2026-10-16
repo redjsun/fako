@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   AnswerResult,
   AnsweredQuestion,
@@ -17,12 +17,20 @@ import {
 } from "./types";
 import { soundEffects } from "./services/audioService";
 import { authService } from "./services/authService";
-import { HttpError } from "./services/httpClient";
+import { HttpError, isGuestSession } from "./services/httpClient";
 import { matchService } from "./services/matchService";
 import { progressService } from "./services/progressService";
 import { LOCAL_LEVELS, levelService } from "./services/levelService";
+import {
+  hitsBody,
+  initialSnake,
+  nextHead,
+  randomFreeCell,
+  sameCell,
+} from "./utils/board";
 import { clampReliability } from "./utils/formatters";
 import { AppHeader, HeaderTab } from "./components/AppHeader";
+import { AppNotice } from "./components/AppNotice";
 import { GameScreen } from "./components/GameScreen";
 import { HomeScreen } from "./components/HomeScreen";
 import { JourneyScreen } from "./components/JourneyScreen";
@@ -33,13 +41,16 @@ import { MatchSummary } from "./components/MatchSummary";
 import { QuestionPopup, ResultPopup } from "./components/QuestionModal";
 import { TutorialScreen } from "./components/TutorialScreen";
 
-// Regras da partida exibidas ao jogador (a pontuação oficial vem da API).
-const MATCH_SECONDS = 120;
-const QUESTION_SECONDS = 45;
+// Regras da partida exibidas ao jogador (a pontuação oficial vem da API). O que muda por
+// nível (tabuleiro, velocidade, tempos, tolerância...) vem do nível da partida.
 const COUNTDOWN_SECONDS = 3;
 const POINTS_PER_CORRECT = 10;
-const GRID_SIZE = 16;
 const INITIAL_RELIABILITY = 50;
+// Blocos que a cobra cresce ao comer a maçã podre.
+const ROTTEN_APPLE_GROWTH = 2;
+// A maçã com prazo pisca nos últimos instantes antes de mudar de lugar.
+const APPLE_FADING_MS = 2000;
+const FIRST_LEVEL = LOCAL_LEVELS[0];
 
 const OPPOSITE_DIRECTIONS: Record<Direction, Direction> = {
   UP: "DOWN",
@@ -59,27 +70,6 @@ const KEY_DIRECTIONS: Record<string, Direction> = {
   d: "RIGHT",
 };
 
-const tickForLevel = (level: number) => Math.max(75, 160 - (level - 1) * 14);
-
-const initialSnake = (): Position[] => {
-  const middle = Math.floor(GRID_SIZE / 2);
-  return [
-    { x: middle, y: middle },
-    { x: middle - 1, y: middle },
-    { x: middle - 2, y: middle },
-  ];
-};
-
-function placeRandomApple(snake: Position[]): Position {
-  const freeCells: Position[] = [];
-  for (let x = 0; x < GRID_SIZE; x++) {
-    for (let y = 0; y < GRID_SIZE; y++) {
-      if (!snake.some((segment) => segment.x === x && segment.y === y)) freeCells.push({ x, y });
-    }
-  }
-  return freeCells.length > 0 ? freeCells[Math.floor(Math.random() * freeCells.length)] : { x: 0, y: 0 };
-}
-
 function readSavedTheme(): "light" | "dark" {
   try {
     const saved = localStorage.getItem("fako_theme");
@@ -88,6 +78,17 @@ function readSavedTheme(): "light" | "dark" {
     // Sem armazenamento local, segue no tema claro
   }
   return "light";
+}
+
+const DEFAULT_PROGRESS: UserProgress = {
+  current_level: 1,
+  highest_level: 1,
+  total_score: 0,
+  matches_played: 0,
+};
+
+function errorText(error: unknown, fallback: string): string {
+  return error instanceof HttpError && error.message ? error.message : fallback;
 }
 
 interface MatchEnding {
@@ -106,18 +107,10 @@ export default function App() {
     return authService.hasSeenTutorial(user.username) ? "home" : "tutorial";
   });
   const [loginNotice, setLoginNotice] = useState<string | null>(null);
+  // Aviso sobre a partida (não começou, não foi salva...), mostrado acima da tela
+  const [appNotice, setAppNotice] = useState<string | null>(null);
   const [theme, setTheme] = useState<"light" | "dark">(readSavedTheme);
 
-  // Registrado antes dos efeitos que chamam a API, para pegar o 401 do token vencido.
-  useEffect(
-    () =>
-      authService.onSessionExpired(() => {
-        setCurrentUser(null);
-        setCurrentScreen("login");
-        setLoginNotice("Sua sessão expirou. Entre novamente para salvar o seu progresso.");
-      }),
-    []
-  );
   const [isMuted, setIsMuted] = useState<boolean>(soundEffects.getMuted());
 
   // Progresso: estatísticas locais (histórico, conquistas) e progresso oficial da API
@@ -125,25 +118,35 @@ export default function App() {
     const user = authService.getCurrentUser();
     return authService.getUserStats(user?.username ?? "");
   });
-  const [progress, setProgress] = useState<UserProgress>({
-    current_level: 1,
-    highest_level: 1,
-    total_score: 0,
-    matches_played: 0,
-  });
+  const [progress, setProgress] = useState<UserProgress>(DEFAULT_PROGRESS);
   const [levels, setLevels] = useState<Level[]>(LOCAL_LEVELS);
+
+  // Registrado antes dos efeitos que chamam a API, para pegar o 401 do token vencido.
+  useEffect(
+    () =>
+      authService.onSessionExpired(() => {
+        setCurrentUser(null);
+        setProgress(DEFAULT_PROGRESS);
+        setCurrentScreen("login");
+        setLoginNotice("Sua sessão expirou. Entre novamente para salvar o seu progresso.");
+      }),
+    []
+  );
 
   // Partida
   const [currentMatch, setCurrentMatch] = useState<Match | null>(null);
   const [status, setStatus] = useState<GameStatus>("COUNTDOWN");
   const [level, setLevel] = useState(1);
-  const [tickMs, setTickMs] = useState(tickForLevel(1));
-  const [matchDuration, setMatchDuration] = useState(MATCH_SECONDS);
-  const [timeLeft, setTimeLeft] = useState(MATCH_SECONDS);
+  // Regras do nível da partida em andamento
+  const [rules, setRules] = useState<Level>(FIRST_LEVEL);
+  const [matchDuration, setMatchDuration] = useState(FIRST_LEVEL.match_seconds);
+  const [timeLeft, setTimeLeft] = useState(FIRST_LEVEL.match_seconds);
   const [countdownLeft, setCountdownLeft] = useState(COUNTDOWN_SECONDS);
-  const [snake, setSnake] = useState<Position[]>(initialSnake);
+  const [snake, setSnake] = useState<Position[]>(() => initialSnake(FIRST_LEVEL.board_size));
   const [direction, setDirection] = useState<Direction>("RIGHT");
   const [apple, setApple] = useState<Position | null>(null);
+  const [rottenApples, setRottenApples] = useState<Position[]>([]);
+  const [isAppleFading, setIsAppleFading] = useState(false);
   const [score, setScore] = useState(0);
   const [answers, setAnswers] = useState<AnsweredQuestion[]>([]);
   const [ending, setEnding] = useState<MatchEnding | null>(null);
@@ -151,7 +154,7 @@ export default function App() {
   // Pergunta e resultado
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
   const [reliability, setReliability] = useState(INITIAL_RELIABILITY);
-  const [questionSecondsLeft, setQuestionSecondsLeft] = useState(QUESTION_SECONDS);
+  const [questionSecondsLeft, setQuestionSecondsLeft] = useState(FIRST_LEVEL.question_seconds);
   const [lastResult, setLastResult] = useState<AnswerResult | null>(null);
   const [isSubmittingAnswer, setIsSubmittingAnswer] = useState(false);
 
@@ -162,13 +165,21 @@ export default function App() {
   const statusRef = useRef<GameStatus>(status);
   const snakeRef = useRef<Position[]>(snake);
   const appleRef = useRef<Position | null>(apple);
+  const rottenApplesRef = useRef<Position[]>([]);
+  const rulesRef = useRef<Level>(FIRST_LEVEL);
+  // Tempo de cobra andando desde que a maçã apareceu, para a maçã que muda de lugar
+  const appleAgeMsRef = useRef(0);
   const nextDirectionRef = useRef<Direction>("RIGHT");
   const currentDirectionRef = useRef<Direction>("RIGHT");
   const growPendingRef = useRef(0);
   const matchIdRef = useRef<number | null>(null);
   const statusBeforeDialogRef = useRef<GameStatus>("PLAYING");
   const finishingRef = useRef(false);
-  const remainingMsRef = useRef(MATCH_SECONDS * 1000);
+  const startingRef = useRef(false);
+  const dialogRef = useRef<"exit" | "howto" | null>(null);
+  // Muda a cada partida e no fim dela: a resposta de um pedido feito antes é ignorada.
+  const matchTokenRef = useRef(0);
+  const remainingMsRef = useRef(FIRST_LEVEL.match_seconds * 1000);
 
   const changeStatus = useCallback((next: GameStatus) => {
     statusRef.current = next;
@@ -178,6 +189,10 @@ export default function App() {
   useEffect(() => {
     snakeRef.current = snake;
   }, [snake]);
+
+  useEffect(() => {
+    dialogRef.current = dialog;
+  }, [dialog]);
 
   useEffect(() => {
     appleRef.current = apple;
@@ -193,24 +208,24 @@ export default function App() {
   }, [theme]);
 
   const refreshProgress = useCallback(async () => {
-    if (!currentUser) return;
+    if (!authService.getCurrentUser()) return;
     setProgress(await progressService.getMyProgress());
-  }, [currentUser]);
+  }, []);
 
   useEffect(() => {
     if (!currentUser) return;
-    setUserStats(authService.getUserStats(currentUser.username));
-    refreshProgress();
+    progressService.getMyProgress().then(setProgress);
     levelService.listLevels().then((list) => {
       if (list.length > 0) setLevels([...list].sort((a, b) => a.number - b.number));
     });
-  }, [currentUser, refreshProgress]);
+  }, [currentUser]);
 
   const maxLevels = levels.length;
   const levelConfig = (number: number) => levels.find((item) => item.number === number);
   const minScoreToAdvance = currentMatch?.level.min_score_to_advance ?? levelConfig(level)?.min_score_to_advance ?? 30;
-  const blocksFromErrors = answers.filter((answer) => !answer.isCorrect).length;
-  const acertos = answers.length - blocksFromErrors;
+  const errorCount = answers.filter((answer) => !answer.isCorrect).length;
+  const blocksFromErrors = errorCount * rules.growth_per_error;
+  const acertos = answers.length - errorCount;
 
   // Melhor partida no nível atual: base do "faltam X pts".
   const bestScoreInCurrentLevel = useMemo(
@@ -228,17 +243,21 @@ export default function App() {
   // ---------------------------------------------------------------- partida
 
   // Valores atuais para o encerramento, sem recriar o loop da cobra a cada segundo.
-  const latestRef = useRef({ level, matchDuration, timeLeft, score, answers, currentUser });
-  latestRef.current = { level, matchDuration, timeLeft, score, answers, currentUser };
+  const currentLevel = progress.current_level;
+  const latestRef = useRef({ level, matchDuration, timeLeft, score, answers, currentUser, currentLevel });
+  useLayoutEffect(() => {
+    latestRef.current = { level, matchDuration, timeLeft, score, answers, currentUser, currentLevel };
+  });
 
   const finishMatch = useCallback(
     async (reason: MatchEndReason) => {
       if (finishingRef.current) return;
       finishingRef.current = true;
+      matchTokenRef.current += 1;
       changeStatus("FINISHED");
       setDialog(null);
 
-      const { level, matchDuration, timeLeft, score, answers, currentUser } = latestRef.current;
+      const { level, matchDuration, timeLeft, score, answers, currentUser, currentLevel } = latestRef.current;
       const erros = answers.filter((answer) => !answer.isCorrect).length;
       const activeMatchId = matchIdRef.current;
       matchIdRef.current = null;
@@ -246,11 +265,14 @@ export default function App() {
       let unlockedLevel = level;
       if (activeMatchId) {
         try {
-          const result = await matchService.finishMatch(activeMatchId);
+          const result = await matchService.finishMatch(activeMatchId, currentLevel);
           advanced = result.advanced;
           unlockedLevel = result.current_level;
         } catch (error) {
           console.error("Erro ao encerrar a partida na API:", error);
+          setAppNotice(
+            "Não foi possível salvar esta partida no servidor: os pontos dela podem não ter entrado no seu progresso."
+          );
         }
       }
 
@@ -279,32 +301,48 @@ export default function App() {
 
   const startGame = useCallback(
     async (levelNumber?: number) => {
-      finishingRef.current = false;
-      growPendingRef.current = 0;
-      setDialog(null);
-      setEnding(null);
-
+      // Um clique duplo (ou Enter repetido) não abre duas partidas
+      if (startingRef.current) return;
+      startingRef.current = true;
       let match: Match;
       try {
         match = await matchService.startMatch(levelNumber ?? progress.current_level);
       } catch (error) {
         // Sem a API não há partida: as perguntas e a correção vêm só dela.
         console.error("Erro ao iniciar a partida na API:", error);
+        // A sessão expirada já leva ao login com o aviso
         if (authService.getCurrentUser()) {
-          window.alert("Não foi possível iniciar a partida: o servidor não respondeu. Tente de novo.");
+          setAppNotice(errorText(error, "Não foi possível começar a partida. Tente de novo."));
+          // O tutorial não mostra avisos: volta ao painel, onde ele aparece
+          setCurrentScreen((screen) => (screen === "tutorial" ? "home" : screen));
         }
         return;
+      } finally {
+        startingRef.current = false;
       }
       if (!authService.getCurrentUser()) return; // a sessão expirou durante o pedido
 
-      const matchLevel = match.level.number;
+      matchTokenRef.current += 1;
+      finishingRef.current = false;
+      growPendingRef.current = 0;
+      setDialog(null);
+      setEnding(null);
+      setAppNotice(
+        matchService.isLocalMatch(match.id) && !isGuestSession()
+          ? "Servidor indisponível: esta partida é local e não vai para a sua conta."
+          : null
+      );
+
+      const levelRules = match.level;
       const duration = match.duration_seconds;
-      const startSnake = initialSnake();
+      const boardSize = levelRules.board_size;
+      const startSnake = initialSnake(boardSize);
 
       matchIdRef.current = match.id;
       setCurrentMatch(match);
-      setLevel(matchLevel);
-      setTickMs(tickForLevel(matchLevel));
+      setLevel(levelRules.number);
+      setRules(levelRules);
+      rulesRef.current = levelRules;
       setMatchDuration(duration);
       setTimeLeft(duration);
       remainingMsRef.current = duration * 1000;
@@ -313,16 +351,30 @@ export default function App() {
       setDirection("RIGHT");
       nextDirectionRef.current = "RIGHT";
       currentDirectionRef.current = "RIGHT";
-      const firstApple = placeRandomApple(startSnake);
+      const firstApple = randomFreeCell(boardSize, startSnake);
       setApple(firstApple);
       appleRef.current = firstApple;
+      appleAgeMsRef.current = 0;
+      setIsAppleFading(false);
+      // Maçãs podres sorteadas uma a uma, cada uma numa célula ainda livre
+      const firstRottenApples: Position[] = [];
+      for (let index = 0; index < levelRules.rotten_apples; index++) {
+        const cell = randomFreeCell(boardSize, [
+          ...startSnake,
+          ...(firstApple ? [firstApple] : []),
+          ...firstRottenApples,
+        ]);
+        if (cell) firstRottenApples.push(cell);
+      }
+      setRottenApples(firstRottenApples);
+      rottenApplesRef.current = firstRottenApples;
       setScore(0);
       setAnswers([]);
       setCurrentQuestion(null);
       setLastResult(null);
-      setCountdownLeft(COUNTDOWN_SECONDS);
       setCurrentScreen("game");
-      changeStatus("COUNTDOWN");
+      // A partida começa com a cobra andando; a contagem fica só para as retomadas
+      changeStatus("PLAYING");
     },
     [progress.current_level, changeStatus]
   );
@@ -332,48 +384,66 @@ export default function App() {
     changeStatus("COUNTDOWN");
   }, [changeStatus]);
 
+  // Status depois de um pedido à API. Com uma janela aberta (ex.: Sair), ele fica guardado
+  // para quando ela fechar.
+  const settleStatus = useCallback(
+    (next: "PLAYING" | "FEEDBACK") => {
+      if (dialogRef.current) statusBeforeDialogRef.current = next;
+      else if (next === "PLAYING") resumeWithCountdown();
+      else changeStatus(next);
+    },
+    [resumeWithCountdown, changeStatus]
+  );
+
   const openQuestion = useCallback(async () => {
+    const token = matchTokenRef.current;
     changeStatus("QUESTION");
     setCurrentQuestion(null);
     setLastResult(null);
     setReliability(INITIAL_RELIABILITY);
-    setQuestionSecondsLeft(QUESTION_SECONDS);
+    setQuestionSecondsLeft(rulesRef.current.question_seconds);
     try {
-      setCurrentQuestion(await matchService.getNextQuestion(matchIdRef.current ?? 0));
+      const question = await matchService.getNextQuestion(matchIdRef.current ?? 0);
+      if (token !== matchTokenRef.current) return; // a partida acabou durante o pedido
+      setCurrentQuestion(question);
     } catch (error) {
+      if (token !== matchTokenRef.current) return;
+      // 404: acabaram as afirmações; 422: a API não aceita mais perguntas nesta partida
+      // (limite de respostas ou tempo de partida aberta).
       if (error instanceof HttpError && error.status === 404) {
         finishMatch("NO_QUESTIONS");
         return;
       }
+      if (error instanceof HttpError && error.status === 422) {
+        finishMatch("TIMEOUT");
+        return;
+      }
       console.error("Erro ao buscar a próxima afirmação:", error);
-      resumeWithCountdown();
+      settleStatus("PLAYING");
     }
-  }, [changeStatus, finishMatch, resumeWithCountdown]);
+  }, [changeStatus, finishMatch, settleStatus]);
 
   // Um passo da cobrinha
   const step = useCallback(() => {
     if (statusRef.current !== "PLAYING") return;
 
+    const levelRules = rulesRef.current;
+    const boardSize = levelRules.board_size;
     const currentSnake = snakeRef.current;
     const activeDirection = nextDirectionRef.current;
     currentDirectionRef.current = activeDirection;
     setDirection(activeDirection);
 
-    const delta = { UP: [0, -1], DOWN: [0, 1], LEFT: [-1, 0], RIGHT: [1, 0] }[activeDirection];
-    const head = currentSnake[0];
-    const newHead: Position = {
-      x: (head.x + delta[0] + GRID_SIZE) % GRID_SIZE,
-      y: (head.y + delta[1] + GRID_SIZE) % GRID_SIZE,
-    };
-
-    if (currentSnake.some((segment) => segment.x === newHead.x && segment.y === newHead.y)) {
+    const newHead = nextHead(currentSnake[0], activeDirection, boardSize, levelRules.solid_walls);
+    // Bateu na parede sólida ou no próprio corpo
+    if (!newHead || hitsBody(currentSnake, newHead, growPendingRef.current > 0)) {
       soundEffects.playGameOver();
       finishMatch("GAMEOVER");
       return;
     }
 
     const newSnake = [newHead, ...currentSnake];
-    // A cobrinha só cresce depois de um erro
+    // A cobrinha só cresce depois de um erro (ou da maçã podre)
     if (growPendingRef.current > 0) {
       growPendingRef.current -= 1;
     } else {
@@ -382,28 +452,64 @@ export default function App() {
     snakeRef.current = newSnake;
     setSnake(newSnake);
 
-    const currentApple = appleRef.current;
-    if (currentApple && newHead.x === currentApple.x && newHead.y === currentApple.y) {
-      soundEffects.playEat();
-      const nextApple = placeRandomApple(newSnake);
+    const occupiedExcept = (...others: (Position | null)[]) => [
+      ...newSnake,
+      ...others.filter((cell): cell is Position => cell !== null),
+    ];
+    const moveApple = () => {
+      const nextApple = randomFreeCell(boardSize, occupiedExcept(...rottenApplesRef.current));
       appleRef.current = nextApple;
       setApple(nextApple);
+      appleAgeMsRef.current = 0;
+      setIsAppleFading(false);
+    };
+
+    const eatenRotten = rottenApplesRef.current.findIndex((rotten) => sameCell(newHead, rotten));
+    if (eatenRotten >= 0) {
+      soundEffects.playMistake();
+      growPendingRef.current += ROTTEN_APPLE_GROWTH;
+      // A maçã podre comida reaparece em outro lugar; as outras ficam onde estão
+      const others = rottenApplesRef.current.filter((_, index) => index !== eatenRotten);
+      const nextRotten = randomFreeCell(boardSize, occupiedExcept(appleRef.current, ...others));
+      const nextRottenApples = nextRotten ? [...others, nextRotten] : others;
+      rottenApplesRef.current = nextRottenApples;
+      setRottenApples(nextRottenApples);
+    }
+
+    const currentApple = appleRef.current;
+    if (currentApple && sameCell(newHead, currentApple)) {
+      soundEffects.playEat();
+      moveApple();
       openQuestion();
+      return;
+    }
+
+    // Maçã com prazo: muda de lugar depois de um tempo de cobra andando e pisca antes
+    const lifetimeMs = (levelRules.apple_lifetime_seconds ?? 0) * 1000;
+    if (lifetimeMs > 0 && currentApple) {
+      appleAgeMsRef.current += levelRules.tick_ms;
+      if (appleAgeMsRef.current >= lifetimeMs) moveApple();
+      else setIsAppleFading(lifetimeMs - appleAgeMsRef.current <= APPLE_FADING_MS);
     }
   }, [finishMatch, openQuestion]);
 
-  const changeDirection = useCallback((next: Direction) => {
-    if (statusRef.current !== "PLAYING") return;
-    if (OPPOSITE_DIRECTIONS[next] === currentDirectionRef.current) return;
-    nextDirectionRef.current = next;
-  }, []);
+  // Mexer a cobra durante a contagem encerra a contagem e volta ao jogo na hora
+  const changeDirection = useCallback(
+    (next: Direction) => {
+      const current = statusRef.current;
+      if (current !== "PLAYING" && current !== "COUNTDOWN") return;
+      if (OPPOSITE_DIRECTIONS[next] !== currentDirectionRef.current) nextDirectionRef.current = next;
+      if (current === "COUNTDOWN") changeStatus("PLAYING");
+    },
+    [changeStatus]
+  );
 
   // Loop da cobrinha
   useEffect(() => {
     if (currentScreen !== "game" || status !== "PLAYING") return;
-    const timer = window.setInterval(step, tickMs);
+    const timer = window.setInterval(step, rules.tick_ms);
     return () => window.clearInterval(timer);
-  }, [currentScreen, status, tickMs, step]);
+  }, [currentScreen, status, rules.tick_ms, step]);
 
   // Cronômetro da partida: só corre com a cobra andando. Acumula o tempo real em ms
   // para que trechos curtos entre uma pergunta e outra também descontem.
@@ -416,39 +522,53 @@ export default function App() {
       last = now;
       setTimeLeft(Math.ceil(remainingMsRef.current / 1000));
     };
-    const timer = window.setInterval(consume, 200);
+    const timer = window.setInterval(() => {
+      consume();
+      // O tempo acaba com a cobra andando; ao pausar, o resto só é descontado
+      if (remainingMsRef.current <= 0) finishMatch("TIMEOUT");
+    }, 200);
     return () => {
       window.clearInterval(timer);
       consume();
     };
-  }, [currentScreen, status]);
+  }, [currentScreen, status, finishMatch]);
 
   useEffect(() => {
-    if (status !== "PLAYING") return;
-    if (timeLeft <= 0) finishMatch("TIMEOUT");
-    else if (timeLeft <= 5) soundEffects.playTick();
-  }, [timeLeft, status, finishMatch]);
+    if (status === "PLAYING" && timeLeft > 0 && timeLeft <= 5) soundEffects.playTick();
+  }, [timeLeft, status]);
 
   // Contagem de 3 s antes de a cobra andar
   useEffect(() => {
     if (currentScreen !== "game" || status !== "COUNTDOWN") return;
-    if (countdownLeft <= 0) {
-      changeStatus("PLAYING");
-      return;
-    }
-    const timer = window.setTimeout(() => setCountdownLeft((previous) => previous - 1), 1000);
+    const timer = window.setTimeout(() => {
+      if (countdownLeft <= 1) changeStatus("PLAYING");
+      else setCountdownLeft(countdownLeft - 1);
+    }, 1000);
     return () => window.clearTimeout(timer);
   }, [currentScreen, status, countdownLeft, changeStatus]);
+
+  // Trocar de aba pausa a partida: em segundo plano o cronômetro continuaria correndo.
+  useEffect(() => {
+    if (currentScreen !== "game") return;
+    const handleVisibility = () => {
+      const current = statusRef.current;
+      if (document.hidden && (current === "PLAYING" || current === "COUNTDOWN")) changeStatus("PAUSED");
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [currentScreen, changeStatus]);
 
   // ---------------------------------------------------------------- pergunta
 
   const confirmAnswer = useCallback(async () => {
     if (!currentQuestion || isSubmittingAnswer || statusRef.current !== "QUESTION") return;
     setIsSubmittingAnswer(true);
+    const token = matchTokenRef.current;
     const question = currentQuestion;
     const value = clampReliability(reliability);
     try {
       const result = await matchService.answerQuestion(matchIdRef.current ?? 0, question.id, value);
+      if (token !== matchTokenRef.current) return; // a partida acabou durante o pedido
       setLastResult(result);
       setScore(result.score); // placar oficial da API
       setAnswers((previous) => [
@@ -464,18 +584,19 @@ export default function App() {
         soundEffects.playCorrect();
       } else {
         soundEffects.playMistake();
-        growPendingRef.current += 1;
+        growPendingRef.current += rulesRef.current.growth_per_error;
       }
-      changeStatus("FEEDBACK");
+      settleStatus("FEEDBACK");
     } catch (error) {
+      if (token !== matchTokenRef.current) return;
       // Sem a correção da API não há como avaliar: a pergunta sai sem pontuar nem penalizar.
       console.error("Erro ao enviar a resposta:", error);
       setCurrentQuestion(null);
-      resumeWithCountdown();
+      settleStatus("PLAYING");
     } finally {
       setIsSubmittingAnswer(false);
     }
-  }, [currentQuestion, isSubmittingAnswer, reliability, changeStatus, resumeWithCountdown]);
+  }, [currentQuestion, isSubmittingAnswer, reliability, settleStatus]);
 
   // 45 s por pergunta; no fim do tempo vale o valor marcado na barra
   useEffect(() => {
@@ -488,11 +609,14 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, [status, currentQuestion, isSubmittingAnswer, questionSecondsLeft, confirmAnswer]);
 
+  // Bateu a meta do nível atual: a partida termina depois do resultado da pergunta.
+  // Rejogar um nível já vencido segue até o fim, como na regra de avanço da API.
   const continueAfterFeedback = useCallback(() => {
     setCurrentQuestion(null);
     setLastResult(null);
-    resumeWithCountdown();
-  }, [resumeWithCountdown]);
+    if (level === progress.current_level && score >= minScoreToAdvance) finishMatch("GOAL");
+    else resumeWithCountdown();
+  }, [level, progress.current_level, score, minScoreToAdvance, finishMatch, resumeWithCountdown]);
 
   // ---------------------------------------------------------------- janelas e pausa
 
@@ -541,7 +665,7 @@ export default function App() {
         return;
       }
 
-      if (current === "PLAYING") {
+      if (current === "PLAYING" || current === "COUNTDOWN") {
         if (keyDirection) {
           event.preventDefault();
           changeDirection(keyDirection);
@@ -582,12 +706,19 @@ export default function App() {
 
   const handleLoginSuccess = (user: User) => {
     setLoginNotice(null);
+    setAppNotice(null);
+    setUserStats(authService.getUserStats(user.username));
+    setProgress(DEFAULT_PROGRESS);
     setCurrentUser(user);
     setCurrentScreen(authService.hasSeenTutorial(user.username) ? "home" : "tutorial");
   };
 
   const handleLogout = () => {
     authService.logout();
+    // Nada do jogador anterior fica na tela até o próximo entrar
+    setProgress(DEFAULT_PROGRESS);
+    setUserStats(authService.getUserStats(""));
+    setAppNotice(null);
     setCurrentUser(null);
     setCurrentScreen("login");
   };
@@ -624,14 +755,18 @@ export default function App() {
   }
 
   if (currentScreen === "tutorial") {
+    // Só o tutorial da primeira entrada leva direto ao jogo; aberto pelo painel, volta a ele.
+    const isFirstTutorial = !!currentUser && !authService.hasSeenTutorial(currentUser.username);
     return (
       <div className="fako-app screen-tutorial">
         <TutorialScreen
-          questionSeconds={QUESTION_SECONDS}
+          questionSeconds={FIRST_LEVEL.question_seconds}
           pointsPerCorrect={POINTS_PER_CORRECT}
+          completeLabel={isFirstTutorial ? "Começar a Jogar →" : "Voltar ao painel →"}
           onComplete={() => {
             markTutorialSeen();
-            startGame();
+            if (isFirstTutorial) startGame();
+            else setCurrentScreen("home");
           }}
           onSkip={() => {
             markTutorialSeen();
@@ -649,13 +784,16 @@ export default function App() {
         <div className="page-shell page-shell--game">
           <MatchHud
             level={level}
-            boardSize={GRID_SIZE}
+            boardSize={rules.board_size}
             status={status}
             timeLeft={timeLeft}
             duration={matchDuration}
             score={score}
+            exitDisabled={isSubmittingAnswer}
             onExit={() => openDialog("exit")}
           />
+
+          {appNotice && <AppNotice message={appNotice} onClose={() => setAppNotice(null)} />}
 
           {status === "FINISHED" && ending ? (
             <MatchSummary
@@ -670,7 +808,14 @@ export default function App() {
               snakeLength={ending.snakeLength}
               secondsPlayed={ending.secondsPlayed}
               pointsPerCorrect={POINTS_PER_CORRECT}
-              onPlayAgain={() => startGame(ending.advanced ? undefined : level)}
+              tolerance={rules.reliability_tolerance}
+              growthPerError={rules.growth_per_error}
+              wrongAnswerPenalty={rules.wrong_answer_penalty}
+              canPlayNextLevel={
+                level < maxLevels && (ending.advanced || level < progress.current_level)
+              }
+              onPlayAgain={() => startGame(level)}
+              onPlayNextLevel={() => startGame(level + 1)}
               onGoHome={handleGoHome}
               onOpenJourney={() => setCurrentScreen("journey")}
             />
@@ -681,7 +826,10 @@ export default function App() {
               score={score}
               minScoreToAdvance={minScoreToAdvance}
               isLastLevel={isLastLevel}
-              gridSize={GRID_SIZE}
+              gridSize={rules.board_size}
+              rottenApples={rottenApples}
+              isAppleFading={isAppleFading}
+              solidWalls={rules.solid_walls}
               snake={snake}
               direction={direction}
               apple={apple}
@@ -700,6 +848,7 @@ export default function App() {
             question={currentQuestion}
             reliability={reliability}
             secondsLeft={questionSecondsLeft}
+            tolerance={rules.reliability_tolerance}
             isSubmitting={isSubmittingAnswer}
             onChangeReliability={(value) => setReliability(clampReliability(value))}
             onConfirm={confirmAnswer}
@@ -711,6 +860,8 @@ export default function App() {
             statement={currentQuestion.statement}
             result={lastResult}
             pointsPerCorrect={POINTS_PER_CORRECT}
+            growthPerError={rules.growth_per_error}
+            wrongAnswerPenalty={rules.wrong_answer_penalty}
             onContinue={continueAfterFeedback}
           />
         )}
@@ -728,7 +879,7 @@ export default function App() {
 
         {dialog === "howto" && (
           <HowToPlayDialog
-            questionSeconds={QUESTION_SECONDS}
+            rules={rules}
             pointsPerCorrect={POINTS_PER_CORRECT}
             onClose={closeDialog}
           />
@@ -753,6 +904,8 @@ export default function App() {
           onLogout={handleLogout}
         />
 
+        {appNotice && <AppNotice message={appNotice} onClose={() => setAppNotice(null)} />}
+
         {currentScreen === "journey" ? (
           <JourneyScreen
             levels={levels}
@@ -762,6 +915,7 @@ export default function App() {
             matchesPlayed={progress.matches_played}
             bestScoreInLevel={bestScoreInCurrentLevel}
             stats={userStats}
+            isGuest={isGuestSession()}
             onPlayLevel={(number) => startGame(number)}
           />
         ) : (
@@ -770,7 +924,7 @@ export default function App() {
             currentLevel={progress.current_level}
             maxLevels={maxLevels}
             missingPoints={missingPoints}
-            matchSeconds={MATCH_SECONDS}
+            matchSeconds={(levelConfig(progress.current_level) ?? FIRST_LEVEL).match_seconds}
             stats={userStats}
             matchesPlayed={progress.matches_played}
             onPlay={() => startGame()}

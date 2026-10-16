@@ -1,4 +1,6 @@
 # Leves: o que os testes e o CI precisam.
 numpy>=1.26
-scikit-learn>=1.4
+# A mesma versão de api/requirements.txt: a API carrega o referencia.joblib gravado aqui, e um
+# joblib de outra versão do scikit-learn pode não carregar.
+scikit-learn==1.9.1
 joblib>=1.3

@@ -5,6 +5,11 @@ da equipe (brainstorming em quadro no Miro) e entrevista com jogadores em potenc
 priorizado com MoSCoW. Cada requisito carrega a técnica de origem, para rastreabilidade; ver
 [Técnicas de elicitação](tecnicas-elicitacao.md).
 
+RF31 a RF38 detalham a progressão de dificuldade e o fim da partida previstos no workshop
+(redução do espaço de jogo, colisão com a borda, aumento gradual da dificuldade e checagem de
+nível) e entraram na revisão dos níveis; as regras de cada nível estão em
+[Níveis da jornada](../jogo/niveis.md).
+
 Ao todo foram levantados 49 requisitos; os classificados como **Won't have** (fora do
 escopo atual) não entram nesta tabela, só os que seguem para o MVP (Must, Should e Could
 have).
@@ -25,8 +30,8 @@ have).
 | RF12 | Movimentação da cobra | O sistema deve permitir a movimentação da cobra pelo espaço disponível da partida, atualizando a posição de sua cabeça e de seu corpo a cada passo. | Must have | Workshop |
 | RF14 | Controle do espaço de jogo | O sistema deve utilizar uma área em formato de grade para a movimentação da cobra. | Must have | Workshop |
 | RF15 | Progressão de níveis | O sistema deve permitir a progressão do jogador por diferentes níveis de dificuldade conforme seu desempenho na partida. | Should have | Workshop e Entrevista |
-| RF16 | Redução da área por nível | O sistema deve reduzir progressivamente o espaço disponível para movimentação conforme o avanço dos níveis, utilizando, inicialmente, uma grade de 7×7 nos níveis 1, 2 e 3 e uma grade de 6×6 nos níveis 4, 5 e 6, seguindo a progressão definida para os níveis posteriores. | Should have | Workshop |
-| RF17 | Aumento da dificuldade | O sistema deve aumentar gradualmente a dificuldade da partida conforme o jogador avança nos níveis. | Should have | Workshop e Entrevista |
+| RF16 | Redução da área por nível | O sistema deve reduzir progressivamente o espaço disponível para movimentação conforme o avanço dos níveis, utilizando uma grade de 16×16 nos níveis 1 e 2, 14×14 nos níveis 3 e 4 e 12×12 nos níveis 5 e 6. | Should have | Workshop |
+| RF17 | Aumento da dificuldade | O sistema deve aumentar gradualmente a dificuldade da partida conforme o jogador avança nos níveis, combinando a velocidade da cobra com os modificadores de RF31 a RF36. | Should have | Workshop e Entrevista |
 | RF18 | Controle da pontuação | O sistema deve registrar e atualizar a pontuação do jogador de acordo com seu desempenho durante a partida. | Must have | Workshop e Entrevista |
 | RF19 | Controle do progresso do jogador | O sistema deve registrar o nível alcançado e o desempenho obtido pelo jogador durante sua jornada. | Must have | Workshop |
 | RF20 | Encerramento da partida | O sistema deve identificar as condições definidas para encerramento da partida e apresentar ao jogador o resultado obtido. | Must have | Workshop e Entrevista |
@@ -40,6 +45,14 @@ have).
 | RF28 | Contestação de questão | O sistema deve permitir que o jogador conteste uma questão, para revisão posterior. | Could have | Workshop e Entrevista |
 | RF29 | Registro de proveniência da questão | O sistema deve registrar se uma questão foi gerada por IA ou revisada por pessoa. | Should have | Workshop e Entrevista |
 | RF30 | Notícia recente como contexto | O sistema deve poder exibir uma notícia recente sem checagem como contexto informativo, nunca como questão com gabarito. | Could have | Workshop e Entrevista |
+| RF31 | Tempo por nível | O sistema deve definir, para cada nível, a duração da partida e o tempo para responder cada afirmação, reduzindo-os nos níveis mais avançados. | Should have | Workshop |
+| RF32 | Tolerância de acerto por nível | O sistema deve definir, para cada nível, a distância máxima entre a confiabilidade marcada e a de referência para a resposta contar como acerto, reduzindo-a nos níveis mais avançados. | Should have | Workshop |
+| RF33 | Penalidade do erro por nível | O sistema deve definir, para cada nível, quantos blocos a cobra cresce e quantos pontos o jogador perde a cada resposta incorreta, sem que a pontuação fique negativa. | Should have | Workshop |
+| RF34 | Paredes sólidas | O sistema deve encerrar a partida quando a cobra colidir com a borda do tabuleiro nos níveis com paredes sólidas; nos demais, a cobra atravessa a borda e reaparece no lado oposto. | Should have | Workshop |
+| RF35 | Maçã com prazo | O sistema deve mudar a maçã de lugar quando ela não for coletada dentro do prazo definido para o nível, sinalizando ao jogador que o prazo está acabando. | Could have | Workshop |
+| RF36 | Maçãs podres | O sistema deve exibir, nos níveis definidos, a quantidade de maçãs podres definida para o nível; comer uma delas faz a cobra crescer sem apresentar afirmação, e o jogador deve evitá-las. | Could have | Workshop |
+| RF37 | Encerramento ao atingir a meta | O sistema deve encerrar a partida quando o jogador atingir a pontuação mínima do seu nível atual, depois de apresentar o resultado da última resposta. | Should have | Workshop |
+| RF38 | Ações ao fim da partida | O sistema deve oferecer, ao fim da partida, as opções de jogar o mesmo nível novamente, jogar o próximo nível (quando liberado) e voltar à tela inicial. | Should have | Workshop |
 
 ## Leitura em relação ao que já está implementado
 
@@ -48,6 +61,8 @@ Esta tabela é o requisito como levantado; o estado real de cada um está em
 afirmações) e no restante da documentação de produto. Em particular:
 
 - RF07 a RF11, RF18 e RF20 correspondem às mecânicas do jogo já descritas no `README.md`.
+- RF15 a RF17 e RF31 a RF36 são parâmetros de cada nível, guardados na tabela `levels` da
+  API; a tabela completa está em [Níveis da jornada](../jogo/niveis.md).
 - RF22 a RF24 correspondem ao pré-processamento e à classificação do modelo de referência
   (`doc/relatorio-tecnico.md`), não a um pipeline isolado por requisito.
 - RF08 (classificação binária verdadeiro/falso) está sob revisão: ver

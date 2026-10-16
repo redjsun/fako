@@ -1,7 +1,7 @@
 """estrutura inicial
 
 Revision ID: 067bd9f46759
-Revises: 
+Revises:
 Create Date: 2026-09-25 13:35:32.578780
 """
 from typing import Sequence, Union

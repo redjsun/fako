@@ -1,4 +1,3 @@
-import React from "react";
 
 // Ícones de linha 2px do Figma ("Ícones FAKO"); a cor vem de `currentColor`.
 const PATHS = {

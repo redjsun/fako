@@ -11,6 +11,9 @@ interface GameScreenProps {
   minScoreToAdvance: number;
   isLastLevel: boolean;
   gridSize: number;
+  rottenApples: Position[];
+  isAppleFading: boolean;
+  solidWalls: boolean;
   snake: Position[];
   direction: Direction;
   apple: Position | null;
@@ -39,6 +42,9 @@ export const GameScreen: React.FC<GameScreenProps> = ({
   minScoreToAdvance,
   isLastLevel,
   gridSize,
+  rottenApples,
+  isAppleFading,
+  solidWalls,
   snake,
   direction,
   apple,
@@ -96,9 +102,11 @@ export const GameScreen: React.FC<GameScreenProps> = ({
       </aside>
 
       <section className="game-layout__board" aria-label="Tabuleiro">
-        <div className="board-frame">
+        <div className={solidWalls ? "board-frame board-frame--solid" : "board-frame"}>
           <GameBoard
             gridSize={gridSize}
+            rottenApples={rottenApples}
+            isAppleFading={isAppleFading}
             snake={snake}
             direction={direction}
             apple={apple}
@@ -138,6 +146,8 @@ export const GameScreen: React.FC<GameScreenProps> = ({
               aria-label="Cima"
               disabled={!canSteer}
               onPointerDown={() => onDirection("UP")}
+              // Enter/Espaço no botão (o toque e o mouse já viraram no onPointerDown)
+              onClick={(event) => event.detail === 0 && onDirection("UP")}
             >
               <Icon name="up" size={18} />
             </button>
@@ -150,6 +160,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                   aria-label={key.label}
                   disabled={!canSteer}
                   onPointerDown={() => onDirection(key.direction)}
+                  onClick={(event) => event.detail === 0 && onDirection(key.direction)}
                 >
                   <Icon name={key.icon} size={18} />
                 </button>

@@ -1,9 +1,8 @@
 """Rotas de curadoria de conteúdo e ferramentas de IA (restritas a administradores)."""
 
 from fastapi import APIRouter, Depends, status
-from sqlalchemy.orm import Session
 
-from app.core.database import get_db
+from app.core.database import SessaoDaRequisicao
 from app.core.deps import get_current_admin
 from app.integrations.noticias_client import NoticiasClient, get_noticias_clients
 from app.ml.classificador import ClassificadorClient, get_classificador
@@ -30,12 +29,12 @@ from app.services.noticias_service import NoticiasService
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(get_current_admin)])
 
 
-def get_content_service(db: Session = Depends(get_db)) -> ContentService:
+def get_content_service(db: SessaoDaRequisicao) -> ContentService:
     return ContentService(db)
 
 
 def get_ai_service(
-    db: Session = Depends(get_db),
+    db: SessaoDaRequisicao,
     llm: LLMClient = Depends(get_llm_client),
     classificador: ClassificadorClient = Depends(get_classificador),
     noticias: list[NoticiasClient] = Depends(get_noticias_clients),
@@ -45,7 +44,7 @@ def get_ai_service(
 
 
 def get_classify_service(
-    db: Session = Depends(get_db),
+    db: SessaoDaRequisicao,
     llm: LLMClient = Depends(get_llm_client),
     classificador: ClassificadorClient = Depends(get_classificador),
 ) -> AIService:
@@ -99,7 +98,7 @@ def classify_statement(
 
 
 def get_noticias_service(
-    db: Session = Depends(get_db),
+    db: SessaoDaRequisicao,
     noticias: list[NoticiasClient] = Depends(get_noticias_clients),
     classificador: ClassificadorClient = Depends(get_classificador),
     llm: LLMClient = Depends(get_llm_client),

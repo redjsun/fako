@@ -51,7 +51,9 @@ def partida(db) -> Match:
     user = User(username=f"jogador_{uuid.uuid4().hex[:8]}", password_hash="x")
     db.add(user)
     db.flush()
-    match = Match(user_id=user.id, level_id=db.scalar(select(Level.id).limit(1)))
+    match = Match(
+        user_id=user.id, level_id=db.scalar(select(Level.id).limit(1)), duration_seconds=120
+    )
     db.add(match)
     db.flush()
     return match

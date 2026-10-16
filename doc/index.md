@@ -18,7 +18,6 @@ Use as abas no topo para navegar, ou veja o índice completo abaixo.
 | [Requisitos funcionais](requisitos/requisitos-funcionais.md) | Catálogo RF01 a RF30, com prioridade e origem |
 | [Requisitos não funcionais](requisitos/requisitos-nao-funcionais.md) | Catálogo RNF01 a RNF27, com prioridade e origem |
 | [Histórias de usuário](requisitos/historias-usuario.md) | Os requisitos funcionais reescritos como histórias de usuário |
-| [Matriz de rastreabilidade](requisitos/matriz-rastreabilidade.md) | Cada requisito ligado à issue, ao artefato de código e ao status real |
 
 ## Arquitetura
 
@@ -32,6 +31,8 @@ Use as abas no topo para navegar, ou veja o índice completo abaixo.
 
 | Documento | Conteúdo |
 |---|---|
+| [Níveis da jornada](jogo/niveis.md) | Regras de cada um dos 6 níveis: tabuleiro, tempos, paredes, maçãs e meta |
+| [Conquistas](jogo/conquistas.md) | As 8 conquistas da Jornada, como cada uma é liberada e como adicionar outras |
 | [Banco de perguntas do jogo](banco-perguntas.md) | Afirmação, contexto, notícias de API externa rotuladas, checagens e revisão humana |
 | [Notícias externas e classificador](noticias-classificador.md) | Importação de manchetes (GNews), referência TF-IDF e rascunhos para revisão |
 
