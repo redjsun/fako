@@ -7,16 +7,13 @@ import unittest
 from pathlib import Path
 
 import torch
-from transformers import AutoTokenizer
-
 from ml.bertimbau import (
     MODEL_NAME,
     NoticiasDataset,
-    avaliar_modelo,
     obter_dispositivo,
     salvar_artefatos,
 )
-from ml.dados import DadosML, RegistroML
+from transformers import AutoTokenizer
 
 
 class TestBERTimbau(unittest.TestCase):
@@ -35,7 +32,6 @@ class TestBERTimbau(unittest.TestCase):
             "Vacina com chip? Isso é falso!",
         ]
         self.labels_y1 = [1, 0]
-        self.labels_y2 = [1, 0]
         self.pesos = [1.0, 0.7]
 
     def tearDown(self):
@@ -91,7 +87,7 @@ class TestBERTimbau(unittest.TestCase):
             "dataset_hash": "hash123",
         }
 
-        artefatos = salvar_artefatos(
+        salvar_artefatos(
             modelo_dummy, modelo_dummy, self.tokenizer, metadados, diretorio=self.models_dir
         )
 

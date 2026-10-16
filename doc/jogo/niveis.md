@@ -48,5 +48,10 @@ que faltam.
   um nível já vencido segue até o fim do tempo.
 - O jogador avança quando a partida é do nível atual, o placar alcança a meta e existe um
   nível acima (`match_service.finish`).
+- O tempo da pergunta também vale no servidor: a API aceita a resposta até o tempo do nível
+  mais 30 s de folga (rede e animação). Depois disso a resposta conta como erro, e o resultado
+  avisa o jogador.
+- Cada jogador tem uma partida aberta por vez. Começar outra abandona a anterior, que não
+  soma pontos nem conta como partida jogada.
 - No fim da partida há três opções: jogar o mesmo nível de novo, jogar o próximo nível (só
   quando ele já está liberado) e voltar ao início.

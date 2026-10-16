@@ -1,7 +1,8 @@
 # Treino (container ml): as leves + PyTorch CPU e transformers. Fora do CI, pelo tamanho.
 -r requirements.txt
+# Índice do PyTorch só para baixar a versão CPU (sem CUDA, bem menor). Os demais pacotes vêm do
+# PyPI; os pisos abaixo evitam que uma versão antiga e vulnerável venha de qualquer um dos dois.
 --extra-index-url https://download.pytorch.org/whl/cpu
-torch>=2.4
-transformers>=4.44
-sentence-transformers>=3.0
+torch>=2.6  # antes da 2.6, torch.load executa pickle arbitrário por padrão
+transformers>=4.53
 matplotlib>=3.8  # diagrama de confiabilidade do avaliar.py

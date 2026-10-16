@@ -7,18 +7,20 @@ classificadores independentes para Y1 e Y2 utilizando ponderação por sample_we
 
 from __future__ import annotations
 
+import argparse
 import json
 import logging
 import random
 import time
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 import torch
 import torch.nn as nn
+from ml.dados import DadosML, carregar
 from sklearn.metrics import (
     accuracy_score,
     balanced_accuracy_score,
@@ -33,8 +35,6 @@ from transformers import (
     AutoTokenizer,
     get_linear_schedule_with_warmup,
 )
-
-from ml.dados import DadosML, carregar
 
 logger = logging.getLogger("fako.ml.bertimbau")
 
@@ -197,7 +197,9 @@ def treinar_classificador(
     melhor_estado = None
     melhores_metricas_val = None
 
-    print(f"\n--- Treinando BERTimbau {nome_alvo} ({epochs} épocas, batch={batch_size}, lr={learning_rate}) ---")
+    print(
+        f"\n--- Treinando BERTimbau {nome_alvo} ({epochs} épocas, batch={batch_size}, lr={learning_rate}) ---"
+    )
 
     for epoca in range(1, epochs + 1):
         modelo.train()
@@ -291,8 +293,12 @@ def executar_experimento(
     salvar: bool = True,
     epochs: int = EPOCHS,
     batch_size: int = BATCH_SIZE,
+    avaliar_teste: bool = False,
 ) -> dict[str, Any]:
-    """Executa o ciclo completo de fine-tuning e avaliação do BERTimbau."""
+    """Executa o ciclo completo de fine-tuning e avaliação do BERTimbau.
+
+    O teste só é avaliado com `avaliar_teste` (uma vez por modelo, como manda o protocolo).
+    """
     fixar_seed(RANDOM_STATE)
     dispositivo = obter_dispositivo()
 
@@ -350,22 +356,24 @@ def executar_experimento(
         batch_size=batch_size,
     )
 
-    # 3. Avaliação no conjunto de teste (inédito)
-    ds_teste_y1 = NoticiasDataset(X_teste, y1_teste, pesos_teste, tokenizer)
-    ds_teste_y2 = NoticiasDataset(X_teste, y2_teste, pesos_teste, tokenizer)
+    # 3. Avaliação no conjunto de teste (inédito), só quando pedida
+    metricas_teste_y1 = metricas_teste_y2 = None
+    if avaliar_teste:
+        ds_teste_y1 = NoticiasDataset(X_teste, y1_teste, pesos_teste, tokenizer)
+        ds_teste_y2 = NoticiasDataset(X_teste, y2_teste, pesos_teste, tokenizer)
 
-    dl_teste_y1 = DataLoader(ds_teste_y1, batch_size=batch_size, shuffle=False)
-    dl_teste_y2 = DataLoader(ds_teste_y2, batch_size=batch_size, shuffle=False)
+        dl_teste_y1 = DataLoader(ds_teste_y1, batch_size=batch_size, shuffle=False)
+        dl_teste_y2 = DataLoader(ds_teste_y2, batch_size=batch_size, shuffle=False)
 
-    metricas_teste_y1 = avaliar_modelo(modelo_y1, dl_teste_y1, dispositivo)
-    metricas_teste_y2 = avaliar_modelo(modelo_y2, dl_teste_y2, dispositivo)
+        metricas_teste_y1 = avaliar_modelo(modelo_y1, dl_teste_y1, dispositivo)
+        metricas_teste_y2 = avaliar_modelo(modelo_y2, dl_teste_y2, dispositivo)
 
     tempo_treinamento = time.time() - t_inicio
 
     # Metadados do experimento
     metadados = {
         "modelo": f"BERTimbau ({MODEL_NAME})",
-        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "timestamp_utc": datetime.now(UTC).isoformat(),
         "dispositivo": str(dispositivo),
         "random_state": RANDOM_STATE,
         "tempo_treinamento_segundos": round(tempo_treinamento, 2),
@@ -388,10 +396,11 @@ def executar_experimento(
             "y1": metricas_val_y1.to_dict(),
             "y2": metricas_val_y2.to_dict(),
         },
-        "metricas_teste": {
-            "y1": metricas_teste_y1.to_dict(),
-            "y2": metricas_teste_y2.to_dict(),
-        },
+        "metricas_teste": (
+            {"y1": metricas_teste_y1.to_dict(), "y2": metricas_teste_y2.to_dict()}
+            if avaliar_teste
+            else None
+        ),
     }
 
     caminhos_artefatos = {}
@@ -414,6 +423,11 @@ def executar_experimento(
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
+    parser.add_argument(
+        "--teste", action="store_true", help="avalia também o teste (uma vez por modelo)"
+    )
+    args = parser.parse_args()
     print("=" * 68)
     print("      TREINAMENTO E AVALIAÇÃO DO BERTIMBAU (FAKO)")
     print("=" * 68)
@@ -421,12 +435,16 @@ def main():
     print("\n1. Carregando dados do pipeline oficial (ml.dados)...")
     dados = carregar(texto="original")
     print(f"   Dataset hash: {dados.dataset_hash}")
-    print(f"   Exemplos: Treino={len(dados.treino)}, Validação={len(dados.validacao)}, Teste={len(dados.teste)}")
+    print(
+        f"   Exemplos: Treino={len(dados.treino)}, Validação={len(dados.validacao)}, Teste={len(dados.teste)}"
+    )
     print(f"   Dispositivo de aceleração: {obter_dispositivo()}")
     print(f"   max_length: {MAX_LENGTH}")
 
     print("\n2. Executando fine-tuning de BERTimbau Y1 e Y2...")
-    resultado = executar_experimento(dados, diretorio_modelos="models", salvar=True)
+    resultado = executar_experimento(
+        dados, diretorio_modelos="models", salvar=True, avaliar_teste=args.teste
+    )
     meta = resultado["metadata"]
 
     print(f"\n   Tempo total de treinamento: {meta.get('tempo_treinamento_segundos')}s")
@@ -436,27 +454,43 @@ def main():
 
     val_y1 = resultado["metricas_val_y1"]
     val_y2 = resultado["metricas_val_y2"]
-    te_y1 = resultado["metricas_teste_y1"]
-    te_y2 = resultado["metricas_teste_y2"]
 
     print("\n" + "=" * 68)
     print("            RESULTADOS DE VALIDAÇÃO (BERTIMBAU)")
     print("=" * 68)
-    print(f"{'Modelo':<15} {'Acc':>8} {'Prec':>8} {'Rec':>8} {'F1':>8} {'Macro F1':>10} {'Bal Acc':>10}")
+    print(
+        f"{'Modelo':<15} {'Acc':>8} {'Prec':>8} {'Rec':>8} {'F1':>8} {'Macro F1':>10} {'Bal Acc':>10}"
+    )
     print("-" * 68)
-    print(f"{'BERTimbau Y1':<15} {val_y1.accuracy*100:>7.2f}% {val_y1.precision*100:>7.2f}% {val_y1.recall*100:>7.2f}% {val_y1.f1*100:>7.2f}% {val_y1.macro_f1*100:>9.2f}% {val_y1.balanced_accuracy*100:>9.2f}%")
-    print(f"{'BERTimbau Y2':<15} {val_y2.accuracy*100:>7.2f}% {val_y2.precision*100:>7.2f}% {val_y2.recall*100:>7.2f}% {val_y2.f1*100:>7.2f}% {val_y2.macro_f1*100:>9.2f}% {val_y2.balanced_accuracy*100:>9.2f}%")
+    print(
+        f"{'BERTimbau Y1':<15} {val_y1.accuracy*100:>7.2f}% {val_y1.precision*100:>7.2f}% {val_y1.recall*100:>7.2f}% {val_y1.f1*100:>7.2f}% {val_y1.macro_f1*100:>9.2f}% {val_y1.balanced_accuracy*100:>9.2f}%"
+    )
+    print(
+        f"{'BERTimbau Y2':<15} {val_y2.accuracy*100:>7.2f}% {val_y2.precision*100:>7.2f}% {val_y2.recall*100:>7.2f}% {val_y2.f1*100:>7.2f}% {val_y2.macro_f1*100:>9.2f}% {val_y2.balanced_accuracy*100:>9.2f}%"
+    )
     print("\nMatrizes de Confusão (Validação):")
     print(f"  Y1: {formatar_matriz(val_y1.confusion_matrix)}")
     print(f"  Y2: {formatar_matriz(val_y2.confusion_matrix)}")
 
+    if not args.teste:
+        print("\nTeste não avaliado (use --teste, uma vez por modelo).")
+        return
+    te_y1 = resultado["metricas_teste_y1"]
+    te_y2 = resultado["metricas_teste_y2"]
+
     print("\n" + "=" * 68)
     print("              RESULTADOS DE TESTE (BERTIMBAU)")
     print("=" * 68)
-    print(f"{'Modelo':<15} {'Acc':>8} {'Prec':>8} {'Rec':>8} {'F1':>8} {'Macro F1':>10} {'Bal Acc':>10}")
+    print(
+        f"{'Modelo':<15} {'Acc':>8} {'Prec':>8} {'Rec':>8} {'F1':>8} {'Macro F1':>10} {'Bal Acc':>10}"
+    )
     print("-" * 68)
-    print(f"{'BERTimbau Y1':<15} {te_y1.accuracy*100:>7.2f}% {te_y1.precision*100:>7.2f}% {te_y1.recall*100:>7.2f}% {te_y1.f1*100:>7.2f}% {te_y1.macro_f1*100:>9.2f}% {te_y1.balanced_accuracy*100:>9.2f}%")
-    print(f"{'BERTimbau Y2':<15} {te_y2.accuracy*100:>7.2f}% {te_y2.precision*100:>7.2f}% {te_y2.recall*100:>7.2f}% {te_y2.f1*100:>7.2f}% {te_y2.macro_f1*100:>9.2f}% {te_y2.balanced_accuracy*100:>9.2f}%")
+    print(
+        f"{'BERTimbau Y1':<15} {te_y1.accuracy*100:>7.2f}% {te_y1.precision*100:>7.2f}% {te_y1.recall*100:>7.2f}% {te_y1.f1*100:>7.2f}% {te_y1.macro_f1*100:>9.2f}% {te_y1.balanced_accuracy*100:>9.2f}%"
+    )
+    print(
+        f"{'BERTimbau Y2':<15} {te_y2.accuracy*100:>7.2f}% {te_y2.precision*100:>7.2f}% {te_y2.recall*100:>7.2f}% {te_y2.f1*100:>7.2f}% {te_y2.macro_f1*100:>9.2f}% {te_y2.balanced_accuracy*100:>9.2f}%"
+    )
     print("\nMatrizes de Confusão (Teste):")
     print(f"  Y1: {formatar_matriz(te_y1.confusion_matrix)}")
     print(f"  Y2: {formatar_matriz(te_y2.confusion_matrix)}")

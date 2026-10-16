@@ -24,10 +24,6 @@ import unittest
 from pathlib import Path
 
 from ml.dados import (
-    CLASSES_VERACIDADE,
-    MAPA_Y1,
-    MAPA_Y2,
-    PESOS_ORIGEM,
     carregar,
     limpar_texto,
 )
@@ -176,7 +172,9 @@ class TestPipelineDadosML(unittest.TestCase):
 
     def test_03_urls_removidas(self):
         """3. Garante que URLs http/https/www são removidas do texto."""
-        texto_limpo = limpar_texto("Veja em https://exemplo.com/noticia e www.portal.com/teste aqui!")
+        texto_limpo = limpar_texto(
+            "Veja em https://exemplo.com/noticia e www.portal.com/teste aqui!"
+        )
         self.assertNotIn("https://", texto_limpo)
         self.assertNotIn("www.portal.com", texto_limpo)
         self.assertEqual(texto_limpo, "Veja em e aqui!")

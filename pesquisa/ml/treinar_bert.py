@@ -36,7 +36,13 @@ from torch import nn
 from transformers import AutoModel, AutoTokenizer, get_linear_schedule_with_warmup
 
 from avaliar import gravar_previsoes, metricas
-from configuracao import CONFIGS, Configuracao, carregar_configuracao
+from configuracao import (
+    CONFIGS,
+    Configuracao,
+    carregar_configuracao,
+    conferir_artefato,
+    sha256_arquivo,
+)
 from dados import CLASSES, ORDEM, Exemplo, carregar
 
 PASTA_CODIFICADOR = "codificador"
@@ -109,7 +115,7 @@ def fronteiras(textos: list[str], modelo: dict, tamanho: int = 64) -> tuple[np.n
 
 def salvar_modelo(rede: Coral, tokenizador, pasta: Path, extras: dict):
     destino = pasta / PASTA_CODIFICADOR
-    rede.codificador.save_pretrained(destino)
+    rede.codificador.save_pretrained(destino, safe_serialization=True)
     tokenizador.save_pretrained(destino)
     torch.save(
         {"linear": rede.linear.state_dict(), "vieses": rede.vieses.detach().cpu(), **extras},
@@ -119,8 +125,11 @@ def salvar_modelo(rede: Coral, tokenizador, pasta: Path, extras: dict):
 
 def carregar_modelo(pasta: Path) -> dict:
     """Modelo salvo por este script: {"rede", "tokenizador", "max_tokens", "versao"}."""
-    cabeca = torch.load(pasta / ARQUIVO_CABECA, map_location="cpu", weights_only=False)
-    codificador = AutoModel.from_pretrained(pasta / PASTA_CODIFICADOR)
+    # weights_only: a cabeça tem só tensores, inteiros e textos; nada de pickle arbitrário.
+    cabeca = torch.load(
+        conferir_artefato(pasta, ARQUIVO_CABECA), map_location="cpu", weights_only=True
+    )
+    codificador = AutoModel.from_pretrained(pasta / PASTA_CODIFICADOR, use_safetensors=True)
     rede = Coral(codificador)
     rede.linear.load_state_dict(cabeca["linear"])
     rede.vieses.data = cabeca["vieses"]
@@ -143,6 +152,7 @@ def treinar_semente(
     rede = Coral(AutoModel.from_pretrained(parametros["modelo_base"]))
     max_tokens, tamanho = parametros.get("max_tokens", 96), parametros.get("lote", 32)
     max_epocas = parametros.get("max_epocas", 4)
+    # Quantas épocas seguidas sem melhora são toleradas: o treino para na seguinte.
     paciencia = parametros.get("paciencia", 1)
 
     classe = pesos_por_classe(treino)
@@ -244,6 +254,7 @@ def treinar(config: Configuracao, saida: Path | None = None) -> dict:
     valores = [s["f1_macro_validacao"] for s in por_semente.values()]
     resultado = {
         "versao": versao,
+        "artefatos_sha256": {ARQUIVO_CABECA: sha256_arquivo(saida / ARQUIVO_CABECA)},
         "semente_escolhida": semente,
         "f1_macro_validacao": f1,
         "f1_macro_validacao_media": statistics.mean(valores),

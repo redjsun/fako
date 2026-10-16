@@ -2,7 +2,7 @@
 nome = "referencia"
 modelo = "referencia"
 saida = "models/2026-11/referencia"
-sementes = [42]
+sementes = [42]   # sem efeito: a regressão logística (lbfgs) é determinística
 
 [dados]
 dataset = "pesquisa/data/processed/dataset.jsonl"
