@@ -30,7 +30,12 @@ Acesse em `http://localhost:5173`.
 
 ### Projeto completo (Docker Compose)
 
+Antes da primeira vez, crie o `.env` a partir do exemplo e gere o segredo dos tokens de login.
+A API não sobe sem um `JWT_SECRET` próprio (32 bytes ou mais, diferente do exemplo):
+
 ```bash
+cp .env.example .env
+python -c "import secrets; print(secrets.token_urlsafe(48))"   # cole em JWT_SECRET no .env
 make up
 ```
 
@@ -39,20 +44,29 @@ make up
 
 `make help` lista todos os comandos disponíveis.
 
+**Segurança do ambiente de desenvolvimento.** As portas publicadas (API, web, banco, Jupyter e
+docs) escutam só em `127.0.0.1`, então nada fica exposto na rede local. As credenciais padrão do
+banco (`fako`/`fako`) servem só para dev: troque `POSTGRES_USER` e `POSTGRES_PASSWORD` no `.env`
+em qualquer outro ambiente. Se já houver um PostgreSQL na 5432 do host (comum no Windows), use
+`POSTGRES_HOST_PORT=5433` no `.env`. O Jupyter (`make eda`) exige token: defina `JUPYTER_TOKEN` no `.env`
+ou use o token aleatório que aparece em `docker compose --profile pesquisa logs pesquisa`.
+Administrador: `make admin u=usuario` (a senha é pedida no terminal). Senhas de jogador têm
+de 8 caracteres a 72 bytes, e o login bloqueia por 15 minutos depois de 5 senhas erradas.
+
 ## Desenvolvimento
 
 ```bash
-make test      # testes da API (ruff + pytest num banco fako_test separado)
-make lint      # lint e formatação da API
+make test      # testes da API (pytest num banco fako_test separado)
+make lint      # lint e formatação da API (ruff)
 make format    # formata o código da API
-make test-ml   # lint e testes de pesquisa/ml/
+make test-ml   # lint de pesquisa/ml e pesquisa/dados, e testes de pesquisa/ml/
 make test-web  # tipos, lint e testes do frontend
 ```
 
 O CI (`.github/workflows/ci.yml`) roda os mesmos comandos a cada push, com cobertura mínima
-na API (80%) e em `pesquisa/ml/` (75%), além do build estrito dos docs (`mkdocs build --strict`)
-e do build das imagens. A auditoria de dependências e a checagem de links externos dos docs
-só avisam, sem bloquear.
+na API (80%) e em `pesquisa/ml/` (75%), o lint do `ml/` legado, o build estrito dos docs
+(`mkdocs build --strict`) e o build das imagens. A auditoria de dependências e a checagem de
+links externos dos docs só avisam, sem bloquear.
 
 ## Dados
 
@@ -74,17 +88,17 @@ Os coletores usam `requests` e `beautifulsoup4` (`pesquisa/requirements.txt`), e
 entre requisições ao mesmo site e guardam as páginas em cache em `pesquisa/data/raw/`, então
 rodar de novo só baixa o que falta. O preparo usa só a biblioteca padrão.
 
-**Coleta diária.** O serviço `agendador` do compose (sobe com `make up`) roda
-`pesquisa/crontab` com o [supercronic](https://github.com/aptible/supercronic): às 3h,
-`coletar_factcheck.py --incremental` e depois `preparar_dados.py`. Logs em
-`docker compose logs agendador`.
+**Coleta diária.** O serviço `agendador` do compose (profile próprio: sobe com
+`make agendador`, só na máquina que coleta) roda `pesquisa/crontab` com o
+[supercronic](https://github.com/aptible/supercronic): às 3h, `coletar_factcheck.py --incremental`
+e depois `preparar_dados.py`. Logs em `docker compose --profile agendador logs agendador`.
 
 **Anotação da equipe** (`doc/guia-classificacao.md` §7, `pesquisa/anotacoes/README.md`):
 
 ```bash
 python pesquisa/dados/sortear_anotacao.py --rodada 1 --anotadores ana bruno --itens 600
 python pesquisa/dados/consolidar_anotacoes.py importar --rodada 1 pesquisa/data/anotacao/rodada-01-*.csv
-python pesquisa/dados/consolidar_anotacoes.py          # concordância e anotacoes/consolidado.csv
+python pesquisa/dados/consolidar_anotacoes.py          # concordância e pesquisa/anotacoes/consolidado.csv
 ```
 
 | Base | Classe | Origem | O que entra |

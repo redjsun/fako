@@ -40,7 +40,9 @@ PREFIXO_BOATO = re.compile(r"^\s*Boato\s*[–—-]\s*", re.I)
 
 def urls_do_fakerecogna() -> list[str]:
     if not FAKERECOGNA.exists():
-        sys.exit("pesquisa/data/raw/FakeRecogna.csv não encontrado. Rode antes: bash pesquisa/dados/baixar_dados.sh")
+        sys.exit(
+            "pesquisa/data/raw/FakeRecogna.csv não encontrado. Rode antes: bash pesquisa/dados/baixar_dados.sh"
+        )
     with open(FAKERECOGNA, encoding="utf-8", newline="") as f:
         return [
             linha["URL"].strip()

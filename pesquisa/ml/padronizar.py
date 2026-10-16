@@ -257,8 +257,11 @@ def extrator_openai(
         requisicao = urllib.request.Request(url, json.dumps(corpo).encode(), cabecalhos)
         dados = requisitar(requisicao, timeout, dormir=dormir)
         uso = dados.get("usage") or {}
+        conteudo = dados["choices"][0]["message"].get("content")
+        if not isinstance(conteudo, str):  # ex.: content null quando o modelo só "pensou"
+            raise ValueError(f"Resposta da LLM sem texto: {str(dados)[:200]}")
         return Extracao(
-            afirmacoes=interpretar_resposta(dados["choices"][0]["message"]["content"]),
+            afirmacoes=interpretar_resposta(conteudo),
             tokens_entrada=uso.get("prompt_tokens", 0),
             tokens_saida=uso.get("completion_tokens", 0),
         )
@@ -338,7 +341,8 @@ def padronizar(
         for n, futuro in enumerate(as_completed(futuros), 1):
             try:
                 id_, extracao = futuro.result()
-            except (OSError, ValueError, KeyError, IndexError) as erro:  # rede, timeout, JSON
+            # Rede, timeout, JSON ou resposta fora do formato: o item fica de fora e o lote segue.
+            except (OSError, ValueError, KeyError, IndexError, TypeError, AttributeError) as erro:
                 relatorio.falhas += 1
                 log(f"  falha: {erro}")
                 continue
@@ -468,7 +472,8 @@ def main():
             if not args.base or registro.get("base") in args.base:
                 yield registro
 
-    cache_path = caminho_cache(prompt.versao)
+    # Ao lado do dataset, onde dados.carregar() procura o cache (também com --dataset).
+    cache_path = caminho_cache(prompt.versao, args.dataset.parent)
     if args.exportar:
         destino = CONFERENCIA / f"padronizacao_{prompt.versao}.csv"
         n = exportar(registros(), ler_cache(cache_path, prompt, modelo), destino)
@@ -485,7 +490,7 @@ def main():
     )
     print(f"splits: {args.splits}")
     print(relatorio.resumo())
-    print(f"Cache em {cache_path.relative_to(RAIZ)}")
+    print(f"Cache em {cache_path}")
     # Tempo e tokens de cada rodada, para registrar o custo do lote (critério da #20).
     with open(cache_path.with_suffix(".rodadas.jsonl"), "a", encoding="utf-8") as rodadas:
         rodadas.write(json.dumps(vars(relatorio), ensure_ascii=False) + "\n")

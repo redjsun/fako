@@ -11,11 +11,10 @@ import csv
 import hashlib
 import json
 import logging
-import os
 import re
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterator, Literal
+from typing import Any, Literal
 
 logger = logging.getLogger("fako.ml.dados")
 
@@ -45,6 +44,7 @@ PESOS_ORIGEM = {
 }
 
 PESO_PADRAO = 1.0
+RAIZ_REPOSITORIO = Path(__file__).resolve().parent.parent
 
 # Regexes de limpeza textual
 RE_URL = re.compile(r"https?://\S+|www\.\S+", re.IGNORECASE)
@@ -247,8 +247,8 @@ def carregar_anotacoes(caminho_anotacoes: Path | str | None) -> dict[str, dict[s
         try:
             if arq.suffix.lower() == ".jsonl":
                 with open(arq, encoding="utf-8") as f:
-                    for linha in f:
-                        linha = linha.strip()
+                    for linha_bruta in f:
+                        linha = linha_bruta.strip()
                         if linha:
                             reg = json.loads(linha)
                             if "id" in reg:
@@ -329,10 +329,10 @@ def resolver_caminho_dataset(caminho: str | Path | None = None) -> Path:
             return p
         raise FileNotFoundError(f"Arquivo de dataset não encontrado em: {p}")
 
+    # No serviço ml-legado, pesquisa/data é montada em /work/data; no host, vale o caminho do repositório.
     candidatos = [
-        Path("data/processed/dataset.jsonl"),
         Path("/work/data/processed/dataset.jsonl"),
-        Path(__file__).resolve().parent.parent / "data" / "processed" / "dataset.jsonl",
+        RAIZ_REPOSITORIO / "pesquisa" / "data" / "processed" / "dataset.jsonl",
     ]
 
     for cand in candidatos:
@@ -340,8 +340,8 @@ def resolver_caminho_dataset(caminho: str | Path | None = None) -> Path:
             return cand
 
     raise FileNotFoundError(
-        "Arquivo data/processed/dataset.jsonl não encontrado. "
-        "Execute 'make dados' ou 'python scripts/preparar_dados.py' para gerar a base processada."
+        "Arquivo pesquisa/data/processed/dataset.jsonl não encontrado. "
+        "Execute 'make dados' (ou 'python pesquisa/dados/preparar_dados.py') para gerar a base."
     )
 
 
@@ -350,10 +350,10 @@ def resolver_caminho_anotacoes(caminho: str | Path | None = None) -> Path | None
         p = Path(caminho)
         return p if p.exists() else None
 
+    # Só a decisão final da equipe (consolidado.csv), nunca as rodadas de cada anotador.
     candidatos = [
-        Path("anotacoes"),
-        Path("/work/anotacoes"),
-        Path(__file__).resolve().parent.parent / "anotacoes",
+        Path("/work/anotacoes/consolidado.csv"),
+        RAIZ_REPOSITORIO / "pesquisa" / "anotacoes" / "consolidado.csv",
     ]
     for cand in candidatos:
         if cand.exists():
@@ -367,9 +367,8 @@ def resolver_caminho_cache(caminho: str | Path | None = None) -> Path | None:
         return p if p.exists() else None
 
     candidatos = [
-        Path("data/cache/padronizacao"),
         Path("/work/data/cache/padronizacao"),
-        Path(__file__).resolve().parent.parent / "data" / "cache" / "padronizacao",
+        RAIZ_REPOSITORIO / "pesquisa" / "data" / "cache" / "padronizacao",
     ]
     for cand in candidatos:
         if cand.exists():
@@ -398,7 +397,9 @@ def carregar(
     - usar_splits_existentes: se True, utiliza split_produto já calculado no dataset.
     """
     if texto not in ("original", "padronizado"):
-        raise ValueError(f"Opção de texto inválida: '{texto}'. Escolha 'original' ou 'padronizado'.")
+        raise ValueError(
+            f"Opção de texto inválida: '{texto}'. Escolha 'original' ou 'padronizado'."
+        )
 
     caminho_dados = resolver_caminho_dataset(caminho_dataset)
     dir_anotacoes = resolver_caminho_anotacoes(caminho_anotacoes)
@@ -412,12 +413,13 @@ def carregar(
     reserva: list[RegistroML] = []
 
     descartados_sem_texto = 0
+    descartados_sem_padronizacao = 0
     descartados_portal = 0
     total_lidos = 0
 
     with open(caminho_dados, encoding="utf-8") as f:
-        for num_linha, linha in enumerate(f, start=1):
-            linha = linha.strip()
+        for num_linha, linha_bruta in enumerate(f, start=1):
+            linha = linha_bruta.strip()
             if not linha:
                 continue
 
@@ -443,8 +445,12 @@ def carregar(
 
             # 3. Preparação do texto (original limpo vs padronizado)
             if texto == "padronizado":
-                texto_padrao = obter_texto_padronizado(registro, versao_prompt, dir_cache)
-                texto_final = texto_padrao if texto_padrao else limpar_texto(texto_curto)
+                # Sem padronização no cache, o registro fica de fora: misturar texto original
+                # e padronizado no mesmo treino invalidaria a comparação entre os dois.
+                texto_final = obter_texto_padronizado(registro, versao_prompt, dir_cache)
+                if not texto_final:
+                    descartados_sem_padronizacao += 1
+                    continue
             else:
                 texto_final = limpar_texto(texto_curto)
 
@@ -462,11 +468,11 @@ def carregar(
             y2 = MAPA_Y2[veracidade]
 
             # 5. Origem e pesos
-            origem = str(
-                registro.get("origem_rotulo")
-                or registro.get("origem")
-                or "agencia"
-            ).strip().lower()
+            origem = (
+                str(registro.get("origem_rotulo") or registro.get("origem") or "agencia")
+                .strip()
+                .lower()
+            )
 
             # REGRA CRÍTICA: Registros de 'portal' NÃO devem entrar nos splits de ML
             if origem == "portal":
@@ -502,11 +508,7 @@ def carregar(
             )
 
             # 7. Distribuição dos splits
-            split_alvo = str(
-                registro.get("split_produto")
-                or registro.get("split")
-                or ""
-            ).lower()
+            split_alvo = str(registro.get("split_produto") or registro.get("split") or "").lower()
 
             # Reserva não entra nos splits de treino, validação ou teste
             if split_alvo == "reserva" or registro.get("reserva") is True:
@@ -524,10 +526,14 @@ def carregar(
                 # Fora do escopo do experimento de produto
                 continue
             else:
-                # Sorteio determinístico usando a seed fixa caso não haja split pré-definido
-                hash_sorteio = int(
-                    hashlib.sha256(f"{seed}-{reg_id}".encode()).hexdigest()[:8], 16
-                ) / 0xFFFFFFFF
+                # Sorteio determinístico usando a seed fixa caso não haja split pré-definido.
+                # Pelo par_id quando houver: os dois lados de um par (Fake.br, FakeTrue) caem
+                # no mesmo split, sem vazamento entre treino e teste.
+                chave_sorteio = registro.get("par_id") or reg_id
+                hash_sorteio = (
+                    int(hashlib.sha256(f"{seed}-{chave_sorteio}".encode()).hexdigest()[:8], 16)
+                    / 0xFFFFFFFF
+                )
                 if hash_sorteio < 0.80:
                     treino.append(item)
                 elif hash_sorteio < 0.90:
@@ -544,6 +550,7 @@ def carregar(
         "seed": seed,
         "total_lidos": total_lidos,
         "descartados_sem_texto": descartados_sem_texto,
+        "descartados_sem_padronizacao": descartados_sem_padronizacao,
         "descartados_portal": descartados_portal,
         "dataset_hash": d_hash,
     }
@@ -559,25 +566,22 @@ def carregar(
 
 
 if __name__ == "__main__":
-    import sys
-
     print("=== Pipeline de Dados ML - FAKO ===")
     try:
         dados = carregar(texto="original")
-        resumo = dados.resumo()
-        print(f"Dataset carregado com sucesso:")
-        print(f"  Hash do experimento: {dados.dataset_hash}")
-        print(f"  Treino:    {len(dados.treino)} registros {resumo['classes_treino']}")
-        print(f"  Validação: {len(dados.validacao)} registros {resumo['classes_validacao']}")
-        print(f"  Teste:     {len(dados.teste)} registros {resumo['classes_teste']}")
-        print(f"  Reserva:   {len(dados.reserva)} registros")
-        print(f"  Descartados sem texto_curto: {dados.metadados.get('descartados_sem_texto')}")
-        print(f"  Descartados de portal:       {dados.metadados.get('descartados_portal')}")
     except FileNotFoundError as e:
-        print(f"[AVISO] {e}")
-        print("\nPara gerar a base real, execute:")
-        print("  make dados")
-        print("ou:")
-        print("  bash scripts/baixar_dados.sh && python scripts/preparar_dados.py")
-        print("\nPara rodar a suíte de testes unitários do pipeline:")
-        print("  python3 -m unittest ml/test_dados.py")
+        print(f"[ERRO] {e}")
+        print("\nPara gerar a base real, execute: make dados")
+        print(
+            "Para rodar a suíte de testes unitários do pipeline: python -m pytest ml/test_dados.py"
+        )
+        raise SystemExit(1) from e
+    resumo = dados.resumo()
+    print("Dataset carregado com sucesso:")
+    print(f"  Hash do experimento: {dados.dataset_hash}")
+    print(f"  Treino:    {len(dados.treino)} registros {resumo['classes_treino']}")
+    print(f"  Validação: {len(dados.validacao)} registros {resumo['classes_validacao']}")
+    print(f"  Teste:     {len(dados.teste)} registros {resumo['classes_teste']}")
+    print(f"  Reserva:   {len(dados.reserva)} registros")
+    print(f"  Descartados sem texto_curto: {dados.metadados.get('descartados_sem_texto')}")
+    print(f"  Descartados de portal:       {dados.metadados.get('descartados_portal')}")

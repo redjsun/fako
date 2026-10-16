@@ -1,6 +1,6 @@
 COMPOSE := docker compose
 
-.PHONY: help build up down restart logs ps shell-api shell-web shell-db migrate makemigration seed admin test lint format dados padronizar atalho contagens referencia bert avaliar classificar publicar test-web test-ml shell-ml eda ml-legado docs clean
+.PHONY: help build up down restart logs ps shell-api shell-web shell-db migrate makemigration seed admin test lint format dados padronizar atalho contagens referencia bert avaliar classificar publicar test-web test-ml shell-ml eda ml-legado agendador docs clean
 
 help: ## Lista os comandos disponíveis
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -29,7 +29,7 @@ shell-web: ## Abre um shell no container do frontend
 	$(COMPOSE) exec web sh
 
 shell-db: ## Abre o psql no container do banco
-	$(COMPOSE) exec db psql -U fako -d fako
+	$(COMPOSE) exec db sh -c 'psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"'
 
 migrate: ## Aplica as migrations pendentes no banco
 	$(COMPOSE) exec api alembic upgrade head
@@ -40,20 +40,24 @@ makemigration: ## Gera uma migration a partir dos models (uso: make makemigratio
 seed: ## Popula o banco com categorias, níveis e questões iniciais
 	$(COMPOSE) exec api python -m app.seeds.run
 
-admin: ## Cria um administrador de conteúdo (uso: make admin u=usuario p=senha)
-	$(COMPOSE) exec api python -m app.seeds.create_admin "$(u)" "$(p)"
+# Sem p=, o script pede a senha no terminal (não fica no histórico do shell nem na lista de processos).
+admin: ## Cria um administrador de conteúdo (uso: make admin u=usuario; a senha é pedida no terminal)
+	$(COMPOSE) exec api python -m app.seeds.create_admin "$(u)" $(if $(p),"$(p)",)
 
-TEST_DB_URL := postgresql+psycopg://fako:fako@db:5432/fako_test
+# As credenciais vêm do .env do container (env_file), com os padrões de dev do compose.yaml.
+TEST_DB_URL := postgresql+psycopg://\$${POSTGRES_USER:-fako}:\$${POSTGRES_PASSWORD:-fako}@db:5432/fako_test
+# Segredo só de teste: a API recusa subir sem um JWT_SECRET de 32+ bytes.
+TEST_JWT_SECRET := teste-local-somente-nao-usar-em-producao-0123456789
 
 test: ## Roda os testes da API num banco separado (fako_test)
-	-$(COMPOSE) exec db createdb -U fako fako_test
-	$(COMPOSE) run --rm --no-deps -v ./api:/app -e DATABASE_URL=$(TEST_DB_URL) api sh -c "pip install -q -r requirements-dev.txt && pytest -v"
+	-$(COMPOSE) exec db sh -c 'createdb -U "$$POSTGRES_USER" fako_test'
+	$(COMPOSE) run --rm --no-deps -v ./api:/app -e JWT_SECRET=$(TEST_JWT_SECRET) api sh -c "pip install -q -r requirements-dev.txt && DATABASE_URL=$(TEST_DB_URL) pytest -v"
 
 lint: ## Verifica lint e formatação da API
-	$(COMPOSE) run --rm --no-deps -v ./api:/app api sh -c "pip install -q -r requirements-dev.txt && ruff check . && ruff format --check ."
+	$(COMPOSE) run --rm --no-deps -v ./api:/app -e JWT_SECRET=$(TEST_JWT_SECRET) api sh -c "pip install -q -r requirements-dev.txt && ruff check . && ruff format --check ."
 
 format: ## Formata o código da API
-	$(COMPOSE) run --rm --no-deps -v ./api:/app api sh -c "pip install -q -r requirements-dev.txt && ruff format . && ruff check --fix ."
+	$(COMPOSE) run --rm --no-deps -v ./api:/app -e JWT_SECRET=$(TEST_JWT_SECRET) api sh -c "pip install -q -r requirements-dev.txt && ruff format . && ruff check --fix ."
 
 PESQUISA := $(COMPOSE) --profile pesquisa run --rm --no-deps pesquisa
 ML := $(COMPOSE) --profile ml run --rm --no-deps ml
@@ -99,16 +103,20 @@ shell-ml: ## Abre um shell no container de treino
 	$(ML) bash
 
 test-web: ## Roda tipos, lint e testes do frontend
-	$(COMPOSE) run --rm --no-deps web sh -c "npm install --no-audit --no-fund && npm run typecheck && npm run lint && npm run test"
+	$(COMPOSE) run --rm --no-deps web sh -c "npm ci --no-audit --no-fund && npm run typecheck && npm run lint && npm run test"
 
-test-ml: ## Roda lint e testes de pesquisa/ml/
-	$(COMPOSE) --profile pesquisa run --rm --no-deps -w /work/pesquisa/ml pesquisa sh -c "pip install -q -r requirements-dev.txt && ruff check . && ruff format --check . && pytest -v"
+test-ml: ## Roda lint de pesquisa/ml e pesquisa/dados, e os testes de pesquisa/ml/ (o ml/ legado roda no CI)
+	$(COMPOSE) --profile pesquisa run --rm --no-deps -w /work/pesquisa/ml pesquisa sh -c "pip install -q --user -r requirements-dev.txt && python -m ruff check --config pyproject.toml . ../dados && python -m ruff format --check --config pyproject.toml . ../dados && python -m pytest -v"
 
-eda: ## Sobe o Jupyter Lab da EDA em http://localhost:8888
+eda: ## Sobe o Jupyter Lab da EDA em http://localhost:8888 (token: JUPYTER_TOKEN do .env ou o do log)
 	$(COMPOSE) --profile pesquisa up -d pesquisa
+	@echo "Jupyter em http://localhost:8888. Sem JUPYTER_TOKEN no .env, o token está em: $(COMPOSE) --profile pesquisa logs pesquisa"
 
 ml-legado: ## Ambiente do ml/ antigo (BERTimbau Y1/Y2 da API): carregamento e verificação dos dados
 	$(COMPOSE) --profile ml-legado run --rm ml-legado python -m ml.dados
+
+agendador: ## Sobe a coleta diária (pesquisa/crontab: Fact Check às 3h e preparo do dataset)
+	$(COMPOSE) --profile agendador up -d agendador
 
 docs: ## Sobe a documentação (MkDocs) em http://localhost:8001
 	$(COMPOSE) --profile docs up docs

@@ -1,0 +1,11 @@
+# O build só copia requirements.txt; o código e os dados entram por volume (compose.yaml).
+data/
+notebooks/
+anotacoes/
+ml/saidas/
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
+**/.ruff_cache/
+**/.ipynb_checkpoints/
+.coverage

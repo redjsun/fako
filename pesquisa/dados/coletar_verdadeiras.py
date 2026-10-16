@@ -50,8 +50,18 @@ PORTAIS = {
     "jornalusp": ("jornal.usp.br", "ciencia"),
     "infomoney": ("www.infomoney.com.br", "economia"),
 }
-CAMPOS = ["id", "portal", "linha_editorial", "url", "data", "titulo", "linha_fina",
-          "primeiro_paragrafo", "texto", "n_palavras"]
+CAMPOS = [
+    "id",
+    "portal",
+    "linha_editorial",
+    "url",
+    "data",
+    "titulo",
+    "linha_fina",
+    "primeiro_paragrafo",
+    "texto",
+    "n_palavras",
+]
 MIN_CARACTERES_PARAGRAFO = 40
 
 
@@ -61,10 +71,20 @@ def texto_limpo(fragmento: str) -> str:
 
 def paragrafos(conteudo: str) -> list[str]:
     """Parágrafos do corpo, sem legendas, embeds e chamadas curtas ("Leia mais")."""
-    conteudo = re.sub(r"<(figure|figcaption|script|style|blockquote)[^>]*>.*?</\1>", " ", conteudo or "",
-                      flags=re.S | re.I)
-    trechos = [texto_limpo(p) for p in re.findall(r"<p[^>]*>(.*?)</p>", conteudo, flags=re.S | re.I)]
-    return [t for t in trechos if len(t) >= MIN_CARACTERES_PARAGRAFO and not t.lower().startswith("leia")]
+    conteudo = re.sub(
+        r"<(figure|figcaption|script|style|blockquote)[^>]*>.*?</\1>",
+        " ",
+        conteudo or "",
+        flags=re.S | re.I,
+    )
+    trechos = [
+        texto_limpo(p) for p in re.findall(r"<p[^>]*>(.*?)</p>", conteudo, flags=re.S | re.I)
+    ]
+    return [
+        t
+        for t in trechos
+        if len(t) >= MIN_CARACTERES_PARAGRAFO and not t.lower().startswith("leia")
+    ]
 
 
 def janelas(inicio: date, fim: date):
@@ -73,7 +93,7 @@ def janelas(inicio: date, fim: date):
     while atual < fim:
         proximo_mes = (atual.replace(day=28) + timedelta(days=4)).replace(day=1)
         cortes = [atual.replace(day=d) for d in (1, 6, 11, 16, 21, 26)] + [proximo_mes]
-        for a, b in zip(cortes, cortes[1:]):
+        for a, b in zip(cortes, cortes[1:], strict=False):
             if a < fim:
                 yield a, min(b, fim)
         atual = proximo_mes
@@ -83,11 +103,16 @@ def coletar_portal(nome: str, dominio: str, inicio: date, fim: date, n: int, int
     pasta = CACHE / nome
     for a, b in janelas(inicio, fim):
         params = {
-            "per_page": n, "orderby": "date", "order": "desc",
-            "after": f"{a.isoformat()}T00:00:00", "before": f"{b.isoformat()}T00:00:00",
+            "per_page": n,
+            "orderby": "date",
+            "order": "desc",
+            "after": f"{a.isoformat()}T00:00:00",
+            "before": f"{b.isoformat()}T00:00:00",
             "_fields": "id,date,link,title,excerpt,content",
         }
-        corpo, status = baixar(f"https://{dominio}/wp-json/wp/v2/posts?{urlencode(params)}", pasta, intervalo)
+        corpo, status = baixar(
+            f"https://{dominio}/wp-json/wp/v2/posts?{urlencode(params)}", pasta, intervalo
+        )
         if status != 200 or not corpo:
             print(f"  {nome} {a}: status {status}")
             continue
@@ -124,7 +149,9 @@ def main():
     parser.add_argument("--portais", nargs="*", default=list(PORTAIS), choices=list(PORTAIS))
     parser.add_argument("--de", default="2018-01", help="mês inicial (AAAA-MM)")
     parser.add_argument("--ate", default=None, help="mês final, exclusivo (AAAA-MM); padrão: hoje")
-    parser.add_argument("--por-janela", type=int, default=4, help="matérias por portal e janela de ~5 dias")
+    parser.add_argument(
+        "--por-janela", type=int, default=4, help="matérias por portal e janela de ~5 dias"
+    )
     parser.add_argument("--intervalo", type=float, default=1.0, help="segundos entre requisições")
     args = parser.parse_args()
 
@@ -160,7 +187,9 @@ def coletar_e_gravar(nome: str, inicio: date, fim: date, n: int, intervalo: floa
         if i % 200 == 0:
             gravar(parcial, registros)  # salva o progresso de tempos em tempos
     gravar(parcial, registros)
-    print(f"{nome}: {len(registros) - antes} matérias novas ({len(registros)} no total)", flush=True)
+    print(
+        f"{nome}: {len(registros) - antes} matérias novas ({len(registros)} no total)", flush=True
+    )
 
 
 def ler(arquivo: Path) -> dict:
