@@ -1,5 +1,10 @@
 site_name: Documentação do FAKO
 site_description: Jogo educativo de avaliação de confiabilidade e classificador de veracidade treinado com bases brasileiras de fake news.
+# Endereço publicado (GitHub Pages); vem de SITE_URL no deploy. Vazio no `make docs`, que serve na raiz.
+site_url: !ENV [SITE_URL, ""]
+repo_url: https://github.com/redjsun/grupo11_challenge1
+repo_name: redjsun/grupo11_challenge1
+edit_uri: edit/develop/doc/
 docs_dir: doc
 
 theme:
@@ -54,13 +59,13 @@ nav:
       - Requisitos funcionais: requisitos/requisitos-funcionais.md
       - Requisitos não funcionais: requisitos/requisitos-nao-funcionais.md
       - Histórias de usuário: requisitos/historias-usuario.md
-      - Matriz de rastreabilidade: requisitos/matriz-rastreabilidade.md
   - Arquitetura:
       - Visão geral: arquitetura/visao-geral.md
       - Decisões de arquitetura: arquitetura/decisoes.md
       - Esquema do banco: arquitetura/schema.md
   - Produto:
       - Níveis da jornada: jogo/niveis.md
+      - Conquistas: jogo/conquistas.md
       - Banco de perguntas do jogo: banco-perguntas.md
       - Notícias externas e classificador: noticias-classificador.md
   - Pesquisa e dados:

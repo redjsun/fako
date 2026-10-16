@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from avaliar import (
+    DatasetDiferente,
     avaliar,
     comparar,
     ece,
@@ -153,3 +154,17 @@ def test_margem_sobre_o_atalho(tmp_path, dataset):
     atalho.write_text(json.dumps(piso), encoding="utf-8")
     resultado = avaliar(tmp_path / "bom", dataset, atalho=atalho)
     assert resultado["atalho"]["validacao"]["margem"] == pytest.approx(0.3)
+
+
+def test_avaliar_para_se_o_dataset_nao_for_o_do_treino(tmp_path, dataset):
+    pasta = tmp_path / "modelo"
+    gravar_modelo(pasta, dataset, acerta_ate=30)
+    config = json.loads((pasta / "config.json").read_text(encoding="utf-8"))
+    config["dataset_sha256"] = "0" * 64
+    (pasta / "config.json").write_text(json.dumps(config), encoding="utf-8")
+    sem_atalho = tmp_path / "sem-atalho.json"
+    with pytest.raises(DatasetDiferente):
+        avaliar(pasta, dataset, atalho=sem_atalho)
+    resultado = avaliar(pasta, dataset, atalho=sem_atalho, aceitar_dataset_diferente=True)
+    assert resultado["dataset_diferente_do_treino"] is True
+    assert "não é o do treino" in relatorio(resultado)

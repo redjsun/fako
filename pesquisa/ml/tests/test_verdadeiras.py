@@ -7,8 +7,8 @@ import pytest
 # Os scripts de pesquisa/dados/ importam uns aos outros pelo nome, como ao rodar da pasta.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "dados"))
 
-import auditar_verdadeiras as auditoria  # noqa: E402
-import preparar_dados as preparar  # noqa: E402
+import auditar_verdadeiras as auditoria
+import preparar_dados as preparar
 
 
 def materia(item, titulo, fonte="poder360.com.br", data="2020-05-01", url=None, **outros):

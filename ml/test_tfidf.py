@@ -20,14 +20,10 @@ from pathlib import Path
 
 from ml.dados import DadosML, RegistroML
 from ml.tfidf import (
-    DEFAULT_LOGISTIC_PARAMS,
-    DEFAULT_TFIDF_PARAMS,
     RANDOM_STATE,
     avaliar_modelo,
     carregar_artefatos,
     executar_experimento,
-    preparar_vetorizador,
-    salvar_artefatos,
     treinar_classificador,
     treinar_vetorizador,
 )
@@ -40,21 +36,73 @@ class TestTFIDFBaseline(unittest.TestCase):
 
         # Fixture sintética controlada
         self.treino = [
-            RegistroML("t1", "Notícia oficial sobre saúde pública", "verdadeiro", 1, 1, "agencia", 1.0),
-            RegistroML("t2", "Vacina tem substância tóxica perigosa", "falso", 0, 0, "agencia", 1.0),
-            RegistroML("t3", "Repasse urgente para todos os contatos", "falso", 0, 0, "mensagem", 0.7),
-            RegistroML("t4", "Número de empregos cresce acima da média", "enganoso", 1, 0, "agencia", 1.0),
-            RegistroML("t5", "Governo anuncia programa de saúde pública", "verdadeiro", 1, 1, "agencia", 1.0),
-            RegistroML("t6", "Golpe do aplicativo que cancela conta bancária", "falso", 0, 0, "mensagem", 0.7),
+            RegistroML(
+                "t1", "Notícia oficial sobre saúde pública", "verdadeiro", 1, 1, "agencia", 1.0
+            ),
+            RegistroML(
+                "t2", "Vacina tem substância tóxica perigosa", "falso", 0, 0, "agencia", 1.0
+            ),
+            RegistroML(
+                "t3", "Repasse urgente para todos os contatos", "falso", 0, 0, "mensagem", 0.7
+            ),
+            RegistroML(
+                "t4", "Número de empregos cresce acima da média", "enganoso", 1, 0, "agencia", 1.0
+            ),
+            RegistroML(
+                "t5",
+                "Governo anuncia programa de saúde pública",
+                "verdadeiro",
+                1,
+                1,
+                "agencia",
+                1.0,
+            ),
+            RegistroML(
+                "t6",
+                "Golpe do aplicativo que cancela conta bancária",
+                "falso",
+                0,
+                0,
+                "mensagem",
+                0.7,
+            ),
         ]
         self.val = [
-            RegistroML("v1", "Ministério lança nova vacina contra gripe", "verdadeiro", 1, 1, "agencia", 1.0),
-            RegistroML("v2", "Post falso afirma que benefício foi cortado", "falso", 0, 0, "agencia", 1.0),
+            RegistroML(
+                "v1",
+                "Ministério lança nova vacina contra gripe",
+                "verdadeiro",
+                1,
+                1,
+                "agencia",
+                1.0,
+            ),
+            RegistroML(
+                "v2", "Post falso afirma que benefício foi cortado", "falso", 0, 0, "agencia", 1.0
+            ),
         ]
         self.teste = [
-            RegistroML("te1", "Boato afirma que eleição foi cancelada", "falso", 0, 0, "agencia", 1.0),
-            RegistroML("te2", "Economia fecha ano em alta segundo relatório", "enganoso", 1, 0, "agencia", 1.0),
-            RegistroML("te3", "Ministério confirma nova campanha de vacina", "verdadeiro", 1, 1, "agencia", 1.0),
+            RegistroML(
+                "te1", "Boato afirma que eleição foi cancelada", "falso", 0, 0, "agencia", 1.0
+            ),
+            RegistroML(
+                "te2",
+                "Economia fecha ano em alta segundo relatório",
+                "enganoso",
+                1,
+                0,
+                "agencia",
+                1.0,
+            ),
+            RegistroML(
+                "te3",
+                "Ministério confirma nova campanha de vacina",
+                "verdadeiro",
+                1,
+                1,
+                "agencia",
+                1.0,
+            ),
         ]
         self.dados = DadosML(
             treino=self.treino,
@@ -109,16 +157,22 @@ class TestTFIDFBaseline(unittest.TestCase):
         self.assertEqual(pesos, [1.0, 1.0, 0.7, 1.0, 1.0, 0.7])
 
         vec, X_tr_vec = treinar_vetorizador([r.texto for r in self.dados.treino])
-        clf = treinar_classificador(X_tr_vec, [r.y1 for r in self.dados.treino], sample_weight=pesos)
+        clf = treinar_classificador(
+            X_tr_vec, [r.y1 for r in self.dados.treino], sample_weight=pesos
+        )
         self.assertTrue(hasattr(clf, "coef_"))
 
     def test_06_seed_reproduzivel(self):
         """6. Garante que o treinamento é determinístico com RANDOM_STATE=42."""
-        vec1, X_tr_vec1 = treinar_vetorizador([r.texto for r in self.dados.treino])
-        vec2, X_tr_vec2 = treinar_vetorizador([r.texto for r in self.dados.treino])
+        _, X_tr_vec1 = treinar_vetorizador([r.texto for r in self.dados.treino])
+        _, X_tr_vec2 = treinar_vetorizador([r.texto for r in self.dados.treino])
 
-        clf1 = treinar_classificador(X_tr_vec1, [r.y1 for r in self.dados.treino], params={"random_state": 42})
-        clf2 = treinar_classificador(X_tr_vec2, [r.y1 for r in self.dados.treino], params={"random_state": 42})
+        clf1 = treinar_classificador(
+            X_tr_vec1, [r.y1 for r in self.dados.treino], params={"random_state": 42}
+        )
+        clf2 = treinar_classificador(
+            X_tr_vec2, [r.y1 for r in self.dados.treino], params={"random_state": 42}
+        )
 
         self.assertEqual(clf1.coef_.tolist(), clf2.coef_.tolist())
 
@@ -157,7 +211,7 @@ class TestTFIDFBaseline(unittest.TestCase):
 
     def test_10_artefatos_sao_salvos_e_carregados(self):
         """10. Garante que os modelos e metadados são salvos em models/ e recarregados."""
-        res = executar_experimento(self.dados, diretorio_modelos=self.models_dir, salvar=True)
+        executar_experimento(self.dados, diretorio_modelos=self.models_dir, salvar=True)
 
         self.assertTrue((self.models_dir / "tfidf_vectorizer.joblib").exists())
         self.assertTrue((self.models_dir / "tfidf_y1.joblib").exists())
@@ -167,6 +221,8 @@ class TestTFIDFBaseline(unittest.TestCase):
         vec, clf_y1, clf_y2, meta = carregar_artefatos(self.models_dir)
         self.assertEqual(meta["dataset_hash"], self.dados.dataset_hash)
         self.assertEqual(meta["random_state"], RANDOM_STATE)
+        # O teste só é avaliado com avaliar_teste=True (uma vez por modelo).
+        self.assertIsNone(meta["metricas_teste"])
 
 
 if __name__ == "__main__":

@@ -1,3 +1,5 @@
+# Ambiente de desenvolvimento. As portas publicadas escutam só em 127.0.0.1: nada fica exposto
+# na rede local. As credenciais padrão do banco (fako/fako) servem só para dev; troque-as no .env.
 services:
   db:
     image: postgres:16-alpine
@@ -8,7 +10,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fako}
       POSTGRES_DB: ${POSTGRES_DB:-fako}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
@@ -33,12 +35,18 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-fako}:${POSTGRES_PASSWORD:-fako}@db:5432/${POSTGRES_DB:-fako}
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     volumes:
       - ./api/app:/app/app
       - ./api/migrations:/app/migrations
       - ./models:/app/models:ro   # modelos publicados (MODELS_DIR), só leitura
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
     depends_on:
       db:
         condition: service_healthy
@@ -56,10 +64,16 @@ services:
     environment:
       API_URL: http://api:8000   # destino do proxy /api do Vite
     ports:
-      - "5173:5173"
+      - "127.0.0.1:5173:5173"
     volumes:
       - ./web:/app
       - /app/node_modules
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:5173/"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
     depends_on:
       - api
 
@@ -80,13 +94,17 @@ services:
     # Para alcançar uma LLM local no host (Ollama) também no Linux.
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    # O Jupyter exige token: JUPYTER_TOKEN do .env ou, sem ele, um token aleatório impresso no log
+    # (docker compose --profile pesquisa logs pesquisa).
     ports:
-      - "8888:8888"
+      - "127.0.0.1:8888:8888"
     volumes:
       - ./pesquisa:/work/pesquisa
       - ./api/app/prompts:/work/api/app/prompts
+      - ./models:/work/models:ro   # modelos treinados, lidos pelo notebook de avaliação
 
   # Coleta diária e preparo dos dados nos horários de pesquisa/crontab (supercronic).
+  # Fica num profile: só a máquina que coleta sobe (make agendador), não todo `make up`.
   agendador:
     build:
       context: ./pesquisa
@@ -96,6 +114,7 @@ services:
         cache-to:
           - type=gha,scope=pesquisa,mode=max
     container_name: fakenews-agendador
+    profiles: ["agendador"]
     restart: unless-stopped
     env_file:
       - path: .env
@@ -105,11 +124,16 @@ services:
     command: supercronic /work/pesquisa/crontab
     volumes:
       - ./pesquisa:/work/pesquisa
-      - ./models:/work/models
 
   # Treino e experimentos de ML: imagem com PyTorch CPU e transformers, fora da API.
   ml:
-    build: ./pesquisa/ml
+    build:
+      context: ./pesquisa/ml
+      x-bake:
+        cache-from:
+          - type=gha,scope=ml
+        cache-to:
+          - type=gha,scope=ml,mode=max
     container_name: fakenews-ml
     profiles: ["ml"]
     env_file:
@@ -131,20 +155,20 @@ services:
       - ml-legado
     volumes:
       - ./ml:/work/ml
-      - ./data:/work/data
-      - ./scripts:/work/scripts
-      - ./anotacoes:/work/anotacoes
+      - ./pesquisa/data:/work/data
+      - ./pesquisa/anotacoes:/work/anotacoes
       - ./models:/work/models
 
   # Documentação do projeto (MkDocs + Material), servida com live-reload.
+  # A versão segue requirements-docs.txt (a mesma do CI). O repositório entra só leitura.
   docs:
-    image: squidfunk/mkdocs-material
+    image: squidfunk/mkdocs-material:9.7.7
     container_name: fakenews-docs
     profiles: ["docs"]
     ports:
-      - "8001:8000"
+      - "127.0.0.1:8001:8000"
     volumes:
-      - .:/docs
+      - .:/docs:ro
 
 volumes:
   db_data:

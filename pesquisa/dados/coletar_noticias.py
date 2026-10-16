@@ -35,7 +35,9 @@ MIN_CARACTERES_PARAGRAFO = 40
 
 def urls_verdadeiras() -> dict[str, dict]:
     if not FAKERECOGNA.exists():
-        sys.exit("pesquisa/data/raw/FakeRecogna.csv não encontrado. Rode antes: bash pesquisa/dados/baixar_dados.sh")
+        sys.exit(
+            "pesquisa/data/raw/FakeRecogna.csv não encontrado. Rode antes: bash pesquisa/dados/baixar_dados.sh"
+        )
     with open(FAKERECOGNA, encoding="utf-8", newline="") as f:
         return {
             linha["URL"].strip(): linha

@@ -15,6 +15,18 @@ export interface AnswerResult {
   explanation: string;
   source: string;
   score: number;
+  // A API conta como erro a resposta que chega depois do tempo da pergunta (com folga).
+  timed_out?: boolean;
+  // Palpite do classificador sobre a afirmação; ausente quando ele está desligado.
+  model_guess?: ModelGuess | null;
+}
+
+// Palpite do classificador (api/app/schemas/match_schema.py, ModelGuess).
+interface ModelGuess {
+  category: string; // falso, enganoso, confere ou incerto
+  score: number | null;
+  confidence: number;
+  model_version: string;
 }
 
 // Afirmação já respondida, para o feedback, o resumo da partida e o histórico.
@@ -41,13 +53,11 @@ export interface Level {
   rotten_apples: number;
 }
 
-export type MatchStatus = "in_progress" | "finished";
-
 export interface Match {
   id: number;
   level: Level;
   score: number;
-  status: MatchStatus;
+  status: "in_progress" | "finished" | "abandoned";
   duration_seconds: number;
   started_at: string;
   ended_at: string | null;
@@ -117,6 +127,8 @@ export interface Achievement {
 
 export interface UserStats {
   highScore: number;
+  // Soma dos pontos de todas as partidas, como o total_score da API.
+  totalScore: number;
   maxLevel: number;
   gamesPlayed: number;
   totalAcertos: number;

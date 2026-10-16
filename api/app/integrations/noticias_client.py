@@ -14,7 +14,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from itertools import zip_longest
 from typing import Protocol
 
@@ -37,7 +37,6 @@ class Noticia:
     url: str
     veiculo: str | None
     publicada_em: datetime | None
-    descricao: str | None = None
     # Veredito da agência, só nas checagens; sem ele, a notícia é manchete publicada.
     veredito: str | None = None
     # None quando o veredito não tem lado no jogo (enganoso, ambíguo).
@@ -52,9 +51,11 @@ def data_iso(texto: str | None) -> datetime | None:
     if not texto:
         return None
     try:
-        return datetime.fromisoformat(texto.replace("Z", "+00:00"))
+        data = datetime.fromisoformat(texto.replace("Z", "+00:00"))
     except ValueError:
         return None
+    # Sem fuso, vale UTC: comparar datas com e sem fuso dá erro ou ordena pela hora local.
+    return data if data.tzinfo else data.replace(tzinfo=timezone.utc)
 
 
 def pedir_json(endereco: str, tempo_limite: float, provedor: str) -> dict:
@@ -84,7 +85,7 @@ class FakeNoticias:
                 titulo=f"{manchete} - Portal Exemplo",
                 url=f"https://exemplo.com.br/noticias/{i}",
                 veiculo="Portal Exemplo",
-                publicada_em=datetime(2026, 10, 1, 12, 0),
+                publicada_em=datetime(2026, 10, 1, 12, 0, tzinfo=timezone.utc),
             )
             for i, manchete in enumerate(self.MANCHETES[:quantidade])
         ]
@@ -137,7 +138,6 @@ class GNewsClient:
             url=artigo.get("url") or "",
             veiculo=(artigo.get("source") or {}).get("name"),
             publicada_em=data_iso(artigo.get("publishedAt")),
-            descricao=artigo.get("description"),
         )
 
 
@@ -212,12 +212,14 @@ class FactCheckClient:
         if revisao is None:
             return None
         veredito = normalizar_veredito(revisao.get("textualRating"))
+        if veredito is None:
+            # Sem veredito a alegação passaria por manchete publicada (verdadeira).
+            return None
         return Noticia(
             titulo=claim.get("text") or "",
             url=revisao.get("url") or "",
             veiculo=(revisao.get("publisher") or {}).get("name"),
             publicada_em=data_iso(revisao.get("reviewDate")),
-            descricao=revisao.get("title"),
             veredito=veredito,
             verdadeira=verdadeira_pelo_veredito(veredito),
         )

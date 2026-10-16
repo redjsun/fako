@@ -32,7 +32,8 @@ def test_modelo_salvo_carrega_sem_codigo_da_pesquisa_e_respeita_a_ordem(tmp_path
     probabilidades = np.column_stack([1 - p1, p1 - p2, p2])
     np.testing.assert_allclose(probabilidades.sum(axis=1), 1)
 
-    previsoes = [json.loads(linha) for linha in open(pasta / "previsoes.jsonl", encoding="utf-8")]
+    with open(pasta / "previsoes.jsonl", encoding="utf-8") as arquivo:
+        previsoes = [json.loads(linha) for linha in arquivo]
     assert {p["split"] for p in previsoes} == {"validacao", "teste"}
     assert all(p["p2"] <= p["p1"] for p in previsoes)
 

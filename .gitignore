@@ -4,6 +4,8 @@ __pycache__/
 venv/
 node_modules/
 .env
+.env.*
+!.env.example
 .DS_Store
 dist/
 *.tsbuildinfo
@@ -11,6 +13,9 @@ site/
 coverage/
 .coverage
 htmlcov/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
 
 # Dados brutos e processados: gerados por pesquisa/dados/baixar_dados.sh e preparar_dados.py
 data/

@@ -10,7 +10,7 @@ from app.schemas.level_schema import LevelResponse
 
 class MatchStartRequest(BaseModel):
     # Se omitido, a partida começa no nível atual do jogador.
-    level: int | None = None
+    level: int | None = Field(default=None, ge=1)
 
 
 class MatchResponse(BaseModel):
@@ -50,6 +50,8 @@ class AnswerResultResponse(BaseModel):
     explanation: str
     source: str
     score: int
+    # Resposta depois do tempo da pergunta (com a folga do servidor): conta como erro.
+    timed_out: bool = False
     model_guess: ModelGuess | None = None
 
 

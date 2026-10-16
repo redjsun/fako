@@ -19,22 +19,27 @@ um classificador de veracidade treinado com bases brasileiras de fake news. Todo
 | `pesquisa/notebooks/` | EDA (`eda_1_datasets.ipynb`, `eda_2_conjunto.ipynb`) |
 | `pesquisa/data/` | Fora do Git. `raw/` (bases e coletas, com cache) e `processed/` (`dataset.jsonl`) |
 | `models/` | Fora do Git. Modelos treinados, lidos pela API |
+| `ml/` | Legado: BERTimbau Y1/Y2 lido por `api/app/integrations/bertimbau_engine.py` (`POST /ai/analyze`). Serviço `ml-legado`; código novo vai para `pesquisa/ml/` |
 | `doc/` | Todos os docs do projeto, inclusive os de pesquisa; site gerado com MkDocs (`mkdocs.yml`, registrar ali cada doc novo) |
 
 ## Comandos
 
 Tudo roda por Docker Compose (o Docker Desktop precisa estar aberto). `make help` lista todos.
 
-- `make up` / `make down`: API em `:8000` (docs em `/docs`), web em `:5173`, banco em `:5432`
+- `make up` / `make down`: API em `:8000` (docs em `/docs`), web em `:5173`, banco em `127.0.0.1:5432` (`POSTGRES_HOST_PORT`)
+  (todas as portas só em `127.0.0.1`)
 - `make test`, `make lint`, `make format`: API (ruff + pytest num banco `fako_test` separado)
-- `make test-ml`: lint e testes de `pesquisa/ml/`
+- `make test-ml`: lint de `pesquisa/ml/` e `pesquisa/dados/`, e testes de `pesquisa/ml/`
 - `make test-web`: tipos, lint (ESLint) e testes (Vitest) do frontend
 - `make dados`: baixa as bases para `pesquisa/data/raw/` e gera `pesquisa/data/processed/dataset.jsonl`.
   Os coletores (`pesquisa/dados/coletar_*.py`) rodam à parte e são lentos (~1 req/s, com cache)
 - `make padronizar`, `make atalho`, `make contagens`, `make shell-ml`: experimentos de `pesquisa/ml/`
-- `make eda`: Jupyter Lab em `:8888`
+- `make eda`: Jupyter Lab em `:8888`, com token (`JUPYTER_TOKEN` ou o do log)
+- `make agendador`: coleta diária (profile próprio, fora do `make up`)
+- `make docs`: documentação em `:8001`
 
-Segredos ficam em `.env` (copiar de `.env.example`): `FACTCHECK_API_KEY`, `LLM_*`, `AI_*`.
+Segredos ficam em `.env` (copiar de `.env.example`, nunca versionar): `JWT_SECRET` (obrigatório,
+32+ bytes), `POSTGRES_PASSWORD`, `JUPYTER_TOKEN`, `FACTCHECK_API_KEY`, `NOTICIAS_API_KEY`, `LLM_*`.
 
 ## Dados
 

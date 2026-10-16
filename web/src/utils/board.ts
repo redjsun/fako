@@ -17,6 +17,15 @@ export function includesCell(cells: Position[], cell: Position): boolean {
   return cells.some((item) => sameCell(item, cell));
 }
 
+/**
+ * A cabeça nova bate no corpo? Sem crescer, a ponta da cauda sai do lugar no mesmo passo,
+ * então ir para a célula dela não é mordida.
+ */
+export function hitsBody(snake: Position[], head: Position, growing: boolean): boolean {
+  const body = growing ? snake : snake.slice(0, -1);
+  return includesCell(body, head);
+}
+
 /** Cobra de 3 blocos no meio do tabuleiro, virada para a direita. */
 export function initialSnake(boardSize: number): Position[] {
   const middle = Math.floor(boardSize / 2);

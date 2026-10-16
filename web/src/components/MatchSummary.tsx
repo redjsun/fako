@@ -1,6 +1,6 @@
 import React from "react";
 import { AnsweredQuestion, MatchEndReason } from "../types";
-import { formatClock } from "../utils/formatters";
+import { formatClock, wrongAnswerEffect } from "../utils/formatters";
 import { Icon } from "./Icon";
 
 interface MatchSummaryProps {
@@ -16,6 +16,8 @@ interface MatchSummaryProps {
   secondsPlayed: number;
   pointsPerCorrect: number;
   tolerance: number;
+  growthPerError: number;
+  wrongAnswerPenalty: number;
   /** Nível seguinte já liberado: habilita o botão "Próximo nível". */
   canPlayNextLevel: boolean;
   onPlayAgain: () => void;
@@ -46,6 +48,8 @@ export const MatchSummary: React.FC<MatchSummaryProps> = ({
   secondsPlayed,
   pointsPerCorrect,
   tolerance,
+  growthPerError,
+  wrongAnswerPenalty,
   canPlayNextLevel,
   onPlayAgain,
   onPlayNextLevel,
@@ -182,7 +186,9 @@ export const MatchSummary: React.FC<MatchSummaryProps> = ({
                   <p>{answer.statement}</p>
                   <span className="answer-list__meta">
                     <span className={`tag ${answer.isCorrect ? "tag--success" : "tag--danger"}`}>
-                      {answer.isCorrect ? `Acertou · +${pointsPerCorrect}` : "Errou · +1 bloco"}
+                      {answer.isCorrect
+                        ? `Acertou · +${pointsPerCorrect}`
+                        : `Errou · ${wrongAnswerEffect(growthPerError, wrongAnswerPenalty)}`}
                     </span>
                     Você: {answer.reliability}% · Referência: {answer.reference}%
                   </span>

@@ -2,8 +2,7 @@
 
 Reescrita dos [requisitos funcionais](requisitos-funcionais.md) no formato "Como
 [ator], quero [ação], para [benefício]", na ordem do catálogo. Cada história mantém o
-vínculo com o RF de origem, para rastreabilidade; ver também a
-[matriz de rastreabilidade](matriz-rastreabilidade.md).
+vínculo com o RF de origem, para rastreabilidade.
 
 | ID | Ator | História | RF |
 |----|---|---|---|
