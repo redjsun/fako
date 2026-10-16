@@ -1,4 +1,4 @@
-# PRs para a develop. Atualizações semanais: actions (fixadas por SHA), npm do web e pip da API e da pesquisa.
+# PRs para a develop. Atualizações semanais: actions (fixadas por SHA), npm do web e pip da API.
 version: 2
 updates:
   - package-ecosystem: github-actions
@@ -20,8 +20,6 @@ updates:
   - package-ecosystem: pip
     directories:
       - /api
-      - /pesquisa
-      - /pesquisa/ml
     target-branch: develop
     schedule:
       interval: weekly
@@ -31,8 +29,6 @@ updates:
     directories:
       - /api
       - /web
-      - /pesquisa
-      - /pesquisa/ml
     target-branch: develop
     schedule:
       interval: monthly

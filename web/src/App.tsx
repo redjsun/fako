@@ -308,6 +308,7 @@ export default function App() {
       try {
         match = await matchService.startMatch(levelNumber ?? progress.current_level);
       } catch (error) {
+        // Sem a API não há partida: as perguntas e a correção vêm só dela.
         console.error("Erro ao iniciar a partida na API:", error);
         // A sessão expirada já leva ao login com o aviso
         if (authService.getCurrentUser()) {
@@ -569,9 +570,7 @@ export default function App() {
       const result = await matchService.answerQuestion(matchIdRef.current ?? 0, question.id, value);
       if (token !== matchTokenRef.current) return; // a partida acabou durante o pedido
       setLastResult(result);
-      // A API devolve o placar oficial; se ela cair no meio da partida, a pergunta local
-      // ainda soma os pontos do acerto.
-      setScore(result.score);
+      setScore(result.score); // placar oficial da API
       setAnswers((previous) => [
         ...previous,
         {

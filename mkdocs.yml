@@ -68,11 +68,13 @@ nav:
       - Conquistas: jogo/conquistas.md
       - Banco de perguntas do jogo: banco-perguntas.md
       - Notícias externas e classificador: noticias-classificador.md
+      - LLM na API: llm.md
   - Pesquisa e dados:
       - Análise exploratória dos dados: eda.md
       - Dataset de verdadeiros confiáveis: dataset-verdadeiras.md
       - Guia de classificação e anotação: guia-classificacao.md
       - Padronização do texto curto pela LLM: padronizacao.md
+      - Avaliação nas notícias do jogo: avaliacao-jogo.md
       - Planejamento de coleta e retreino: planejamento-retreino.md
   - Modelo:
       - Relatório técnico do classificador: relatorio-tecnico.md

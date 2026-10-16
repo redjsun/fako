@@ -4,10 +4,11 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.exceptions import BusinessRuleError, ConflictError, NotFoundError
-from app.integrations.classificador_client import ClassificadorClient, FakeClassificador
+from app.ml.classificador import ClassificadorClient, FakeClassificador
 from app.models.match import Match, MatchAnswer, MatchStatus
-from app.models.question import QuestionStatus
+from app.models.question import Question, QuestionStatus
 from app.models.user import User
 from app.repositories.level_repository import LevelRepository
 from app.repositories.match_repository import MatchRepository
@@ -15,6 +16,7 @@ from app.repositories.question_repository import QuestionRepository
 from app.schemas.match_schema import (
     AnswerRequest,
     AnswerResultResponse,
+    ClaimOriginResponse,
     MatchResponse,
     MatchResultResponse,
     MatchStartRequest,
@@ -23,6 +25,17 @@ from app.schemas.question_schema import QuestionResponse
 from app.services import game_rules
 from app.services.classificador_service import ClassificadorService
 from app.services.progress_service import ProgressService
+
+
+def origem_da_afirmacao(question: Question) -> ClaimOriginResponse | None:
+    if not question.origin_author:
+        return None  # questões humanas e as importadas antes da origem
+    return ClaimOriginResponse(
+        kind="materia" if question.origin_link else "alegacao",
+        author=question.origin_author,
+        when=question.origin_date,
+        link=question.origin_link,
+    )
 
 
 class MatchService:
@@ -128,12 +141,23 @@ class MatchService:
             reliability_reference=question.reliability_reference,
             tolerance=level.reliability_tolerance,
             distance=abs(data.reliability - question.reliability_reference),
-            explanation=question.explanation,
+            explanation=self.explicacao(question),
             source=question.source,
             score=match.score,
             timed_out=timed_out,
-            model_guess=self.classificador.palpite_do_jogo(question.statement),
+            model_guess=self.classificador.palpite_do_jogo(question.statement, question.claim_text),
+            claim_origin=origem_da_afirmacao(question),
         )
+
+    def explicacao(self, question) -> str:
+        """O "Por quê?": a explicação da LLM sobre a avaliação do classificador, se foi feita
+        pelo modelo publicado (a avaliação que o jogador vê); senão, a explicação da fonte."""
+        if not get_settings().classificador_no_jogo:
+            return question.explanation
+        versao = getattr(self.classificador.classificador, "versao", None)
+        if question.model_explanation and question.model_version == versao:
+            return question.model_explanation
+        return question.explanation
 
     def finish(self, user: User, match_id: int) -> MatchResultResponse:
         # Mesma regra das respostas: partida aberta há mais que o teto não conta mais (nem

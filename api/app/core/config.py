@@ -23,10 +23,28 @@ class Settings(BaseSettings):
     jwt_secret: str = ""
     jwt_expires_minutes: int = 60 * 24
 
-    # Provedor usado por integrations/ai_client.py; "fake" roda sem chamadas externas.
-    ai_provider: str = "fake"
+    # LLM (ml/llm.py): "fake" roda sem chamadas externas; "openai" usa um
+    # endpoint compatível com a API de chat da OpenAI (Ollama, LiteLLM ou provedor hospedado).
+    llm_provider: str = "fake"
+    llm_base_url: str = ""
+    llm_model: str = ""
+    llm_api_key: str = ""
+    llm_extra_body: dict = {}
+    llm_temperatura: float = 0.2
+    llm_tempo_limite: float = 120.0
+    # Envia o JSON Schema da saída em response_format; desligar se o provedor não aceitar.
+    llm_esquema: bool = True
 
-    # Classificador de veracidade (integrations/classificador_client.py): "fake" roda sem modelo;
+    # Embeddings (ml/embeddings.py): "fake" roda sem modelo; "openai" usa o
+    # /embeddings de embeddings_base_url (vazio: o mesmo de llm_base_url), ex.: bge-m3 no Ollama.
+    embeddings_provider: str = "fake"
+    embeddings_base_url: str = ""
+    embeddings_model: str = "bge-m3"
+    # Questão reescrita pela LLM abaixo desta similaridade com a alegação original é descartada
+    # (troca de assunto). Medido com o bge-m3 (doc/llm.md).
+    similaridade_minima_reescrita: float = 0.6
+
+    # Classificador de veracidade (ml/classificador.py): "fake" roda sem modelo;
     # os modelos publicados ficam em models_dir/atual.
     classificador_provider: str = "fake"
     models_dir: str = "/app/models"
@@ -36,7 +54,9 @@ class Settings(BaseSettings):
     # Notícias externas (integrations/noticias_client.py): "fake" roda sem chave; "gnews" usa
     # a API do GNews (gnews.io, plano gratuito de 100 pedidos por dia), com noticias_api_key;
     # "factcheck" usa a Google Fact Check Tools API (checagens de agências), com
-    # factcheck_api_key, a mesma chave da coleta da pesquisa.
+    # factcheck_api_key.
+    # "agenciabrasil" lê os feeds RSS da Agência Brasil (EBC), sem chave: manchetes verdadeiras.
+    # "boatos" lê os boatos desmentidos pelo Boatos.org (API do WordPress), sem chave: falsos.
     # Mais de um, separados por vírgula ("factcheck,gnews"): a quantidade é dividida entre eles.
     noticias_provider: str = "fake"
     noticias_api_key: str = ""
@@ -46,8 +66,12 @@ class Settings(BaseSettings):
     noticias_publicar_direto: bool = False
     # Descarta alegações checadas sobre política e eleição.
     noticias_sem_politica: bool = False
-    # Dispositivo do motor BERTimbau Y1/Y2 (integrations/bertimbau_engine.py)
-    ai_device: str = "cpu"
+    # Rotina diária (app/jobs/, agendada em api/crontab): quantas notícias importar por dia, em
+    # que categoria, e por quantos dias uma notícia fica no banco (depois é apagada, ou
+    # arquivada se algum jogador a respondeu).
+    noticias_por_dia: int = 50
+    noticias_categoria: str = "conhecimentos-gerais"
+    noticias_retencao_dias: int = 30
 
     def exigir_segredo_jwt(self) -> str:
         """O segredo dos tokens; recusa o vazio, o de exemplo e os curtos demais."""

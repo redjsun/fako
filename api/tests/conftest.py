@@ -20,6 +20,9 @@ from sqlalchemy.exc import OperationalError  # noqa: E402
 from app.core.database import engine  # noqa: E402
 from app.core.rate_limit import limite_de_login  # noqa: E402
 from app.main import app  # noqa: E402
+from app.ml.classificador import FakeClassificador, get_classificador  # noqa: E402
+from app.ml.embeddings import FakeEmbeddings, get_embeddings  # noqa: E402
+from app.ml.llm import FakeLLMClient, get_llm_client  # noqa: E402
 from app.seeds.run import main as seed  # noqa: E402
 
 banco_disponivel = False
@@ -39,6 +42,17 @@ def database() -> None:
     command.upgrade(Config("alembic.ini"), "head")
     seed()
     banco_disponivel = True
+
+
+@pytest.fixture(autouse=True)
+def clientes_fake():
+    """LLM, embeddings e classificador fake em todos os testes, seja qual for o .env; cada teste pode
+    sobrescrever. Os overrides são limpos no fim de cada teste."""
+    app.dependency_overrides[get_llm_client] = FakeLLMClient
+    app.dependency_overrides[get_classificador] = FakeClassificador
+    app.dependency_overrides[get_embeddings] = FakeEmbeddings
+    yield
+    app.dependency_overrides.clear()
 
 
 @pytest.fixture(autouse=True)

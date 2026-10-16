@@ -1,8 +1,11 @@
 """Acesso aos dados do banco de questões."""
 
-from sqlalchemy import func, or_, select
+from datetime import datetime
 
-from app.models.question import Question, QuestionStatus
+from sqlalchemy import delete, func, or_, select
+
+from app.models.match import Match, MatchAnswer
+from app.models.question import Question, QuestionOrigin, QuestionStatus
 from app.repositories.base_repository import BaseRepository
 
 
@@ -32,3 +35,24 @@ class QuestionRepository(BaseRepository[Question]):
         condicao = or_(mesmo_texto, Question.source == source) if source else mesmo_texto
         query = select(Question.id).where(condicao)
         return self.db.scalar(query.limit(1)) is not None
+
+    def news_created_before(self, limite: datetime) -> list[Question]:
+        """Notícias importadas antes de `limite` que ainda não foram arquivadas."""
+        query = select(Question).where(
+            Question.origin == QuestionOrigin.NEWS,
+            Question.created_at < limite,
+            Question.status != QuestionStatus.ARCHIVED,
+        )
+        return list(self.db.scalars(query))
+
+    def ids_in_use(self, ids: set[int]) -> set[int]:
+        """Das questões dadas, as que têm resposta de jogador ou estão em jogo numa partida."""
+        if not ids:
+            return set()
+        respondidas = select(MatchAnswer.question_id).where(MatchAnswer.question_id.in_(ids))
+        em_jogo = select(Match.current_question_id).where(Match.current_question_id.in_(ids))
+        return set(self.db.scalars(respondidas.union(em_jogo)))
+
+    def delete_ids(self, ids: set[int]) -> None:
+        if ids:
+            self.db.execute(delete(Question).where(Question.id.in_(ids)))

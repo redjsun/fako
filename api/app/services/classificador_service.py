@@ -10,11 +10,12 @@ import logging
 
 from app.core.config import get_settings
 from app.core.exceptions import ServiceUnavailableError
-from app.integrations.classificador_client import (
+from app.ml.classificador import (
+    Analise,
     ClassificadorClient,
     ClassificadorIndisponivel,
 )
-from app.integrations.normalizacao import limpar
+from app.ml.normalizacao import limpar
 from app.schemas.admin_schema import ClassifierAnalyzeResponse
 from app.schemas.match_schema import ModelGuess
 
@@ -43,16 +44,26 @@ class ClassificadorService:
             contributions=analise.contribuicoes,
         )
 
-    def palpite_do_jogo(self, statement: str) -> ModelGuess | None:
-        if not get_settings().classificador_no_jogo:
-            return None
+    def analise_do_jogo(self, statement: str, claim_text: str | None = None) -> Analise | None:
+        """A análise com o limiar do jogador. `claim_text` (a afirmação extraída na importação)
+        só entra se o modelo publicado foi treinado no texto padronizado ou híbrido; senão, o
+        enunciado como o jogador leu. None sem modelo."""
+        padronizado = self.classificador.texto_de_entrada != "original"
+        entrada = claim_text if padronizado and claim_text else statement
         try:
-            analise = self.classificador.analisar(statement, "jogador")
+            return self.classificador.analisar(entrada, "jogador", enunciado=statement)
         except ClassificadorIndisponivel:
             return None
         except Exception:
             # O palpite é um extra: um erro do modelo não pode derrubar a resposta do jogador.
             logger.exception("O classificador falhou ao dar o palpite do jogo")
+            return None
+
+    def palpite_do_jogo(self, statement: str, claim_text: str | None = None) -> ModelGuess | None:
+        if not get_settings().classificador_no_jogo:
+            return None
+        analise = self.analise_do_jogo(statement, claim_text)
+        if analise is None:
             return None
         return ModelGuess(
             category=analise.categoria,

@@ -1,6 +1,6 @@
 COMPOSE := docker compose
 
-.PHONY: help build up down restart logs ps shell-api shell-web shell-db migrate makemigration seed admin test lint format dados padronizar atalho contagens referencia bert avaliar classificar publicar test-web test-ml shell-ml eda ml-legado agendador docs clean
+.PHONY: help build up down restart logs ps shell-api shell-web shell-db migrate makemigration seed admin test lint format modelo reanalisar importar-noticias limpar-noticias amostra-questoes medir-amostra test-web docs clean
 
 help: ## Lista os comandos disponíveis
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -59,64 +59,35 @@ lint: ## Verifica lint e formatação da API
 format: ## Formata o código da API
 	$(COMPOSE) run --rm --no-deps -v ./api:/app -e JWT_SECRET=$(TEST_JWT_SECRET) api sh -c "pip install -q -r requirements-dev.txt && ruff format . && ruff check --fix ."
 
-PESQUISA := $(COMPOSE) --profile pesquisa run --rm --no-deps pesquisa
-ML := $(COMPOSE) --profile ml run --rm --no-deps ml
+# Modelo publicado (fora do Git): o classificador em conjunto (os dois BERTimbau em ONNX), num
+# arquivo da Release do GitHub. A API o lê de models/atual (MODELS_DIR).
+MODELO_VERSAO ?= conjunto-2026-10-15
+MODELO_URL ?= https://github.com/redjsun/fako/releases/download/modelo-$(MODELO_VERSAO)/modelo-$(MODELO_VERSAO).tar.gz
 
-dados: ## Baixa as bases para pesquisa/data/raw/ e gera dataset.jsonl e claimpt.jsonl em pesquisa/data/processed/
-	bash pesquisa/dados/baixar_dados.sh
-	$(PESQUISA) python pesquisa/dados/preparar_dados.py
-	$(PESQUISA) python pesquisa/dados/preparar_claimpt.py
+modelo: ## Baixa o modelo publicado da Release para models/atual (uso: make modelo [MODELO_VERSAO=...])
+	mkdir -p models
+	curl -fL --progress-bar -o models/modelo.tar.gz $(MODELO_URL)
+	rm -rf models/atual && mkdir -p models/atual && tar -xzf models/modelo.tar.gz -C models/atual
+	rm models/modelo.tar.gz
+	@echo "Modelo em models/atual. Use CLASSIFICADOR_PROVIDER=conjunto no .env e recrie a API."
 
-PROMPT ?= api/app/prompts/extrair_afirmacoes_v1.txt
+reanalisar: ## Refaz a análise guardada nas questões com o modelo publicado (uso: make reanalisar [ARGS=--todas])
+	$(COMPOSE) exec api python -m app.jobs.reanalisar_questoes $(ARGS)
 
-padronizar: ## Padroniza o texto curto com a LLM (uso: make padronizar [PROMPT=api/app/prompts/extrair_afirmacoes_vN.txt] [ARGS="--limite 50"])
-	$(PESQUISA) python pesquisa/ml/padronizar.py --prompt $(PROMPT) $(ARGS)
+importar-noticias: ## Importa as notícias do dia agora, como o agendador-api (uso: make importar-noticias [ARGS="--quantidade 5"])
+	$(COMPOSE) exec api python -m app.jobs.importar_noticias $(ARGS)
 
-atalho: ## Teste de atalho: AUC só pela forma do texto (uso: make atalho [ARGS="--prompt api/app/prompts/extrair_afirmacoes_v1.txt"])
-	$(ML) python pesquisa/ml/atalho.py $(ARGS)
+limpar-noticias: ## Apaga as notícias vencidas agora, como o agendador-api (uso: make limpar-noticias [ARGS="--dias 30"])
+	$(COMPOSE) exec api python -m app.jobs.limpar_noticias $(ARGS)
 
-contagens: ## Contagens por split e classe do conjunto de treino (pesquisa/ml/dados.py)
-	$(ML) python pesquisa/ml/dados.py
+amostra-questoes: ## Planilha de avaliação das questões da LLM para o admin (uso: make amostra-questoes [ARGS="--itens 50"] > amostra.csv)
+	@$(COMPOSE) exec -T api python -m app.jobs.amostra_questoes sortear $(ARGS)
 
-CONFIG ?= pesquisa/ml/configs/referencia.toml
-
-referencia: ## Treina a referência TF-IDF ordinal (uso: make referencia [CONFIG=pesquisa/ml/configs/referencia-padronizado.toml])
-	$(ML) python pesquisa/ml/treinar_referencia.py --config $(CONFIG)
-
-CONFIG_BERT ?= pesquisa/ml/configs/bert.toml
-
-bert: ## Treina o BERTimbau ordinal CORAL (uso: make bert [ARGS="--sementes 42 --max-epocas 3"])
-	$(ML) python pesquisa/ml/treinar_bert.py --config $(CONFIG_BERT) $(ARGS)
-
-MODELO ?= models/2026-11/referencia
-
-classificar: ## Teste manual do modelo (uso: make classificar [ARGS='"uma frase"' | ARGS="--amostra 10 --erros" | ARGS=--exportar])
-	$(ML) python pesquisa/ml/classificar.py --modelo $(MODELO) $(ARGS)
-
-avaliar: ## Avalia modelo(s) na validação (uso: make avaliar [MODELO="models/2026-11/referencia models/2026-11/bert"] [ARGS=--teste])
-	$(ML) python pesquisa/ml/avaliar.py --modelo $(MODELO) $(ARGS)
-
-publicar: ## Publica um modelo para a API em models/atual (uso: make publicar [MODELO=models/2026-11/referencia])
-	rm -rf models/atual && cp -r $(MODELO) models/atual
-
-shell-ml: ## Abre um shell no container de treino
-	$(ML) bash
+medir-amostra: ## % de questões com erro na planilha preenchida (uso: make medir-amostra < amostra.csv)
+	@$(COMPOSE) exec -T api python -m app.jobs.amostra_questoes medir
 
 test-web: ## Roda tipos, lint e testes do frontend
 	$(COMPOSE) run --rm --no-deps web sh -c "npm ci --no-audit --no-fund && npm run typecheck && npm run lint && npm run test"
-
-test-ml: ## Roda lint de pesquisa/ml e pesquisa/dados, e os testes de pesquisa/ml/ (o ml/ legado roda no CI)
-	$(COMPOSE) --profile pesquisa run --rm --no-deps -w /work/pesquisa/ml pesquisa sh -c "pip install -q --user -r requirements-dev.txt && python -m ruff check --config pyproject.toml . ../dados && python -m ruff format --check --config pyproject.toml . ../dados && python -m pytest -v"
-
-eda: ## Sobe o Jupyter Lab da EDA em http://localhost:8888 (token: JUPYTER_TOKEN do .env ou o do log)
-	$(COMPOSE) --profile pesquisa up -d pesquisa
-	@echo "Jupyter em http://localhost:8888. Sem JUPYTER_TOKEN no .env, o token está em: $(COMPOSE) --profile pesquisa logs pesquisa"
-
-ml-legado: ## Ambiente do ml/ antigo (BERTimbau Y1/Y2 da API): carregamento e verificação dos dados
-	$(COMPOSE) --profile ml-legado run --rm ml-legado python -m ml.dados
-
-agendador: ## Sobe a coleta diária (pesquisa/crontab: Fact Check às 3h e preparo do dataset)
-	$(COMPOSE) --profile agendador up -d agendador
 
 docs: ## Sobe a documentação (MkDocs) em http://localhost:8001
 	$(COMPOSE) --profile docs up docs

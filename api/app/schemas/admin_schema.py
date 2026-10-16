@@ -1,6 +1,6 @@
 """DTOs da curadoria de conteúdo e das ferramentas de IA."""
 
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, Field
 
@@ -42,6 +42,11 @@ class QuestionAdminResponse(BaseModel):
     model_score: float | None = None
     model_confidence: float | None = None
     model_version: str | None = None
+    # Afirmação classificada (modelo padronizado) e onde a alegação circulou.
+    claim_text: str | None = None
+    origin_author: str | None = None
+    origin_link: str | None = None
+    origin_date: date | None = None
 
 
 class AIGenerateRequest(BaseModel):

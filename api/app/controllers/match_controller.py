@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, status
 
 from app.core.database import SessaoDaRequisicao
 from app.core.deps import get_current_user
-from app.integrations.classificador_client import ClassificadorClient, get_classificador
+from app.ml.classificador import ClassificadorClient, get_classificador
 from app.models.user import User
 from app.schemas.match_schema import (
     AnswerRequest,

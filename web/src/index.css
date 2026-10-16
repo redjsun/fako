@@ -2750,6 +2750,12 @@ button.key-cap:disabled {
   color: var(--text-tertiary);
 }
 
+.result-card__why .result-card__source a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .result-card__snake {
   display: flex;
   align-items: center;

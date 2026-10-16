@@ -22,7 +22,7 @@ provedor de notícias ──► normalização ──► filtros ──► dedup
    os outros, e o que ele não trouxe passa para os seguintes. O `category` é opcional
    (padrão `conhecimentos-gerais`): o jogo não separa por categoria, mas a questão exige uma.
 2. Cada manchete é normalizada para o formato do `texto_curto` do treino
-   (`integrations/normalizacao.py`): entidades HTML, sufixo " - Veículo" do agregador e a mesma
+   (`ml/normalizacao.py`): entidades HTML, sufixo " - Veículo" do agregador e a mesma
    `limpar()` de `pesquisa/ml/dados.py` (URLs e créditos de veículo nas pontas; caixa e
    pontuação mantidas).
 3. Saem as manchetes que não servem como afirmação verdadeira, com os mesmos filtros das
@@ -51,8 +51,12 @@ A resposta do import lista as importadas e as descartadas, com o motivo.
 ## Classificador na API
 
 - Adaptador `ReferenciaTfidf` de `ClassificadorClient`
-  (`integrations/classificador_client.py`), ligado por `CLASSIFICADOR_PROVIDER=referencia`.
+  (`ml/classificador.py`), ligado por `CLASSIFICADOR_PROVIDER=referencia`.
   Lê `MODELS_DIR/atual/referencia.joblib` e, se houver, o `limiares.json` do modelo.
+- Adaptador `BertOnnx`, ligado por `CLASSIFICADOR_PROVIDER=bert`: o BERTimbau exportado com
+  `make exportar-onnx MODELO=models/AAAA-MM/bert` (`modelo.onnx`, `tokenizer.json`,
+  `onnx.json`), rodado com `onnxruntime`, sem PyTorch na API. Mesma calibração, limiares e
+  regra de decisão da referência; sem contribuições por palavra.
 - A frase passa pela `limpar()` do treino antes do TF-IDF. **`normalizacao.py` é cópia de
   `pesquisa/ml/dados.py` e `pesquisa/dados/preparar_dados.py`: mudou lá, muda aqui.**
 - O `scikit-learn` da API tem a mesma versão da imagem `ml` (o joblib não carrega entre
@@ -77,9 +81,9 @@ de um modelo melhor.
 
 | Variável | Valores |
 |---|---|
-| `CLASSIFICADOR_PROVIDER` | `fake` (sem modelo) ou `referencia` |
+| `CLASSIFICADOR_PROVIDER` | `fake` (sem modelo), `referencia` (TF-IDF) ou `bert` (BERTimbau em ONNX) |
 | `CLASSIFICADOR_NO_JOGO` | `false` (padrão) ou `true` |
-| `NOTICIAS_PROVIDER` | `fake` (manchetes inventadas, sem chave), `gnews`, `factcheck` ou vários separados por vírgula (`factcheck,gnews`) |
+| `NOTICIAS_PROVIDER` | `fake` (manchetes inventadas, sem chave), `gnews`, `agenciabrasil`, `factcheck` ou vários separados por vírgula (`factcheck,gnews,agenciabrasil`) |
 | `NOTICIAS_API_KEY` | chave gratuita do GNews (https://gnews.io, 100 pedidos por dia) |
 | `FACTCHECK_API_KEY` | chave da Google Fact Check Tools API, a mesma da coleta da pesquisa |
 | `NOTICIAS_PUBLICAR_DIRETO` | `false` (padrão, rascunho) ou `true` (já validadas) |
@@ -91,10 +95,15 @@ jogador acerta sem pensar. Manchetes de serviço ("onde assistir", horário, sor
 e explicativas ("Por que...", "O que se sabe...", "...: entenda", com "?" no meio) também saem. Na Fact Check
 API, as checagens mais recentes das agências brasileiras (a mesma lista de
 `pesquisa/dados/coletar_factcheck.py`): um pedido por agência, juntando as mais recentes.
+Na Agência Brasil (EBC), os feeds RSS (`ultimasnoticias`, `saude`, `geral`, `economia`,
+`educacao`, `internacional`, `meio-ambiente`, `direitos-humanos`, `justica` e `politica`, 10
+matérias cada), sem chave nem cota: lidos em ordem até juntar a quantidade pedida, com os 10 s
+entre feeds do `Crawl-delay` do robots.txt (que não tem opt-out de robôs de IA). A licença
+permite reproduzir citando a fonte, e a fonte da questão é a URL da matéria.
 
 ## Limites conhecidos
 
-- O GNews só traz matérias publicadas (verdadeiras), e a Fact Check API traz quase só falsas
+- O GNews e a Agência Brasil só trazem matérias publicadas (verdadeiras), e a Fact Check API traz quase só falsas
   (as agências checam o que circula): para ter os dois lados, use os dois provedores. Na
   publicação direta, a manchete entra verdadeira por ter sido publicada, a mesma suposição que
   o treino evita (`origem_rotulo=portal`); os filtros de portal tiram opinião e fala relatada.
@@ -105,3 +114,41 @@ API, as checagens mais recentes das agências brasileiras (a mesma lista de
 - Cada classe do treino tem uma "cara" própria (manchete, ponto final, minúsculas); o modelo
   pode puxar uma manchete para `confere` só pela forma (`pesquisa/ml/atalho.py`). A nota do
   modelo na curadoria é apoio à revisão, não um veredito.
+
+## O que o jogador vê depois de responder
+
+- **Onde circulou** (alegação checada): quem fez a alegação e quando, do `claimant` e do
+  `claimDate` da Fact Check API, normalizados por `normalizar_autor()`
+  (`ml/normalizacao.py`). Rótulos genéricos ("Boato de internet", "Várias fontes",
+  "[site:name]", 83% dos casos) viram "redes sociais"; uma plataforma citada vira o nome dela
+  (WhatsApp, Facebook, X...); nomes reais ficam ("Jair Bolsonaro"). A API não traz o link do
+  post: raspar a matéria da agência achou link em 3 de 21 páginas, e às vezes era a prova da
+  checagem, não o boato. Por isso o link mostrado é o da checagem, como apoio ("Checagem:
+  aosfatos.org").
+- **Onde foi publicada** (manchete): o veículo, a data e o link da matéria.
+- A explicação segue a mesma ordem: "Circulou no WhatsApp em 30/09/2026. Aos Fatos checou e
+  concluiu que é falsa."
+- Campos em `questions`: `origin_author`, `origin_link` e `origin_date`; na resposta,
+  `claim_origin` (`kind` `alegacao` ou `materia`). Questões humanas e as importadas antes
+  ficam sem origem.
+
+Se o modelo publicado foi treinado no texto padronizado (`"texto": "padronizado"` no
+`config.json`), a manchete passa na importação pelo prompt de extração (#19/#20) e a primeira
+afirmação vai para `questions.claim_text`, que é o que o classificador recebe na análise e no
+palpite do jogo. A LLM roda uma vez, na importação, e o palpite continua levando
+milissegundos.
+
+## Rotina diária
+
+O serviço `agendador-api` (mesma imagem da API, supercronic com os horários de
+`api/crontab`, fuso de São Paulo) sobe com `make up` e roda todo dia:
+
+| Horário | Comando | O que faz |
+|---|---|---|
+| 5h30 | `python -m app.jobs.limpar_noticias` | Notícias importadas há mais de `NOTICIAS_RETENCAO_DIAS` (30): apaga as que ninguém respondeu; **arquiva** (`status=archived`) as que algum jogador respondeu ou que estão em jogo numa partida, que saem do jogo e ficam para o histórico e a revisão |
+| 6h | `python -m app.jobs.importar_noticias` | Até `NOTICIAS_POR_DIA` (50) notícias dos provedores de `NOTICIAS_PROVIDER` (`factcheck,gnews`: as duas APIs), **no máximo metade falsas e metade verdadeiras** (até 25 de cada; um lado curto não é completado com o outro), na categoria `NOTICIAS_CATEGORIA`. Mesmos filtros e deduplicação de `POST /admin/news/import`; notícias publicadas antes da janela de retenção ficam de fora, para não voltarem logo depois de apagadas |
+
+As notícias entram como rascunho, ou já validadas com `NOTICIAS_PUBLICAR_DIRETO=true`. Se
+os dois provedores estiverem fora, a importação do dia não grava nada e termina com erro no
+log (`docker compose logs agendador-api`). Para rodar na hora: `make importar-noticias` e
+`make limpar-noticias`.

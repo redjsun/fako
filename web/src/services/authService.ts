@@ -144,7 +144,29 @@ class AuthService {
   }
 
   public async loginAsGuest(): Promise<{ success: boolean; error?: string; user?: User }> {
-    // Modo Visitante é 100% autônomo, instantâneo e offline-first
+    // Visitante joga com as notícias e o classificador da API: cria uma conta temporária, com
+    // nome e senha aleatórios que ninguém precisa guardar (a sessão vale até fechar o navegador).
+    const sufixo = Array.from(crypto.getRandomValues(new Uint8Array(4)), (b) =>
+      b.toString(16).padStart(2, "0")
+    ).join("");
+    const senha = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) =>
+      b.toString(16).padStart(2, "0")
+    ).join("");
+    try {
+      const tokenResp = await httpPost<{ access_token: string }>("/auth/register", {
+        username: `visitante_${sufixo}`,
+        password: senha,
+      });
+      setAuthToken(tokenResp.access_token, false);
+      return { success: true, user: await this.startSession(false) };
+    } catch (error) {
+      setAuthToken(null);
+      if (!isApiUnavailable(error)) {
+        return { success: false, error: authError(error, "Não foi possível entrar como visitante.") };
+      }
+    }
+
+    // API fora do ar: modo offline, com o banco local de perguntas e sem o classificador.
     const guestNum = Math.floor(1000 + Math.random() * 9000);
     const sessionUser: User = {
       id: guestNum,

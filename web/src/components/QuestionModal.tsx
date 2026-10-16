@@ -1,5 +1,5 @@
 import React from "react";
-import { AnswerResult, Question } from "../types";
+import { AnswerResult, ClaimOrigin, ModelGuess, Question } from "../types";
 import { reliabilityLabel, wrongAnswerEffect } from "../utils/formatters";
 import { Icon } from "./Icon";
 import { ReliabilityBar } from "./ReliabilityBar";
@@ -123,6 +123,76 @@ function distanceMessage(result: AnswerResult): string {
 }
 
 /** Popup do resultado: sua resposta × referência, explicação, fonte e efeito na cobrinha. */
+function formatDate(isoDate: string): string {
+  const [year, month, day] = isoDate.split("-");
+  return `${day}/${month}/${year}`;
+}
+
+// "https://www.aosfatos.org/noticias/..." -> "aosfatos.org"; texto que não é URL fica como está.
+function sourceLabel(source: string): string {
+  try {
+    return new URL(source).hostname.replace(/^www\d?\./, "");
+  } catch {
+    return source;
+  }
+}
+
+function isUrl(text: string): boolean {
+  return /^https?:\/\//.test(text);
+}
+
+// Onde a alegação circulou (ou o veículo que publicou a manchete): o destaque da resposta.
+const OriginCard: React.FC<{ origin: ClaimOrigin }> = ({ origin }) => {
+  const when = origin.when ? ` em ${formatDate(origin.when)}` : "";
+  const isPlace = origin.kind === "alegacao" && origin.author === "redes sociais";
+  return (
+    <div className="result-card__why result-card__origin">
+      <h3>
+        <Icon name="book" size={18} />
+        {origin.kind === "alegacao" ? "Onde circulou" : "Onde foi publicada"}
+      </h3>
+      <p>
+        {isPlace ? "Nas " : ""}
+        <strong>{origin.author}</strong>
+        {when}
+      </p>
+      {origin.link && (
+        <p className="result-card__source">
+          <a href={origin.link} target="_blank" rel="noopener noreferrer">
+            {origin.kind === "materia" ? "Ler a matéria" : "Ver a publicação original"}
+          </a>
+        </p>
+      )}
+    </div>
+  );
+};
+
+const GUESS_LABELS: Record<ModelGuess["category"], string> = {
+  falso: "Falso",
+  enganoso: "Enganoso",
+  confere: "Confere",
+  incerto: "Incerto",
+};
+
+// O que o classificador achou da afirmação; não muda a correção, que vem da checagem.
+const ModelGuessCard: React.FC<{ guess: ModelGuess }> = ({ guess }) => (
+  <div className="result-card__why result-card__model">
+    <h3>
+      <Icon name="bulb" size={18} />
+      O que o classificador achou
+    </h3>
+    <p>
+      <strong>{GUESS_LABELS[guess.category] ?? guess.category}</strong>
+      {guess.category === "incerto"
+        ? " — o modelo não tem certeza sobre esta afirmação."
+        : ` — nota ${Math.round(guess.score ?? 0)} de 100, com ${Math.round(
+            guess.confidence * 100
+          )}% de confiança.`}
+    </p>
+    <p className="result-card__source">Modelo: {guess.model_version}</p>
+  </div>
+);
+
 export const ResultPopup: React.FC<ResultPopupProps> = ({
   statement,
   result,
@@ -168,19 +238,30 @@ export const ResultPopup: React.FC<ResultPopupProps> = ({
             />
           </div>
 
+          {result.claim_origin && <OriginCard origin={result.claim_origin} />}
+
           <div className="result-card__why">
             <h3>
               <Icon name="bulb" size={18} />
               Por quê?
             </h3>
             <p>{result.explanation}</p>
-            {result.source && (
+            {result.source && result.claim_origin?.kind !== "materia" && (
               <p className="result-card__source">
                 <Icon name="book" size={14} />
-                Fonte: {result.source}
+                {result.claim_origin ? "Checagem: " : "Fonte: "}
+                {isUrl(result.source) ? (
+                  <a href={result.source} target="_blank" rel="noopener noreferrer">
+                    {sourceLabel(result.source)}
+                  </a>
+                ) : (
+                  result.source
+                )}
               </p>
             )}
           </div>
+
+          {result.model_guess && <ModelGuessCard guess={result.model_guess} />}
 
           <div className="result-card__snake">
             <span className="result-card__snake-blocks" aria-hidden="true">

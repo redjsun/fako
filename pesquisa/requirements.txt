@@ -1,8 +1,0 @@
-pandas>=2.2
-numpy>=1.26
-matplotlib>=3.8
-jupyter>=1.0
-requests>=2.33  # versões anteriores têm vulnerabilidades conhecidas
-beautifulsoup4>=4.12
-# A mesma versão da API e do treino: um joblib gravado por outra versão pode não carregar.
-scikit-learn==1.9.1

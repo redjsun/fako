@@ -5,6 +5,22 @@ export interface Question {
 }
 
 // Resultado da resposta na barra de confiabilidade (0 a 100).
+// Palpite do classificador sobre a afirmação (CLASSIFICADOR_NO_JOGO), só depois da resposta.
+export interface ModelGuess {
+  category: "falso" | "enganoso" | "confere" | "incerto";
+  score: number | null; // 0 a 100; sem nota quando incerto
+  confidence: number;
+  model_version: string;
+}
+
+// Onde a afirmação circulou (alegação checada) ou foi publicada (manchete de veículo).
+export interface ClaimOrigin {
+  kind: "alegacao" | "materia";
+  author: string;
+  when: string | null; // AAAA-MM-DD
+  link: string | null;
+}
+
 export interface AnswerResult {
   is_correct: boolean;
   correct_answer: boolean;
@@ -19,14 +35,7 @@ export interface AnswerResult {
   timed_out?: boolean;
   // Palpite do classificador sobre a afirmação; ausente quando ele está desligado.
   model_guess?: ModelGuess | null;
-}
-
-// Palpite do classificador (api/app/schemas/match_schema.py, ModelGuess).
-interface ModelGuess {
-  category: string; // falso, enganoso, confere ou incerto
-  score: number | null;
-  confidence: number;
-  model_version: string;
+  claim_origin?: ClaimOrigin | null;
 }
 
 // Afirmação já respondida, para o feedback, o resumo da partida e o histórico.

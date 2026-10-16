@@ -1,7 +1,0 @@
-# Legado (serviço ml-legado). Índice do PyTorch só para a versão CPU, sem CUDA.
---extra-index-url https://download.pytorch.org/whl/cpu
-torch>=2.6  # antes da 2.6, torch.load executa pickle arbitrário por padrão
-transformers>=4.53
-# A mesma versão da API, que lê os artefatos gerados aqui.
-scikit-learn==1.9.1
-joblib>=1.3
