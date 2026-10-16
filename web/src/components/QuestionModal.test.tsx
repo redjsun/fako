@@ -16,7 +16,16 @@ const base: AnswerResult = {
 };
 
 function renderizar(result: AnswerResult) {
-  render(<ResultPopup statement="Vacina tem chip" result={result} pointsPerCorrect={10} onContinue={() => {}} />);
+  render(
+    <ResultPopup
+      statement="Vacina tem chip"
+      result={result}
+      pointsPerCorrect={10}
+      growthPerError={1}
+      wrongAnswerPenalty={0}
+      onContinue={() => {}}
+    />
+  );
 }
 
 describe("ResultPopup", () => {

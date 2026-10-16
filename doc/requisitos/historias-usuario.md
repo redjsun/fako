@@ -2,8 +2,7 @@
 
 Reescrita dos [requisitos funcionais](requisitos-funcionais.md) no formato "Como
 [ator], quero [ação], para [benefício]", na ordem do catálogo. Cada história mantém o
-vínculo com o RF de origem, para rastreabilidade; ver também a
-[matriz de rastreabilidade](matriz-rastreabilidade.md).
+vínculo com o RF de origem, para rastreabilidade.
 
 | ID | Ator | História | RF |
 |----|---|---|---|
@@ -36,3 +35,11 @@ vínculo com o RF de origem, para rastreabilidade; ver também a
 | HU27 | Jogador | Como jogador, quero poder contestar uma questão que considero errada, para que o time revise o conteúdo. | RF28 |
 | HU28 | Administrador | Como administrador, quero saber se uma questão foi gerada por IA ou revisada por uma pessoa, para avaliar o nível de confiança no conteúdo. | RF29 |
 | HU29 | Jogador | Como jogador, quero ver notícias recentes ainda não checadas como contexto, sem que elas virem pergunta com gabarito, para não ser enganado por uma resposta que ninguém confirmou. | RF30 |
+| HU30 | Jogador | Como jogador, quero ter menos tempo para jogar e responder nos níveis avançados, para sentir a pressão crescer conforme avanço. | RF31 |
+| HU31 | Jogador | Como jogador, quero precisar de mais precisão na barra de confiabilidade nos níveis avançados, para que acertar exija uma análise mais cuidadosa. | RF32 |
+| HU32 | Jogador | Como jogador, quero que errar custe mais nos níveis avançados, para que cada resposta pese na partida. | RF33 |
+| HU33 | Jogador | Como jogador, quero que bater na borda do tabuleiro encerre a partida a partir do nível 4, para precisar planejar melhor o caminho da cobra. | RF34 |
+| HU34 | Jogador | Como jogador, quero que a maçã mude de lugar se eu demorar, para ter um motivo a mais para agir rápido. | RF35 |
+| HU35 | Jogador | Como jogador, quero ver maçãs podres que devo evitar, em maior número nos níveis finais, para ter mais decisões a tomar durante a partida. | RF36 |
+| HU36 | Jogador | Como jogador, quero que a partida termine assim que eu bater a meta do nível, para seguir logo para o próximo desafio. | RF37 |
+| HU37 | Jogador | Como jogador, quero escolher ao fim da partida entre jogar de novo, ir ao próximo nível ou voltar ao início, para decidir como continuar. | RF38 |

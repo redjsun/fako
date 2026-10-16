@@ -31,6 +31,9 @@ export interface AnswerResult {
   explanation: string;
   source: string;
   score: number;
+  // A API conta como erro a resposta que chega depois do tempo da pergunta (com folga).
+  timed_out?: boolean;
+  // Palpite do classificador sobre a afirmação; ausente quando ele está desligado.
   model_guess?: ModelGuess | null;
   claim_origin?: ClaimOrigin | null;
 }
@@ -43,20 +46,27 @@ export interface AnsweredQuestion {
   isCorrect: boolean;
 }
 
+// Regras de um nível da jornada (api/app/models/level.py; tabela em doc/jogo/niveis.md).
 export interface Level {
   number: number;
   board_size: number;
   tick_ms: number;
   min_score_to_advance: number;
+  match_seconds: number;
+  question_seconds: number;
+  reliability_tolerance: number;
+  wrong_answer_penalty: number;
+  growth_per_error: number;
+  solid_walls: boolean;
+  apple_lifetime_seconds: number | null;
+  rotten_apples: number;
 }
-
-export type MatchStatus = "in_progress" | "finished";
 
 export interface Match {
   id: number;
   level: Level;
   score: number;
-  status: MatchStatus;
+  status: "in_progress" | "finished" | "abandoned";
   duration_seconds: number;
   started_at: string;
   ended_at: string | null;
@@ -91,7 +101,8 @@ export type GameStatus = "PLAYING" | "PAUSED" | "QUESTION" | "FEEDBACK" | "COUNT
 
 // EXIT: o jogador saiu pelo "Sair e salvar".
 // NO_QUESTIONS: o banco não tem mais afirmações inéditas para esta partida.
-export type MatchEndReason = "TIMEOUT" | "GAMEOVER" | "EXIT" | "NO_QUESTIONS";
+// GOAL: o placar alcançou a meta do nível.
+export type MatchEndReason = "TIMEOUT" | "GAMEOVER" | "EXIT" | "NO_QUESTIONS" | "GOAL";
 
 // Partida encerrada, guardada no histórico local do jogador.
 export interface MatchRecord {
@@ -125,6 +136,8 @@ export interface Achievement {
 
 export interface UserStats {
   highScore: number;
+  // Soma dos pontos de todas as partidas, como o total_score da API.
+  totalScore: number;
   maxLevel: number;
   gamesPlayed: number;
   totalAcertos: number;

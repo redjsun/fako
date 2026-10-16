@@ -20,6 +20,7 @@ as requisições por agência, para notar quando uma fonte para de trazer dados.
 import argparse
 import json
 import os
+import re
 import sys
 import time
 from collections import Counter
@@ -79,18 +80,28 @@ class ErroAPI(Exception):
 requisicoes = Counter()
 
 
-def requisitar(params: dict, tentativas: int = 6) -> dict:
-    """GET com nova tentativa e espera crescente para 429 e erros 5xx (instabilidade)."""
+def sem_chave(texto: str) -> str:
+    """Mascara `key=...` numa mensagem, para a chave nunca ir parar no log."""
+    return re.sub(r"(key=)[^&\s'\"]+", r"\1***", texto)
+
+
+def requisitar(params: dict, chave: str, tentativas: int = 6) -> dict:
+    """GET com nova tentativa e espera crescente para 429 e erros 5xx (instabilidade).
+
+    A chave vai no cabeçalho X-Goog-Api-Key, e não na URL, para não aparecer em mensagens de erro.
+    """
     for tentativa in range(tentativas):
         requisicoes[params.get("reviewPublisherSiteFilter") or "descoberta"] += 1
         try:
-            resposta = requests.get(ENDPOINT, params=params, timeout=60)
+            resposta = requests.get(
+                ENDPOINT, params=params, headers={"X-Goog-Api-Key": chave}, timeout=60
+            )
         except requests.RequestException as erro:
-            ultimo = str(erro)
+            ultimo = sem_chave(str(erro))
         else:
             if resposta.status_code == 200:
                 return resposta.json()
-            ultimo = f"{resposta.status_code}: {resposta.text[:200]}"
+            ultimo = sem_chave(f"{resposta.status_code}: {resposta.text[:200]}")
             if resposta.status_code != 429 and resposta.status_code < 500:
                 break  # chave inválida, parâmetro errado: repetir não adianta
         time.sleep(2**tentativa)
@@ -102,9 +113,9 @@ def buscar(params: dict, chave: str, max_paginas: int, parar=None):
 
     `parar(claims)`, se dado, recebe cada página: True encerra a paginação depois dela.
     """
-    params = {**params, "languageCode": "pt", "pageSize": 100, "key": chave}
+    params = {**params, "languageCode": "pt", "pageSize": 100}
     for _ in range(max_paginas):
-        corpo = requisitar(params)
+        corpo = requisitar(params, chave)
         claims = corpo.get("claims", [])
         yield from claims
         if not corpo.get("nextPageToken") or (parar and parar(claims)):
@@ -197,9 +208,15 @@ def main():
     for site in args.sites:
         antes = len(por_url)
         # As URLs conhecidas são copiadas antes: cada página já entrou em por_url quando é avaliada.
-        parar = partial(pagina_conhecida, site=site, conhecidas=set(por_url)) if args.incremental else None
+        parar = (
+            partial(pagina_conhecida, site=site, conhecidas=set(por_url))
+            if args.incremental
+            else None
+        )
         try:
-            for claim in buscar({"reviewPublisherSiteFilter": site}, chave, args.max_paginas, parar):
+            for claim in buscar(
+                {"reviewPublisherSiteFilter": site}, chave, args.max_paginas, parar
+            ):
                 for linha in achatar(claim):
                     if linha["url"]:
                         por_url[linha["url"]] = linha
@@ -215,7 +232,9 @@ def main():
     print(f"\n{sum(novas.values())} checagens novas em {sum(requisicoes.values())} requisições")
     print(f"{len(registros)} checagens em {SAIDA.relative_to(RAIZ)}")
     print("Vereditos mais comuns:")
-    for veredito, n in Counter((r["veredito"] or "").strip().lower() for r in registros).most_common(25):
+    for veredito, n in Counter(
+        (r["veredito"] or "").strip().lower() for r in registros
+    ).most_common(25):
         print(f"  {n:6}  {veredito}")
     anos = Counter((r["data_checagem"] or "????")[:4] for r in registros)
     print("Checagens por ano:", dict(sorted(anos.items())))

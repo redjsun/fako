@@ -9,6 +9,7 @@ bcrypt==4.2.1
 pyjwt==2.15.1
 # Referência TF-IDF: a mesma versão do treino (imagem ml), senão o joblib não carrega
 scikit-learn==1.9.1
-# BERTimbau exportado para ONNX (pesquisa/ml/exportar_onnx.py): roda sem PyTorch
+joblib==1.6.0
+# BERTimbau exportado para ONNX (modelo publicado em models/atual): roda sem PyTorch
 onnxruntime==1.30.0
 tokenizers==0.23.2

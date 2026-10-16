@@ -1,16 +1,15 @@
 """Rotas de níveis."""
 
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
 
-from app.core.database import get_db
+from app.core.database import SessaoDaRequisicao
 from app.schemas.level_schema import LevelResponse
 from app.services.level_service import LevelService
 
 router = APIRouter(prefix="/levels", tags=["levels"])
 
 
-def get_service(db: Session = Depends(get_db)) -> LevelService:
+def get_service(db: SessaoDaRequisicao) -> LevelService:
     return LevelService(db)
 
 

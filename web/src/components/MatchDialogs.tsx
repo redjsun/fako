@@ -1,5 +1,7 @@
 import React from "react";
+import { Level } from "../types";
 import { formatClock } from "../utils/formatters";
+import { describeLevelRules } from "../utils/levelRules";
 import { Icon } from "./Icon";
 
 interface ExitMatchDialogProps {
@@ -71,28 +73,35 @@ export const ExitMatchDialog: React.FC<ExitMatchDialogProps> = ({
 };
 
 interface HowToPlayDialogProps {
-  questionSeconds: number;
+  rules: Level;
   pointsPerCorrect: number;
   onClose: () => void;
 }
 
 /** "Como jogar" durante a partida, sem sair do jogo. */
 export const HowToPlayDialog: React.FC<HowToPlayDialogProps> = ({
-  questionSeconds,
+  rules,
   pointsPerCorrect,
   onClose,
 }) => {
+  const blocks = rules.growth_per_error === 1 ? "1 bloco" : `${rules.growth_per_error} blocos`;
+  const penalty = rules.wrong_answer_penalty > 0 ? ` e perde ${rules.wrong_answer_penalty} pts` : "";
   const steps = [
     { icon: "apple" as const, title: "Colete as maçãs", text: "Guie a cobrinha com as setas. Cada maçã traz uma afirmação." },
     {
       icon: "sliders" as const,
       title: "Avalie de 0% a 100%",
-      text: `Você tem ${questionSeconds}s para marcar na barra o quanto a informação é confiável.`,
+      text: `Você tem ${rules.question_seconds}s para marcar na barra o quanto a informação é confiável.`,
     },
     {
       icon: "target" as const,
       title: "Fique perto da referência",
-      text: `Até 15 pontos de distância vale +${pointsPerCorrect} pts. Mais longe, a cobrinha cresce 1 bloco.`,
+      text: `Até ${rules.reliability_tolerance} pontos de distância vale +${pointsPerCorrect} pts. Mais longe, a cobrinha cresce ${blocks}${penalty}.`,
+    },
+    {
+      icon: "flag" as const,
+      title: `Regras do nível ${rules.number}`,
+      text: describeLevelRules(rules).join(" · "),
     },
   ];
 

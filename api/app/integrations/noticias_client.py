@@ -19,7 +19,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ElementTree
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from email.utils import parsedate_to_datetime
 from itertools import zip_longest
 from typing import Protocol
@@ -43,6 +43,7 @@ class Noticia:
     url: str
     veiculo: str | None
     publicada_em: datetime | None
+    # O título da checagem ou o resumo da matéria: entra no "Por quê?" (Question.source_detail).
     descricao: str | None = None
     # Veredito da agência, só nas checagens; sem ele, a notícia é manchete publicada.
     veredito: str | None = None
@@ -63,9 +64,11 @@ def data_iso(texto: str | None) -> datetime | None:
     if not texto:
         return None
     try:
-        return datetime.fromisoformat(texto.replace("Z", "+00:00"))
+        data = datetime.fromisoformat(texto.replace("Z", "+00:00"))
     except ValueError:
         return None
+    # Sem fuso, vale UTC: comparar datas com e sem fuso dá erro ou ordena pela hora local.
+    return data if data.tzinfo else data.replace(tzinfo=timezone.utc)
 
 
 def pedir_json(endereco: str, tempo_limite: float, provedor: str) -> dict:
@@ -95,7 +98,7 @@ class FakeNoticias:
                 titulo=f"{manchete} - Portal Exemplo",
                 url=f"https://exemplo.com.br/noticias/{i}",
                 veiculo="Portal Exemplo",
-                publicada_em=datetime(2026, 10, 1, 12, 0),
+                publicada_em=datetime(2026, 10, 1, 12, 0, tzinfo=timezone.utc),
             )
             for i, manchete in enumerate(self.MANCHETES[:quantidade])
         ]
@@ -357,6 +360,9 @@ class FactCheckClient:
         if revisao is None:
             return None
         veredito = normalizar_veredito(revisao.get("textualRating"))
+        if veredito is None:
+            # Sem veredito a alegação passaria por manchete publicada (verdadeira).
+            return None
         circulou_em = data_iso(claim.get("claimDate"))
         return Noticia(
             titulo=claim.get("text") or "",

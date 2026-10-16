@@ -1,6 +1,8 @@
 import React from "react";
 import { Level, UserStats } from "../types";
 import { formatMatchDate } from "../utils/formatters";
+import { achievementProgress } from "../utils/achievements";
+import { describeLevelRules } from "../utils/levelRules";
 import { Icon } from "./Icon";
 
 interface JourneyScreenProps {
@@ -11,6 +13,7 @@ interface JourneyScreenProps {
   matchesPlayed: number;
   bestScoreInLevel: number;
   stats: UserStats;
+  isGuest: boolean;
   onPlayLevel: (level: number) => void;
 }
 
@@ -22,8 +25,6 @@ const LEVEL_DESCRIPTIONS = [
   "Muito rápida",
   "Desafio final",
 ];
-
-const MURALHA_STREAK = 5;
 
 const MiniBoard: React.FC = () => (
   <span className="mini-board" aria-hidden="true">
@@ -42,40 +43,28 @@ export const JourneyScreen: React.FC<JourneyScreenProps> = ({
   matchesPlayed,
   bestScoreInLevel,
   stats,
+  isGuest,
   onPlayLevel,
 }) => {
   const answered = stats.totalAcertos + stats.totalErros;
   const accuracy = answered > 0 ? `${Math.round((stats.totalAcertos / answered) * 100)}%` : "—";
   const current = levels.find((level) => level.number === currentLevel);
   const goal = current?.min_score_to_advance ?? 0;
-  const levelPercent = goal > 0 ? Math.min(100, Math.round((bestScoreInLevel / goal) * 100)) : 0;
-  const streakPercent = Math.min(100, Math.round((stats.bestStreak / MURALHA_STREAK) * 100));
   const missing = Math.max(0, goal - bestScoreInLevel);
   const isLastLevel = currentLevel >= levels.length;
-  const unlockedCount = stats.achievements.filter((achievement) => achievement.unlocked).length;
-  const achievement = (id: string) => stats.achievements.find((item) => item.id === id);
-
-  const achievementRows = [
-    {
-      title: "Primeira Checagem",
-      percent: achievement("first_check")?.unlocked ? 100 : 0,
-    },
-    {
-      title: isLastLevel ? `Mestre dos Fatos (${bestScoreInLevel} / ${goal} pts)` : `Subindo de Nível (${bestScoreInLevel} / ${goal} pts)`,
-      percent: achievement(isLastLevel ? "master" : "level_up")?.unlocked ? 100 : levelPercent,
-    },
-    {
-      title: `Muralha Antifake (${Math.min(stats.bestStreak, MURALHA_STREAK)} / ${MURALHA_STREAK} seguidas)`,
-      percent: achievement("imune")?.unlocked ? 100 : streakPercent,
-    },
-  ];
+  const achievements = achievementProgress(stats);
+  const unlockedCount = achievements.filter((achievement) => achievement.unlocked).length;
 
   return (
     <div className="journey-layout">
       <section className="journey-layout__map" aria-labelledby="journey-heading">
         <header className="page-heading">
           <h1 id="journey-heading">Minha jornada</h1>
-          <p>Seu progresso fica salvo na sua conta. Continue de onde parou.</p>
+          <p>
+            {isGuest
+              ? "Como visitante, seu progresso fica só neste navegador e some ao sair. Crie uma conta para guardá-lo."
+              : "Seu progresso fica salvo na sua conta. Continue de onde parou."}
+          </p>
         </header>
 
         <ol className="level-grid">
@@ -100,6 +89,11 @@ export const JourneyScreen: React.FC<JourneyScreenProps> = ({
                     {LEVEL_DESCRIPTIONS[index] ?? ""}
                     {isCurrent && ` · meta ${level.min_score_to_advance} pts`}
                   </p>
+                  <ul className="level-card__rules" aria-label={`Regras do nível ${level.number}`}>
+                    {describeLevelRules(level).map((rule) => (
+                      <li key={rule}>{rule}</li>
+                    ))}
+                  </ul>
                 </div>
                 <div className="level-card__footer">
                   {state === "locked" ? (
@@ -144,17 +138,18 @@ export const JourneyScreen: React.FC<JourneyScreenProps> = ({
 
         <section className="card card--roomy" aria-labelledby="achievements-title">
           <h2 id="achievements-title" className="card__title card__title--large">
-            Conquistas · {unlockedCount} de {stats.achievements.length}
+            Conquistas · {unlockedCount} de {achievements.length}
           </h2>
           <ul className="achievement-list">
-            {achievementRows.map((row) => (
-              <li key={row.title}>
+            {achievements.map((achievement) => (
+              <li key={achievement.id}>
                 <span className="achievement-list__row">
-                  <strong>{row.title}</strong>
-                  <span>{row.percent === 100 ? "Conquistada" : `${row.percent}%`}</span>
+                  <strong>{achievement.title}</strong>
+                  <span>{achievement.unlocked ? "Conquistada" : achievement.counter || `${achievement.percent}%`}</span>
                 </span>
+                <span className="achievement-list__description">{achievement.description}</span>
                 <span className="progress-track progress-track--thick" aria-hidden="true">
-                  <span style={{ width: `${row.percent}%` }} />
+                  <span style={{ width: `${achievement.percent}%` }} />
                 </span>
               </li>
             ))}

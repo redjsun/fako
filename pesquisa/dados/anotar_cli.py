@@ -21,8 +21,15 @@ import pandas as pd
 RAIZ = Path(__file__).resolve().parent.parent
 PLANILHAS = RAIZ / "data" / "anotacao"
 TIPOS = {
-    "o": "opiniao", "f": "fabricado", "m": "manipulado", "i": "impostor", "c": "falso_contexto",
-    "e": "enganoso", "l": "falsa_conexao", "n": "nenhum", "x": "fora_escopo",
+    "o": "opiniao",
+    "f": "fabricado",
+    "m": "manipulado",
+    "i": "impostor",
+    "c": "falso_contexto",
+    "e": "enganoso",
+    "l": "falsa_conexao",
+    "n": "nenhum",
+    "x": "fora_escopo",
 }
 VERAC = {"v": "verdadeiro", "e": "enganoso", "f": "falso"}
 SINAIS = ["pede_compartilhamento", "urgencia", "apelo_emocional", "ataque"]
@@ -68,8 +75,10 @@ for n, i in enumerate(pend, 1):
     print(textwrap.fill(r["texto_curto"].replace("\n", " ")[:700], 100))
     if r["veredito_original"]:
         print(f"\nVEREDITO ORIGINAL: {r['veredito_original']}")
-    print(f"\nPRÉ: tipo={r['tipo'] or '?'} | veracidade={r['veracidade'] or '-'} | "
-          + " ".join(f"{s}={r[s]}" for s in SINAIS))
+    print(
+        f"\nPRÉ: tipo={r['tipo'] or '?'} | veracidade={r['veracidade'] or '-'} | "
+        + " ".join(f"{s}={r[s]}" for s in SINAIS)
+    )
     cmd = input("[Enter=aceita | e=edita | s=pula | q=sai]: ").strip().lower()
     if cmd == "q":
         break

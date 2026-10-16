@@ -43,8 +43,18 @@ ORIGENS = (
 SAIDA = RAIZ / "data" / "processed" / "claimpt.jsonl"
 
 MESES_ABREV = {
-    "jan": 1, "fev": 2, "mar": 3, "abr": 4, "mai": 5, "jun": 6,
-    "jul": 7, "ago": 8, "set": 9, "out": 10, "nov": 11, "dez": 12,
+    "jan": 1,
+    "fev": 2,
+    "mar": 3,
+    "abr": 4,
+    "mai": 5,
+    "jun": 6,
+    "jul": 7,
+    "ago": 8,
+    "set": 9,
+    "out": 10,
+    "nov": 11,
+    "dez": 12,
 }
 
 
@@ -72,7 +82,7 @@ def trechos(bruto, texto: str, descartados: dict) -> list[dict]:
     for t in bruto if isinstance(bruto, list) else [bruto]:
         if not t.get("text"):
             continue
-        if texto[t["begin"]:t["end"]] != t["text"]:
+        if texto[t["begin"] : t["end"]] != t["text"]:
             descartados["subtrechos"] += 1
             continue
         saida.append({"texto": t["text"], "inicio": t["begin"], "fim": t["end"]})
@@ -96,14 +106,16 @@ def ler_artigos(pasta: Path, amostra: bool, descartados: dict):
             if not item["claim"]:
                 nao_afirmacoes.append(base)
                 continue
-            afirmacoes.append({
-                **base,
-                "topico": item.get("claim_topic"),
-                "partes": trechos(item.get("claim_span"), texto, descartados),
-                "quem_disse": trechos(item.get("claimer"), texto, descartados),
-                "objeto": trechos(item.get("claim_object"), texto, descartados),
-                "tempo": trechos(item.get("time"), texto, descartados),
-            })
+            afirmacoes.append(
+                {
+                    **base,
+                    "topico": item.get("claim_topic"),
+                    "partes": trechos(item.get("claim_span"), texto, descartados),
+                    "quem_disse": trechos(item.get("claimer"), texto, descartados),
+                    "objeto": trechos(item.get("claim_object"), texto, descartados),
+                    "tempo": trechos(item.get("time"), texto, descartados),
+                }
+            )
         yield {
             "id": "claimpt-" + doc["document"].removesuffix(".txt"),
             "base": "claimpt",
@@ -120,9 +132,14 @@ def ler_artigos(pasta: Path, amostra: bool, descartados: dict):
 
 
 def main():
-    origem = next(((pasta, amostra) for pasta, amostra in ORIGENS if (pasta / "annotations.jsonl").exists()), None)
+    origem = next(
+        ((pasta, amostra) for pasta, amostra in ORIGENS if (pasta / "annotations.jsonl").exists()),
+        None,
+    )
     if not origem:
-        sys.exit("ClaimPT não encontrado em pesquisa/data/raw/. Rode antes: bash pesquisa/dados/baixar_dados.sh")
+        sys.exit(
+            "ClaimPT não encontrado em pesquisa/data/raw/. Rode antes: bash pesquisa/dados/baixar_dados.sh"
+        )
     pasta, amostra = origem
     print(f"Lendo {pasta.relative_to(RAIZ)}" + (" (amostra de 20 artigos)" if amostra else ""))
     SAIDA.parent.mkdir(parents=True, exist_ok=True)
@@ -135,8 +152,10 @@ def main():
             afirmacoes += len(artigo["afirmacoes"])
             nao_afirmacoes += len(artigo["nao_afirmacoes"])
             com_quem_disse += sum(1 for a in artigo["afirmacoes"] if a["quem_disse"])
-    print(f"artigos: {artigos}  afirmações: {afirmacoes} ({com_quem_disse} com quem disse)  "
-          f"não-afirmações: {nao_afirmacoes}")
+    print(
+        f"artigos: {artigos}  afirmações: {afirmacoes} ({com_quem_disse} com quem disse)  "
+        f"não-afirmações: {nao_afirmacoes}"
+    )
     print("descartados por posição que não bate com o texto:", descartados)
     print(f"Gerado {SAIDA.relative_to(RAIZ)}")
 

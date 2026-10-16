@@ -16,7 +16,8 @@ Saídas na pasta `saida` da configuração:
 - `referencia.joblib`: dicionário só com objetos do scikit-learn (vetorizador e as duas
   fronteiras), para a API carregar sem importar código da pesquisa;
 - `previsoes.jsonl` e `config.json` (contrato do avaliar.py), com o `C` escolhido, a grade,
-  o tempo de treino e a latência por frase.
+  o tempo de treino, a latência por frase e o sha256 do `referencia.joblib`, conferido antes de
+  carregá-lo (`configuracao.conferir_artefato`).
 
 `contribuicoes()` devolve as palavras que mais pesaram numa frase (valor TF-IDF × peso, exato
 num modelo linear), para o admin auditar o modelo. Nunca vai para o jogador.
@@ -34,7 +35,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import FeatureUnion
 
 from avaliar import gravar_previsoes, metricas
-from configuracao import CONFIGS, Configuracao, carregar_configuracao
+from configuracao import CONFIGS, Configuracao, carregar_configuracao, sha256_arquivo
 from dados import ORDEM, Exemplo, carregar
 
 ARQUIVO_MODELO = "referencia.joblib"
@@ -154,6 +155,10 @@ def treinar(config: Configuracao, saida: Path | None = None) -> dict:
             previsoes[split] = (exemplos, *fronteiras([e.texto for e in exemplos], modelo))
     resultado = {
         "versao": versao,
+        # A regressão logística (lbfgs) é determinística: as sementes da configuração não mudam
+        # o resultado e não são gravadas como se tivessem sido usadas.
+        "sementes": None,
+        "artefatos_sha256": {ARQUIVO_MODELO: sha256_arquivo(saida / ARQUIVO_MODELO)},
         "c_escolhido": c,
         "f1_macro_validacao": f1,
         "grade_f1_macro_validacao": grade,

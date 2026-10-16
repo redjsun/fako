@@ -26,10 +26,14 @@ class QuestionRepository(BaseRepository[Question]):
         return list(self.db.scalars(query))
 
     def exists_by_statement_or_source(self, statement: str, source: str) -> bool:
-        """Já existe questão com o mesmo texto (sem diferenciar caixa) ou a mesma fonte."""
-        query = select(Question.id).where(
-            or_(func.lower(Question.statement) == statement.lower(), Question.source == source)
-        )
+        """Já existe questão com o mesmo texto (sem diferenciar caixa) ou a mesma fonte.
+
+        Fonte vazia (notícia sem URL) não conta: senão toda notícia sem URL seria "já importada"
+        depois da primeira.
+        """
+        mesmo_texto = func.lower(Question.statement) == statement.lower()
+        condicao = or_(mesmo_texto, Question.source == source) if source else mesmo_texto
+        query = select(Question.id).where(condicao)
         return self.db.scalar(query.limit(1)) is not None
 
     def news_created_before(self, limite: datetime) -> list[Question]:

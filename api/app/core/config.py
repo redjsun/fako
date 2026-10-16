@@ -7,15 +7,20 @@ from functools import lru_cache
 
 from pydantic_settings import BaseSettings
 
+# Valor que já foi o padrão do código e do .env.example: público, nunca aceito.
+SEGREDO_JWT_DE_EXEMPLO = "troque-este-segredo-em-producao"
+TAMANHO_MINIMO_SEGREDO_JWT = 32  # bytes; o HS256 pede uma chave de pelo menos 256 bits
+
 
 class Settings(BaseSettings):
     app_name: str = "Fake News Snake API"
     version: str = "0.1.0"
-    cors_origins: list[str] = ["*"]
+    cors_origins: list[str] = ["http://localhost:5173"]
     database_url: str = "postgresql+psycopg://fako:fako@localhost:5432/fako"
 
-    jwt_secret: str = "troque-este-segredo-em-producao"
-    jwt_algorithm: str = "HS256"
+    # Sem padrão utilizável: a API não sobe sem um segredo próprio (exigir_segredo_jwt). As
+    # migrations e os seeds não usam o segredo e rodam sem ele.
+    jwt_secret: str = ""
     jwt_expires_minutes: int = 60 * 24
 
     # LLM (ml/llm.py): "fake" roda sem chamadas externas; "openai" usa um
@@ -68,6 +73,17 @@ class Settings(BaseSettings):
     noticias_por_dia: int = 50
     noticias_categoria: str = "conhecimentos-gerais"
     noticias_retencao_dias: int = 30
+
+    def exigir_segredo_jwt(self) -> str:
+        """O segredo dos tokens; recusa o vazio, o de exemplo e os curtos demais."""
+        segredo = self.jwt_secret
+        if segredo == SEGREDO_JWT_DE_EXEMPLO or len(segredo.encode()) < TAMANHO_MINIMO_SEGREDO_JWT:
+            raise RuntimeError(
+                f"Defina JWT_SECRET com {TAMANHO_MINIMO_SEGREDO_JWT} bytes ou mais (e diferente do "
+                "valor de exemplo). Para gerar um: "
+                'python -c "import secrets; print(secrets.token_urlsafe(48))"'
+            )
+        return segredo
 
 
 @lru_cache

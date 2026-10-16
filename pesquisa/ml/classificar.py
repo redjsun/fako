@@ -7,9 +7,10 @@ Uso:
     python pesquisa/ml/classificar.py --amostra 10 --erros   # só os que o modelo errou
     python pesquisa/ml/classificar.py --exportar             # CSV da validação para abrir no Excel
 
-O modelo padrão é models/2026-11/referencia (--modelo para outro). O CSV vai para
-pesquisa/data/conferencia/, fora do Git (tem o texto das checagens). A categoria segue a regra
-de decisão da API, com o limiar do jogador (--limiar para mudar).
+O modelo padrão é models/2026-11/referencia (--modelo para outro, só da referência TF-IDF). O
+CSV vai para pesquisa/data/conferencia/, fora do Git (tem o texto das checagens). A categoria
+segue a regra de decisão da API, com o limiar do jogador (--limiar para mudar). A amostra e o
+CSV usam os mesmos exemplos do treino (texto original ou padronizado, do config.json do modelo).
 """
 
 import argparse
@@ -20,7 +21,8 @@ from pathlib import Path
 import joblib
 import numpy as np
 
-from avaliar import ler_previsoes, nota, probabilidades
+from avaliar import ler_json, ler_previsoes, nota, probabilidades
+from configuracao import caminho_registrado, conferir_artefato
 from dados import CLASSES, carregar
 from treinar_referencia import ARQUIVO_MODELO, contribuicoes, fronteiras
 
@@ -28,6 +30,8 @@ RAIZ_REPOSITORIO = Path(__file__).resolve().parents[2]
 MODELO = RAIZ_REPOSITORIO / "models" / "2026-11" / "referencia"
 CONFERENCIA = RAIZ_REPOSITORIO / "pesquisa" / "data" / "conferencia"
 CATEGORIA = {"falso": "falso", "enganoso": "enganoso", "verdadeiro": "confere"}
+# Mesmo padrão da API para o jogador (LIMIARES_PADRAO em api/app/integrations/classificador_client.py).
+LIMIAR_JOGADOR = 0.7
 
 
 def categoria(proba: np.ndarray, limiar: float) -> str:
@@ -51,7 +55,12 @@ def mostrar(texto: str, modelo: dict, limiar: float, n_palavras: int = 6):
 
 
 def exemplos_validacao(pasta: Path):
-    conjunto = carregar()
+    config = ler_json(pasta / "config.json") or {}
+    conjunto = carregar(
+        config.get("texto", "original"),
+        prompt=caminho_registrado(config.get("prompt")),
+        modelo=config.get("modelo_llm"),
+    )
     previsoes = ler_previsoes(pasta)
     for exemplo in conjunto.splits["validacao"]:
         if exemplo.id in previsoes:
@@ -98,7 +107,7 @@ def main():
     parser.add_argument("frases", nargs="*")
     parser.add_argument("--modelo", type=Path, default=MODELO)
     parser.add_argument(
-        "--limiar", type=float, default=0.5, help="confiança mínima (senão incerto)"
+        "--limiar", type=float, default=LIMIAR_JOGADOR, help="confiança mínima (senão incerto)"
     )
     parser.add_argument("--amostra", type=int, help="exemplos sorteados da validação")
     parser.add_argument("--erros", action="store_true", help="na amostra, só os erros")
@@ -113,8 +122,13 @@ def main():
         print(f"Gravado {exportar(args.modelo, args.limiar)}")
         return
 
-    modelo = joblib.load(args.modelo / ARQUIVO_MODELO)
+    config = ler_json(args.modelo / "config.json") or {}
+    if config.get("modelo", "referencia") != "referencia":
+        raise SystemExit(f"{args.modelo}: classificar.py só abre modelos da referência TF-IDF")
+    modelo = joblib.load(conferir_artefato(args.modelo, ARQUIVO_MODELO))
     print(f"Modelo {modelo['versao']}")
+    if config.get("texto") == "padronizado":
+        print("[AVISO] modelo de texto padronizado: escreva a frase já como afirmação curta")
     for frase in args.frases:
         mostrar(frase, modelo, args.limiar)
     if not args.frases:
