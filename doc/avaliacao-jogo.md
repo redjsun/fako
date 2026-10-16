@@ -1,5 +1,7 @@
 # Avaliação nas notícias do jogo
 
+> **Modelo entregue:** o conjunto (`conjunto-2026-10-15`), ver a seção "Resultado final".
+>
 > **Status:** coleta e medição prontas (`make coletar-avaliacao` e `make avaliar-jogo`). O
 > conjunto cresce a cada coleta; os números abaixo são da primeira.
 
@@ -105,6 +107,30 @@ de `--limite 4000`), calibrados para o jogo como os anteriores (proporção 0,5;
 
 O BERT híbrido decide em 78% das notícias para o jogador (contra 50% do publicado), com 93% de
 acerto. Com 14 falsas, a diferença nas falsas (13 × 11 acertos) ainda não é conclusiva.
+
+### Resultado final: o conjunto (16/10/2026)
+
+A coleta com o Boatos.org levou a avaliação a **225 notícias** (58 não confiáveis: 36 do
+Boatos.org, 18 checagens falsas e 4 enganosas; 167 confiáveis do GNews e da Agência Brasil).
+Com mais exemplos, a vantagem do híbrido sobre o original não se confirmou, e os dois juntos
+foram melhores que cada um:
+
+| Modelo | Balanceado | Confiáveis | Não confiáveis | AUC nota |
+|---|---|---|---|---|
+| `bert` (texto original) | 82,0% | 77,8% | 86,2% | 0,923 |
+| `bert-hibrido` | 78,0% | 78,4% | 77,6% | 0,867 |
+| **conjunto 50/50** | **88,2%** | **85,0%** | **91,4%** | **0,961** |
+
+O conjunto (`ConjuntoBert`, `CLASSIFICADOR_PROVIDER=conjunto`) faz a média das fronteiras já
+calibradas dos dois: o do texto original recebe a manchete, e o híbrido, a afirmação extraída.
+O peso 50/50 foi fixado antes de olhar o resultado; 0,3 e 0,7 dão 85% e 87%. Os limiares de
+`incerto` são a média dos limiares de cada membro, escolhidos na validação (admin 0,48, jogador
+0,54). Com eles, nas 225 notícias:
+
+| Uso | Incerto | Acerto quando decide |
+|---|---|---|
+| admin (0,48) | 14% | 92,2% (178 de 193) |
+| jogador (0,54) | 28% | 98,8% (159 de 161) |
 
 **Cuidado:** todas as falsas são alegações de checagem e todas as verdadeiras são manchetes.
 Parte do AUC pode vir do formato (cara de boato × cara de manchete), e não da veracidade, o

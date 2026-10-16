@@ -44,12 +44,28 @@ make up
 
 `make help` lista todos os comandos disponíveis.
 
-**Segurança do ambiente de desenvolvimento.** As portas publicadas (API, web, banco, Jupyter e
+### Classificador e LLM
+
+O modelo não fica no Git: ele é publicado na
+[Release do GitHub](https://github.com/redjsun/fako/releases) e baixado para `models/atual`.
+É o classificador em **conjunto**: dois BERTimbau em ONNX (um treinado na manchete, outro na
+afirmação extraída pela LLM), com a média das probabilidades.
+
+```bash
+make modelo        # baixa o modelo (~800 MB) para models/atual
+```
+
+No `.env`: `CLASSIFICADOR_PROVIDER=conjunto`, `CLASSIFICADOR_NO_JOGO=true` (o palpite aparece
+depois da resposta) e a LLM, que extrai a afirmação e escreve o "Por quê?": `LLM_PROVIDER=openai`
+com o Qwen pelo Ollama no host (`ollama pull qwen3:8b`; `LLM_BASE_URL` e `LLM_MODEL` como no
+`.env.example`). Depois de trocar de modelo, `make reanalisar` refaz o palpite e o "Por quê?"
+das questões do banco.
+
+**Segurança do ambiente de desenvolvimento.** As portas publicadas (API, web, banco e
 docs) escutam só em `127.0.0.1`, então nada fica exposto na rede local. As credenciais padrão do
 banco (`fako`/`fako`) servem só para dev: troque `POSTGRES_USER` e `POSTGRES_PASSWORD` no `.env`
 em qualquer outro ambiente. Se já houver um PostgreSQL na 5432 do host (comum no Windows), use
-`POSTGRES_HOST_PORT=5433` no `.env`. O Jupyter (`make eda`) exige token: defina `JUPYTER_TOKEN` no `.env`
-ou use o token aleatório que aparece em `docker compose --profile pesquisa logs pesquisa`.
+`POSTGRES_HOST_PORT=5433` no `.env`.
 Administrador: `make admin u=usuario` (a senha é pedida no terminal). Senhas de jogador têm
 de 8 caracteres a 72 bytes, e o login bloqueia por 15 minutos depois de 5 senhas erradas.
 
@@ -59,57 +75,29 @@ de 8 caracteres a 72 bytes, e o login bloqueia por 15 minutos depois de 5 senhas
 make test      # testes da API (pytest num banco fako_test separado)
 make lint      # lint e formatação da API (ruff)
 make format    # formata o código da API
-make test-ml   # lint de pesquisa/ml e pesquisa/dados, e testes de pesquisa/ml/
 make test-web  # tipos, lint e testes do frontend
 ```
 
 O CI (`.github/workflows/ci.yml`) roda os mesmos comandos a cada push, com cobertura mínima
-na API (80%) e em `pesquisa/ml/` (75%), o lint do `ml/` legado, o build estrito dos docs
+na API (80%), os testes do uso do modelo e da LLM (job "ML"), o build estrito dos docs
 (`mkdocs build --strict`) e o build das imagens. A auditoria de dependências e a checagem de
 links externos dos docs só avisam, sem bloquear.
 
-## Dados
+## Dados do treino
 
-As bases não ficam no Git: `pesquisa/data/` está no `.gitignore`. Para baixá-las e gerar a
-versão unificada:
-
-```bash
-bash pesquisa/dados/baixar_dados.sh                     # Fake.br, FakeRecogna, FakeTrue.Br, FakenewsBR e ClaimPT
-python pesquisa/dados/coletar_noticias.py               # texto das verdadeiras do FakeRecogna
-python pesquisa/dados/coletar_boatos.py                 # texto das falsas do FakeRecogna
-python pesquisa/dados/coletar_verdadeiras.py            # notícias verdadeiras dos portais (~1 h)
-python pesquisa/dados/coletar_factcheck.py              # precisa de FACTCHECK_API_KEY no .env
-python pesquisa/dados/preparar_dados.py                 # pesquisa/data/processed/dataset.jsonl
-python pesquisa/dados/preparar_claimpt.py               # pesquisa/data/processed/claimpt.jsonl
-make eda                                                # Jupyter Lab em http://localhost:8888
-```
-
-Os coletores usam `requests` e `beautifulsoup4` (`pesquisa/requirements.txt`), esperam 1 s
-entre requisições ao mesmo site e guardam as páginas em cache em `pesquisa/data/raw/`, então
-rodar de novo só baixa o que falta. O preparo usa só a biblioteca padrão.
-
-**Coleta diária.** O serviço `agendador` do compose (profile próprio: sobe com
-`make agendador`, só na máquina que coleta) roda `pesquisa/crontab` com o
-[supercronic](https://github.com/aptible/supercronic): às 3h, `coletar_factcheck.py --incremental`
-e depois `preparar_dados.py`. Logs em `docker compose --profile agendador logs agendador`.
-
-**Anotação da equipe** (`doc/guia-classificacao.md` §7, `pesquisa/anotacoes/README.md`):
-
-```bash
-python pesquisa/dados/sortear_anotacao.py --rodada 1 --anotadores ana bruno --itens 600
-python pesquisa/dados/consolidar_anotacoes.py importar --rodada 1 pesquisa/data/anotacao/rodada-01-*.csv
-python pesquisa/dados/consolidar_anotacoes.py          # concordância e pesquisa/anotacoes/consolidado.csv
-```
+O classificador foi treinado com as bases abaixo. O código de treino e os dados não ficam no
+repositório: só o modelo pronto, na Release. Como os dados foram escolhidos, a divisão em
+treino, validação e teste e os resultados estão no site de documentação.
 
 | Base | Classe | Origem | O que entra |
 |------|--------|--------|-------------|
 | Fake.br-Corpus | fake e true | [roneysco/Fake.br-Corpus](https://github.com/roneysco/Fake.br-Corpus) (NILC/USP), commit `780f551` | 3.600 pares de 2016–2018 |
-| FakeRecogna | fake e true | [recogna-nlp/FakeRecogna](https://huggingface.co/datasets/recogna-nlp/FakeRecogna) (commit `143842b`, MIT) | só URL e rótulo; o texto é recoletado: as falsas do Boatos.org por `coletar_boatos.py` e as verdadeiras por `coletar_noticias.py` |
+| FakeRecogna | fake e true | [recogna-nlp/FakeRecogna](https://huggingface.co/datasets/recogna-nlp/FakeRecogna) (commit `143842b`, MIT) | só URL e rótulo; o texto foi recoletado das páginas originais |
 | FakeTrue.Br | fake e true | [jpchav98/FakeTrue.Br](https://github.com/jpchav98/FakeTrue.Br), commit `37cdd5f` | 1.791 pares Boatos.org × G1/Folha/UOL do mesmo assunto |
-| Google Fact Check Tools API | fake, enganoso e true | 10 agências brasileiras, por `coletar_factcheck.py` | alegações com veredito "falso", de meia-verdade ou "verdadeiro"; a principal fonte de enganosos |
+| Google Fact Check Tools API | fake, enganoso e true | 10 agências brasileiras | alegações com veredito "falso", de meia-verdade ou "verdadeiro"; a principal fonte de enganosos |
 | FakenewsBR v6 | fake, enganoso e true | [thiago-cg/fakenewsbr-v4](https://github.com/thiago-cg/fakenewsbr-v4), commit `44a55e5`, variante pública | sub-bases de agência, mensagens de WhatsApp e de COVID |
-| Verdadeiras (CSV próprio) | true | 9 portais, por `coletar_verdadeiras.py` | matérias de 2018 em diante |
-| ClaimPT | sem veracidade | [LIAAD/ClaimPT](https://github.com/LIAAD/ClaimPT) (INESC TEC), commit `317a170` | notícias em português europeu, fora do `dataset.jsonl` (vai para `claimpt.jsonl`) |
+| Verdadeiras (CSV próprio) | true | 9 portais | matérias de 2018 em diante |
+| ClaimPT | sem veracidade | [LIAAD/ClaimPT](https://github.com/LIAAD/ClaimPT) (INESC TEC), commit `317a170` | notícias em português europeu, fora do dataset de treino |
 
 **Licenças.** O Fake.br e o FakeTrue.Br não declaram licença. FakeRecogna e a compilação da
 FakenewsBR são MIT, mas o conteúdo de terceiros na FakenewsBR segue os termos das fontes

@@ -114,12 +114,12 @@ class FakeClassificador:
 
 
 class ReferenciaTfidf:
-    """Referência TF-IDF + regressão logística ordinal (pesquisa/ml/treinar_referencia.py).
+    """Referência TF-IDF + regressão logística ordinal.
 
     Lê o `referencia.joblib` da pasta publicada: um dicionário só com objetos do
     scikit-learn (`vetorizador`, `fronteira_1`, `fronteira_2`) e a `versao`. A frase passa
     pela mesma `limpar()` do treino antes de virar TF-IDF. Se houver `calibracao.json`
-    (pesquisa/ml/calibrar.py), as fronteiras são calibradas por Platt antes da regra de
+    (Platt por fronteira, ajustado na validação), as fronteiras são calibradas antes da regra de
     decisão; `texto_de_entrada` diz se o modelo foi treinado no texto original ou no
     padronizado pela LLM (`config.json`).
     """
@@ -165,10 +165,10 @@ def legivel(variavel: str) -> str:
 
 
 class BertOnnx:
-    """BERTimbau com cabeça ordinal CORAL (pesquisa/ml/treinar_bert.py), exportado para ONNX.
+    """BERTimbau com cabeça ordinal CORAL, exportado para ONNX.
 
     Lê da pasta publicada o `modelo.onnx`, o `tokenizer.json` e o `onnx.json` (`max_tokens`,
-    `versao`) gravados por pesquisa/ml/exportar_onnx.py, e roda com `onnxruntime` na CPU, sem
+    `versao`) gravados na exportação, e roda com `onnxruntime` na CPU, sem
     PyTorch. Mesma limpeza, calibração (`calibracao.json`), limiares e regra de decisão da
     referência. Não há contribuições por palavra: o admin vê só a análise.
     """
@@ -225,7 +225,7 @@ def ler_json(arquivo: Path) -> dict | None:
 
 
 def platt(p: float, parametros: dict[str, float]) -> float:
-    """sigmoide(a · logit(p) + b), a mesma de pesquisa/ml/calibrar.py."""
+    """sigmoide(a · logit(p) + b), a mesma da calibração do modelo."""
     p = min(max(p, 1e-6), 1 - 1e-6)
     return 1 / (1 + math.exp(-(parametros["a"] * math.log(p / (1 - p)) + parametros["b"])))
 

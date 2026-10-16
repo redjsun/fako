@@ -3,7 +3,7 @@
 Uso: python -m app.jobs.reanalisar_questoes [--todas]
 
 A importação grava a análise na questão (`model_category`, `model_score`, `model_confidence`,
-`model_version`), que o admin vê na curadoria. Ao publicar outro modelo (make publicar), as
+`model_version`), que o admin vê na curadoria. Ao publicar outro modelo (make modelo), as
 análises antigas continuam lá; este job refaz as que vieram de outra versão (`--todas` refaz
 todas). Mesma entrada da importação: a afirmação extraída (`claim_text`) se o modelo foi
 treinado no texto padronizado ou híbrido; senão, o enunciado.

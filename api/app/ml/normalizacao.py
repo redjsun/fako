@@ -1,10 +1,8 @@
 """Normalização do texto de entrada do classificador, igual à do treino.
 
 O modelo aprendeu com o `texto_curto` do dataset (alegação checada ou título de matéria)
-depois de `limpar()` de `pesquisa/ml/dados.py`. A API não importa código da pesquisa, então
-`VEICULOS`, `limpar()`, os filtros de manchete (`motivo_filtro_portal()` de
-`pesquisa/dados/preparar_dados.py`) e os vereditos das agências (mesmo arquivo) estão copiados
-aqui. **Mudou lá, muda aqui.**
+depois desta mesma `limpar()`. `VEICULOS`, `limpar()`, os filtros de manchete e os vereditos
+das agências são os do preparo do dataset de treino: mudar aqui muda o que o modelo recebe.
 
 - `limpar()`: tira URLs e créditos de veículo nas pontas; mantém caixa e pontuação.
 - `normalizar_manchete()`: o título de uma notícia externa no formato do `texto_curto`
@@ -83,7 +81,7 @@ def limpar(texto: str) -> str:
     return re.sub(r"\s+", " ", texto).strip()
 
 
-# Filtros das matérias de portal (preparar_dados.py): opinião, vídeo, pergunta, fala relatada.
+# Filtros das matérias de portal (os do preparo do dataset): opinião, vídeo, pergunta, fala relatada.
 SECOES_FORA = re.compile(
     r"/(opiniao|colunas?|colunistas?|blogs?|videos?|ao-vivo|podcasts?|publieditorial|"
     r"patrocinado|conteudo-patrocinado|especial-publicitario|editorial|artigos?|analise|"
@@ -201,7 +199,7 @@ def motivo_descarte(
     return None
 
 
-# Vereditos das agências (preparar_dados.py). Os enganosos e os ambíguos não têm lado no jogo.
+# Vereditos das agências (os do preparo do dataset). Os enganosos e os ambíguos não têm lado no jogo.
 VEREDITOS_FALSO = {"falso", "fake", "montagem", "predominantemente falso"}
 # Meias-verdades: a veracidade "enganoso" do treino (fora do jogo binário, entram na avaliação).
 VEREDITOS_ENGANOSO = {
