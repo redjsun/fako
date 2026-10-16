@@ -17,4 +17,4 @@ aquecimento = 0.1
 lote = 32
 max_epocas = 4
 parada_antecipada = "f1_macro_validacao"
-paciencia = 1   # épocas sem melhora antes de parar
+paciencia = 1   # épocas seguidas sem melhora toleradas; para na seguinte (1 → para na 2ª)

@@ -19,10 +19,12 @@ Seções:
     [treino]  hiperparâmetros do modelo (livres, cada script lê os seus)
     sementes = [13, 42, 7]
 
-Caminhos relativos são da raiz do repositório, como os comandos.
+Caminhos relativos são da raiz do repositório, como os comandos. No `config.json` os
+caminhos também são gravados relativos à raiz, para o modelo ser avaliado no host e no container.
 """
 
 import hashlib
+import json
 import os
 import tomllib
 from dataclasses import dataclass, field
@@ -32,6 +34,7 @@ RAIZ_REPOSITORIO = Path(__file__).resolve().parents[2]
 CONFIGS = Path(__file__).resolve().parent / "configs"
 MODELOS = ("referencia", "bert", "atalho")
 TEXTOS = ("original", "padronizado")
+PREFIXO_CONTAINER = "/work/"  # raiz do repositório nos containers do compose
 
 
 class ErroConfiguracao(ValueError):
@@ -67,11 +70,11 @@ class Configuracao:
             "nome": self.nome,
             "modelo": self.modelo,
             "texto": self.texto,
-            "prompt": str(self.prompt) if self.prompt else None,
+            "prompt": relativo(self.prompt),
             "modelo_llm": self.modelo_llm,
             "treino": self.treino,
             "sementes": self.sementes,
-            "configuracao": str(self.arquivo) if self.arquivo else None,
+            "configuracao": relativo(self.arquivo),
             "configuracao_sha1": self.sha1,
             "dataset_sha256": dataset_sha256,
         }
@@ -82,6 +85,58 @@ def caminho(valor: str | None, raiz: Path) -> Path | None:
         return None
     p = Path(valor)
     return p if p.is_absolute() else raiz / p
+
+
+def relativo(caminho_: Path | None, raiz: Path = RAIZ_REPOSITORIO) -> str | None:
+    """Caminho gravado no config.json: relativo à raiz do repositório, igual no host e no container."""
+    if caminho_ is None:
+        return None
+    try:
+        return caminho_.resolve().relative_to(raiz.resolve()).as_posix()
+    except ValueError:
+        return caminho_.as_posix()
+
+
+def caminho_registrado(valor: str | None, raiz: Path = RAIZ_REPOSITORIO) -> Path | None:
+    """Lê um caminho do config.json. Os modelos antigos gravaram o caminho absoluto do container
+    (/work/...), que também é aceito, relativo à raiz do repositório."""
+    if not valor:
+        return None
+    if valor.startswith(PREFIXO_CONTAINER):
+        valor = valor[len(PREFIXO_CONTAINER) :]
+    return caminho(valor, raiz)
+
+
+def sha256_arquivo(arquivo: Path) -> str:
+    h = hashlib.sha256()
+    with open(arquivo, "rb") as entrada:
+        for bloco in iter(lambda: entrada.read(1 << 20), b""):
+            h.update(bloco)
+    return h.hexdigest()
+
+
+def conferir_artefato(pasta: Path, nome: str) -> Path:
+    """Confere o artefato contra o sha256 gravado no config.json antes de carregá-lo.
+
+    joblib e pickle executam código ao carregar: um arquivo trocado na pasta do modelo não pode
+    ser aberto. Modelos antigos, sem o hash no config.json, carregam com um aviso.
+    """
+    arquivo = pasta / nome
+    config = pasta / "config.json"
+    esperado = None
+    if config.exists():
+        esperado = (
+            json.loads(config.read_text(encoding="utf-8")).get("artefatos_sha256", {}).get(nome)
+        )
+    if esperado is None:
+        print(
+            f"[AVISO] {arquivo}: config.json sem artefatos_sha256; carregando sem conferir o hash"
+        )
+    elif sha256_arquivo(arquivo) != esperado:
+        raise ErroConfiguracao(
+            f"{arquivo}: sha256 diferente do gravado no config.json; não carrego"
+        )
+    return arquivo
 
 
 def carregar_configuracao(arquivo: Path, raiz: Path = RAIZ_REPOSITORIO) -> Configuracao:

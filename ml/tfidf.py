@@ -8,13 +8,15 @@ por sample_weight.
 
 from __future__ import annotations
 
+import argparse
 import json
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import joblib
+from ml.dados import DadosML, carregar
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
@@ -25,8 +27,6 @@ from sklearn.metrics import (
     precision_score,
     recall_score,
 )
-
-from ml.dados import DadosML, carregar
 
 # Configuração e reprodutibilidade
 RANDOM_STATE = 42
@@ -165,8 +165,12 @@ def executar_experimento(
     dados: DadosML | None = None,
     diretorio_modelos: Path | str = "models",
     salvar: bool = True,
+    avaliar_teste: bool = False,
 ) -> dict[str, Any]:
-    """Executa o ciclo completo de treinamento, avaliação e persistência."""
+    """Executa o ciclo completo de treinamento, avaliação e persistência.
+
+    O teste só é avaliado com `avaliar_teste` (uma vez por modelo, como manda o protocolo).
+    """
     if dados is None:
         dados = carregar(texto="original")
 
@@ -200,14 +204,16 @@ def executar_experimento(
     metricas_val_y1 = avaliar_modelo(clf_y1, X_val_vec, y1_val)
     metricas_val_y2 = avaliar_modelo(clf_y2, X_val_vec, y2_val)
 
-    # 5. Avaliação no teste
-    metricas_teste_y1 = avaliar_modelo(clf_y1, X_teste_vec, y1_teste)
-    metricas_teste_y2 = avaliar_modelo(clf_y2, X_teste_vec, y2_teste)
+    # 5. Avaliação no teste, só quando pedida
+    metricas_teste_y1 = metricas_teste_y2 = None
+    if avaliar_teste:
+        metricas_teste_y1 = avaliar_modelo(clf_y1, X_teste_vec, y1_teste)
+        metricas_teste_y2 = avaliar_modelo(clf_y2, X_teste_vec, y2_teste)
 
     # Preparação de metadados
     metadata = {
         "modelo": "TF-IDF + LogisticRegression",
-        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "timestamp_utc": datetime.now(UTC).isoformat(),
         "random_state": RANDOM_STATE,
         "dataset_hash": dados.dataset_hash,
         "total_exemplos": {
@@ -218,18 +224,18 @@ def executar_experimento(
         },
         "vocabulario_tamanho": int(X_treino_vec.shape[1]),
         "tfidf_params": {
-            k: list(v) if isinstance(v, tuple) else v
-            for k, v in DEFAULT_TFIDF_PARAMS.items()
+            k: list(v) if isinstance(v, tuple) else v for k, v in DEFAULT_TFIDF_PARAMS.items()
         },
         "logistic_params": DEFAULT_LOGISTIC_PARAMS,
         "metricas_validacao": {
             "y1": metricas_val_y1.to_dict(),
             "y2": metricas_val_y2.to_dict(),
         },
-        "metricas_teste": {
-            "y1": metricas_teste_y1.to_dict(),
-            "y2": metricas_teste_y2.to_dict(),
-        },
+        "metricas_teste": (
+            {"y1": metricas_teste_y1.to_dict(), "y2": metricas_teste_y2.to_dict()}
+            if avaliar_teste
+            else None
+        ),
     }
 
     caminhos_artefatos = {}
@@ -252,6 +258,11 @@ def executar_experimento(
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
+    parser.add_argument(
+        "--teste", action="store_true", help="avalia também o teste (uma vez por modelo)"
+    )
+    args = parser.parse_args()
     print("=" * 68)
     print("   TREINAMENTO E AVALIAÇÃO DO BASELINE TF-IDF (FAKO)")
     print("=" * 68)
@@ -259,10 +270,14 @@ def main():
     print("\n1. Carregando dados do pipeline oficial (ml.dados)...")
     dados = carregar(texto="original")
     print(f"   Dataset hash: {dados.dataset_hash}")
-    print(f"   Exemplos: Treino={len(dados.treino)}, Validação={len(dados.validacao)}, Teste={len(dados.teste)}")
+    print(
+        f"   Exemplos: Treino={len(dados.treino)}, Validação={len(dados.validacao)}, Teste={len(dados.teste)}"
+    )
 
     print("\n2. Executando treinamento e avaliação...")
-    resultado = executar_experimento(dados, diretorio_modelos="models", salvar=True)
+    resultado = executar_experimento(
+        dados, diretorio_modelos="models", salvar=True, avaliar_teste=args.teste
+    )
     meta = resultado["metadata"]
 
     print(f"   Vocabulário TF-IDF gerado no treino: {meta['vocabulario_tamanho']} termos")
@@ -272,27 +287,43 @@ def main():
 
     val_y1 = resultado["metricas_val_y1"]
     val_y2 = resultado["metricas_val_y2"]
-    te_y1 = resultado["metricas_teste_y1"]
-    te_y2 = resultado["metricas_teste_y2"]
 
     print("\n" + "=" * 68)
     print("                 RESULTADOS DE VALIDAÇÃO")
     print("=" * 68)
-    print(f"{'Modelo':<10} {'Acc':>8} {'Prec':>8} {'Rec':>8} {'F1':>8} {'Macro F1':>10} {'Bal Acc':>10}")
+    print(
+        f"{'Modelo':<10} {'Acc':>8} {'Prec':>8} {'Rec':>8} {'F1':>8} {'Macro F1':>10} {'Bal Acc':>10}"
+    )
     print("-" * 68)
-    print(f"{'TF-IDF Y1':<10} {val_y1.accuracy*100:>7.2f}% {val_y1.precision*100:>7.2f}% {val_y1.recall*100:>7.2f}% {val_y1.f1*100:>7.2f}% {val_y1.macro_f1*100:>9.2f}% {val_y1.balanced_accuracy*100:>9.2f}%")
-    print(f"{'TF-IDF Y2':<10} {val_y2.accuracy*100:>7.2f}% {val_y2.precision*100:>7.2f}% {val_y2.recall*100:>7.2f}% {val_y2.f1*100:>7.2f}% {val_y2.macro_f1*100:>9.2f}% {val_y2.balanced_accuracy*100:>9.2f}%")
+    print(
+        f"{'TF-IDF Y1':<10} {val_y1.accuracy*100:>7.2f}% {val_y1.precision*100:>7.2f}% {val_y1.recall*100:>7.2f}% {val_y1.f1*100:>7.2f}% {val_y1.macro_f1*100:>9.2f}% {val_y1.balanced_accuracy*100:>9.2f}%"
+    )
+    print(
+        f"{'TF-IDF Y2':<10} {val_y2.accuracy*100:>7.2f}% {val_y2.precision*100:>7.2f}% {val_y2.recall*100:>7.2f}% {val_y2.f1*100:>7.2f}% {val_y2.macro_f1*100:>9.2f}% {val_y2.balanced_accuracy*100:>9.2f}%"
+    )
     print("\nMatrizes de Confusão (Validação):")
     print(f"  Y1: {formatar_matriz(val_y1.confusion_matrix)}")
     print(f"  Y2: {formatar_matriz(val_y2.confusion_matrix)}")
 
+    if not args.teste:
+        print("\nTeste não avaliado (use --teste, uma vez por modelo).")
+        return
+    te_y1 = resultado["metricas_teste_y1"]
+    te_y2 = resultado["metricas_teste_y2"]
+
     print("\n" + "=" * 68)
     print("                   RESULTADOS DE TESTE")
     print("=" * 68)
-    print(f"{'Modelo':<10} {'Acc':>8} {'Prec':>8} {'Rec':>8} {'F1':>8} {'Macro F1':>10} {'Bal Acc':>10}")
+    print(
+        f"{'Modelo':<10} {'Acc':>8} {'Prec':>8} {'Rec':>8} {'F1':>8} {'Macro F1':>10} {'Bal Acc':>10}"
+    )
     print("-" * 68)
-    print(f"{'TF-IDF Y1':<10} {te_y1.accuracy*100:>7.2f}% {te_y1.precision*100:>7.2f}% {te_y1.recall*100:>7.2f}% {te_y1.f1*100:>7.2f}% {te_y1.macro_f1*100:>9.2f}% {te_y1.balanced_accuracy*100:>9.2f}%")
-    print(f"{'TF-IDF Y2':<10} {te_y2.accuracy*100:>7.2f}% {te_y2.precision*100:>7.2f}% {te_y2.recall*100:>7.2f}% {te_y2.f1*100:>7.2f}% {te_y2.macro_f1*100:>9.2f}% {te_y2.balanced_accuracy*100:>9.2f}%")
+    print(
+        f"{'TF-IDF Y1':<10} {te_y1.accuracy*100:>7.2f}% {te_y1.precision*100:>7.2f}% {te_y1.recall*100:>7.2f}% {te_y1.f1*100:>7.2f}% {te_y1.macro_f1*100:>9.2f}% {te_y1.balanced_accuracy*100:>9.2f}%"
+    )
+    print(
+        f"{'TF-IDF Y2':<10} {te_y2.accuracy*100:>7.2f}% {te_y2.precision*100:>7.2f}% {te_y2.recall*100:>7.2f}% {te_y2.f1*100:>7.2f}% {te_y2.macro_f1*100:>9.2f}% {te_y2.balanced_accuracy*100:>9.2f}%"
+    )
     print("\nMatrizes de Confusão (Teste):")
     print(f"  Y1: {formatar_matriz(te_y1.confusion_matrix)}")
     print(f"  Y2: {formatar_matriz(te_y2.confusion_matrix)}")

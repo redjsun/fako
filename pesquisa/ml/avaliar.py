@@ -10,7 +10,8 @@ Contrato com os scripts de treino (#9, #10): a pasta do modelo tem
   fronteiras ordinais P1 = P(veracidade > falso) e P2 = P(veracidade > enganoso), já
   calibradas. `gravar_previsoes()` grava nesse formato;
 - `config.json` (opcional): `{"texto": "original" | "padronizado", "prompt": ..., "modelo_llm": ...}`,
-  para carregar os mesmos exemplos de `dados.py`;
+  para carregar os mesmos exemplos de `dados.py`, e `dataset_sha256`: se o dataset atual for
+  outro, a avaliação para (ou segue com --aceitar-dataset-diferente, e o relatório avisa);
 - `limiares.json` (opcional, #12): `{"admin": 0.6, "jogador": 0.8}`, a confiança mínima abaixo
   da qual a saída é `incerto`.
 
@@ -39,6 +40,7 @@ from pathlib import Path
 import numpy as np
 from sklearn.metrics import cohen_kappa_score, f1_score, roc_auc_score
 
+from configuracao import caminho_registrado
 from dados import CLASSES, DATASET, ORDEM, Exemplo, carregar
 
 ATALHO = Path(__file__).resolve().parent / "saidas" / "atalho.json"
@@ -256,15 +258,33 @@ def envelhecimento(por_split: dict, exemplos: dict[str, list[Exemplo]], p1, p2) 
     return resultado
 
 
+class DatasetDiferente(Exception):
+    """O dataset atual não é o mesmo com que o modelo foi treinado."""
+
+
 def avaliar(
-    pasta: Path, dataset: Path = DATASET, teste: bool = False, atalho: Path = ATALHO
+    pasta: Path,
+    dataset: Path = DATASET,
+    teste: bool = False,
+    atalho: Path = ATALHO,
+    aceitar_dataset_diferente: bool = False,
 ) -> dict:
     config = ler_json(pasta / "config.json") or {}
     limiares = ler_json(pasta / "limiares.json")
     texto = config.get("texto", "original")
-    prompt = Path(config["prompt"]) if config.get("prompt") else None
+    prompt = caminho_registrado(config.get("prompt"))
     conjunto = carregar(texto, dataset, prompt, config.get("modelo_llm"))
     previsoes = ler_previsoes(pasta)
+
+    # O agendador regenera o dataset.jsonl todo dia: avaliar sobre outro dataset compara
+    # validações diferentes sem aviso. Só segue com --aceitar-dataset-diferente.
+    do_treino = config.get("dataset_sha256")
+    dataset_diferente = bool(do_treino) and do_treino != conjunto.dataset_sha256
+    if dataset_diferente and not aceitar_dataset_diferente:
+        raise DatasetDiferente(
+            f"{pasta}: treinado com o dataset {do_treino[:16]}, mas o atual é "
+            f"{conjunto.dataset_sha256[:16]}. Retreine ou use --aceitar-dataset-diferente."
+        )
 
     splits = ("validacao", "teste") if teste else ("validacao",)
     exemplos, p1, p2, por_split, sem_previsao = {}, {}, {}, {}, {}
@@ -283,6 +303,7 @@ def avaliar(
         "config": config,
         "limiares": limiares,
         "dataset_sha256": conjunto.dataset_sha256,
+        "dataset_diferente_do_treino": dataset_diferente,
         "texto": texto,
         "splits": por_split,
         "sem_previsao": sem_previsao,
@@ -341,6 +362,13 @@ def relatorio(resultado: dict) -> str:
         "",
         f"- texto: `{resultado['texto']}`; dataset sha256 `{resultado['dataset_sha256'][:16]}`",
         f"- limiares: {resultado['limiares'] or 'sem limiares.json'}",
+    ]
+    if resultado.get("dataset_diferente_do_treino"):
+        linhas.append(
+            "- **atenção: o dataset atual não é o do treino** (sha256 diferente do config.json); "
+            "as métricas não comparam com as de outros modelos"
+        )
+    linhas += [
         f"- exemplos sem previsão (ficaram fora): {resultado['sem_previsao']}",
         "",
     ]
@@ -467,6 +495,11 @@ def main():
         "--teste", action="store_true", help="inclui o teste (uma vez por candidato)"
     )
     parser.add_argument("--comparacao", type=Path, help="grava a tabela lado a lado em Markdown")
+    parser.add_argument(
+        "--aceitar-dataset-diferente",
+        action="store_true",
+        help="avalia mesmo se o dataset atual não for o do treino (o relatório avisa)",
+    )
     args = parser.parse_args()
     if not args.dataset.exists():
         sys.exit(f"{args.dataset} não encontrado. Rode antes: make dados")
@@ -475,7 +508,17 @@ def main():
     for pasta in args.modelo:
         if not (pasta / "previsoes.jsonl").exists():
             sys.exit(f"{pasta / 'previsoes.jsonl'} não encontrado")
-        resultado = avaliar(pasta, args.dataset, args.teste)
+        try:
+            resultado = avaliar(
+                pasta,
+                args.dataset,
+                args.teste,
+                aceitar_dataset_diferente=args.aceitar_dataset_diferente,
+            )
+        except DatasetDiferente as erro:
+            sys.exit(str(erro))
+        if resultado["dataset_diferente_do_treino"]:
+            print(f"[AVISO] {pasta}: o dataset atual não é o do treino")
         (pasta / "metricas.json").write_text(
             json.dumps(resultado, ensure_ascii=False, indent=2), encoding="utf-8"
         )

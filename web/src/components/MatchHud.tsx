@@ -11,6 +11,8 @@ interface MatchHudProps {
   timeLeft: number;
   duration: number;
   score: number;
+  // Enquanto a resposta vai para a API, sair agora deixaria o resultado sem dono.
+  exitDisabled?: boolean;
   onExit: () => void;
 }
 
@@ -34,6 +36,7 @@ export const MatchHud: React.FC<MatchHudProps> = ({
   timeLeft,
   duration,
   score,
+  exitDisabled = false,
   onExit,
 }) => {
   const statusText = STATUS_TEXT[status];
@@ -47,7 +50,7 @@ export const MatchHud: React.FC<MatchHudProps> = ({
           type="button"
           className="match-hud__exit"
           onClick={onExit}
-          disabled={status === "FINISHED"}
+          disabled={status === "FINISHED" || exitDisabled}
         >
           <Icon name="logout" size={16} />
           Sair

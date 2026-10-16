@@ -148,7 +148,7 @@ def test_prompt_alterado_sem_trocar_versao_refaz_o_cache(tmp_path, prompt):
 
 
 def test_falha_da_llm_nao_entra_no_cache_e_e_refeita(tmp_path, prompt):
-    def quebrado(texto: str) -> Extracao:
+    def quebrado(_texto: str) -> Extracao:
         raise TimeoutError("sem resposta")
 
     cache = tmp_path / "padronizado_v1.jsonl"
@@ -292,6 +292,16 @@ def test_extrator_openai_nao_insiste_em_erro_do_pedido(prompt):
     assert len(pedidos) == 1 and esperas == []
 
 
+def test_resposta_sem_texto_vira_falha_do_item_e_o_lote_segue(tmp_path, prompt):
+    sem_texto = {"choices": [{"message": {"content": None}}]}
+    servidor, base_url, _ = servidor_falso([(200, sem_texto), (200, RESPOSTA_OK)])
+    extrair = extrator_openai(prompt, base_url, "qwen-x", None)
+    cache = tmp_path / "padronizado_v1.jsonl"
+    relatorio = padronizar(REGISTROS, prompt, extrair, cache, modelo="qwen-x", log=silencioso)
+    servidor.server_close()
+    assert (relatorio.falhas, relatorio.processados) == (1, 1)
+
+
 def test_amostra_com_limite_mantem_os_pares_juntos(tmp_path, prompt):
     registros = [
         {
@@ -311,7 +321,7 @@ def test_amostra_com_limite_mantem_os_pares_juntos(tmp_path, prompt):
     assert pares != {"0", "1", "2", "3", "4"}  # espalhados, não os primeiros
 
 
-def test_exportar_poe_o_original_ao_lado_da_afirmacao(tmp_path, prompt):
+def test_exportar_poe_o_original_ao_lado_da_afirmacao(tmp_path):
     registros = [
         {"id": "a", "base": "fakebr", "veracidade": "falso", "texto": "Texto longo da notícia."},
         {"id": "b", "base": "fakebr", "veracidade": "verdadeiro", "texto": "Outro texto."},
@@ -326,7 +336,8 @@ def test_exportar_poe_o_original_ao_lado_da_afirmacao(tmp_path, prompt):
     }
     destino = tmp_path / "conferencia.csv"
     assert exportar(registros, cache, destino) == 1
-    linhas = list(csv.DictReader(open(destino, encoding="utf-8-sig")))
+    with open(destino, encoding="utf-8-sig") as arquivo:
+        linhas = list(csv.DictReader(arquivo))
     assert linhas[0]["texto_original"] == "Texto longo da notícia."
     assert linhas[0]["afirmacao_1"] == "Afirmação 1" and linhas[0]["quem_disse_1"] == "Fulano"
     assert linhas[0]["n_afirmacoes"] == "2" and linhas[0]["demais_afirmacoes"] == "Afirmação 2"

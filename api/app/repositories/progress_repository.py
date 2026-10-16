@@ -9,5 +9,10 @@ from app.repositories.base_repository import BaseRepository
 class ProgressRepository(BaseRepository[UserProgress]):
     model = UserProgress
 
-    def get_by_user(self, user_id: int) -> UserProgress | None:
-        return self.db.scalar(select(UserProgress).where(UserProgress.user_id == user_id))
+    def get_by_user(self, user_id: int, bloquear: bool = False) -> UserProgress | None:
+        """`bloquear` trava a linha até o fim da transação: dois encerramentos simultâneos
+        somam os dois placares em vez de um sobrescrever o outro."""
+        query = select(UserProgress).where(UserProgress.user_id == user_id)
+        if bloquear:
+            query = query.with_for_update()
+        return self.db.scalar(query)

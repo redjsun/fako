@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from app.core.config import get_settings
+from app.core.exceptions import ServiceUnavailableError
 
 
 @dataclass
@@ -57,5 +58,5 @@ def get_ai_client() -> AIClient:
     provider = get_settings().ai_provider
     if provider == "fake":
         return FakeAIClient()
-    # TODO: adicionar o provedor real escolhido pelo grupo (ex.: Anthropic, OpenAI).
-    raise ValueError(f"Provedor de IA não suportado: {provider}")
+    # Ainda não há provedor real (LLMClient, #22): as rotas de IA respondem 503 em vez de 500.
+    raise ServiceUnavailableError(f"Provedor de IA não suportado: {provider}")

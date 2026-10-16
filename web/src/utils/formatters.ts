@@ -14,6 +14,12 @@ export function reliabilityLabel(value: number): string {
   return "Totalmente confiável";
 }
 
+/** Efeito de um erro no nível: "+2 blocos" ou "+2 blocos · −5 pts". */
+export function wrongAnswerEffect(growthPerError: number, wrongAnswerPenalty: number): string {
+  const blocks = `+${growthPerError} ${growthPerError === 1 ? "bloco" : "blocos"}`;
+  return wrongAnswerPenalty > 0 ? `${blocks} · −${wrongAnswerPenalty} pts` : blocks;
+}
+
 export function clampReliability(value: number): number {
   return Math.min(100, Math.max(0, Math.round(value / 5) * 5));
 }

@@ -9,6 +9,9 @@ bcrypt==4.2.1
 pyjwt==2.15.1
 # Referência TF-IDF: a mesma versão do treino (imagem ml), senão o joblib não carrega
 scikit-learn==1.9.1
+joblib==1.6.0
+# BERTimbau Y1/Y2 (integrations/bertimbau_engine.py). Pisos acima das versões com
+# vulnerabilidades conhecidas no pip-audit (no torch < 2.6, o torch.load executa código).
 --extra-index-url https://download.pytorch.org/whl/cpu
-torch>=2.2.0
-transformers>=4.40.0
+torch>=2.6,<3
+transformers>=4.53,<6

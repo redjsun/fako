@@ -1,0 +1,8 @@
+# O build só copia os requirements; o código entra por volume (compose.yaml).
+saidas/
+tests/
+**/__pycache__/
+**/*.pyc
+.pytest_cache/
+.ruff_cache/
+.coverage

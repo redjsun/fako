@@ -3,4 +3,6 @@
 # Ver doc/planejamento-retreino.md.
 
 # Coleta incremental diária: checagens novas da Fact Check API e preparo do dataset.jsonl.
-0 3 * * * python pesquisa/dados/coletar_factcheck.py --incremental && python pesquisa/dados/preparar_dados.py
+# Se a coleta falhar (sem FACTCHECK_API_KEY, API fora do ar), o erro vai para o log e o dataset
+# é preparado mesmo assim, com as checagens que já estão no cache.
+0 3 * * * python pesquisa/dados/coletar_factcheck.py --incremental || echo "[ERRO] coletar_factcheck.py falhou (código $?); preparando o dataset com as checagens que já existem" >&2; python pesquisa/dados/preparar_dados.py

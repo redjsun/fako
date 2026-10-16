@@ -76,11 +76,12 @@ Partida do jogador (`match.py`).
 | `user_id` | `FK → users.id` | indexado |
 | `level_id` | `FK → levels.id` | |
 | `score` | `int` | pontuação acumulada na partida (RF18) |
-| `duration_seconds` | `int` | duração máxima de 120 segundos |
-| `status` | `enum` (`MatchStatus`) | `in_progress` ou `finished` |
+| `duration_seconds` | `int` | tempo de cobra andando, copiado de `levels.match_seconds` quando a partida começa |
+| `status` | `enum` (`MatchStatus`) | `in_progress`, `finished` ou `abandoned` (deixada aberta quando o jogador começou outra; não conta pontos) |
 | `started_at` | `DateTime` | |
 | `ended_at` | `DateTime`, opcional | |
 | `current_question_id` | `FK → questions.id`, opcional | pergunta servida e ainda sem resposta: a única que a partida aceita responder, e a que `next-question` devolve até ser respondida |
+| `current_question_served_at` | `DateTime`, opcional | quando a pergunta atual foi servida; a resposta vale até o tempo de pergunta do nível mais 30 s de folga |
 
 ## `match_answers`
 
@@ -92,7 +93,10 @@ Confiabilidade (0 a 100) dada pelo jogador a uma questão durante a partida.
 | `question_id` | `FK → questions.id` | |
 | `answer` | `bool` | leitura binária da resposta (`reliability >= 50`), mantida para relatórios |
 | `reliability` | `int`, opcional | valor de 0 a 100 marcado na barra |
-| `is_correct` | `bool` | distância até `reliability_reference` dentro da tolerância (`game_rules.py`) |
+| `is_correct` | `bool` | distância até `reliability_reference` dentro da tolerância (`game_rules.py`); falso se a resposta chegou depois do tempo |
+
+Restrição única `uq_match_answers_match_question` em (`match_id`, `question_id`): cada questão é
+respondida uma vez por partida.
 
 ## `user_progress`
 

@@ -1,0 +1,38 @@
+# PRs para a develop. Atualizações semanais: actions (fixadas por SHA), npm do web e pip da API e da pesquisa.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /web
+    target-branch: develop
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: pip
+    directories:
+      - /api
+      - /pesquisa
+      - /pesquisa/ml
+    target-branch: develop
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: docker
+    directories:
+      - /api
+      - /web
+      - /pesquisa
+      - /pesquisa/ml
+    target-branch: develop
+    schedule:
+      interval: monthly

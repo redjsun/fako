@@ -1,4 +1,4 @@
-import { httpGet, httpPost } from "./httpClient";
+import { HttpError, httpGet, httpPost, isApiUnavailable, isGuestSession } from "./httpClient";
 import { LOCAL_LEVELS } from "./levelService";
 import { AnswerResult, Match, MatchResult, Question } from "../types";
 
@@ -127,6 +127,48 @@ interface LocalMatchSession {
 
 let activeLocalMatch: LocalMatchSession | null = null;
 
+// Embaralhamento de Fisher–Yates (o sort com Math.random() favorece algumas ordens).
+export function shuffled<T>(items: readonly T[], random: () => number = Math.random): T[] {
+  const result = [...items];
+  for (let index = result.length - 1; index > 0; index--) {
+    const other = Math.floor(random() * (index + 1));
+    [result[index], result[other]] = [result[other], result[index]];
+  }
+  return result;
+}
+
+// Mesma regra da API (match_service.finish): avança quem bate a meta jogando o nível atual,
+// enquanto houver nível acima.
+export function advancesLevel(options: {
+  matchLevel: number;
+  currentLevel: number;
+  score: number;
+  minScoreToAdvance: number;
+  maxLevel: number;
+}): boolean {
+  const { matchLevel, currentLevel, score, minScoreToAdvance, maxLevel } = options;
+  return matchLevel === currentLevel && score >= minScoreToAdvance && currentLevel < maxLevel;
+}
+
+function startLocalMatch(level?: number): Match {
+  const lvlConfig = LOCAL_LEVELS.find((item) => item.number === level) ?? LOCAL_LEVELS[0];
+  const match: Match = {
+    id: Date.now(),
+    level: lvlConfig,
+    score: 0,
+    status: "in_progress",
+    duration_seconds: lvlConfig.match_seconds,
+    started_at: new Date().toISOString(),
+    ended_at: null,
+  };
+  activeLocalMatch = {
+    match,
+    questionIndices: shuffled(LOCAL_QUESTIONS.map((_, index) => index)),
+    cursor: 0,
+  };
+  return match;
+}
+
 function answerLocally(questionId: number, reliability: number): AnswerResult {
   const question = LOCAL_QUESTIONS.find((item) => item.id === questionId) || LOCAL_QUESTIONS[0];
   const rules = activeLocalMatch?.match.level ?? LOCAL_LEVELS[0];
@@ -155,59 +197,32 @@ function answerLocally(questionId: number, reliability: number): AnswerResult {
 
 export const matchService = {
   async startMatch(level?: number): Promise<Match> {
+    if (isGuestSession()) return startLocalMatch(level);
     try {
       const match = await httpPost<Match>("/matches", { level });
       activeLocalMatch = null;
       return match;
-    } catch {
-      // Fallback local caso o backend esteja offline
-      const lvlNum = level && level >= 1 && level <= 6 ? level : 1;
-      const lvlConfig = LOCAL_LEVELS.find((l) => l.number === lvlNum) || LOCAL_LEVELS[0];
-
-      const mockMatch: Match = {
-        id: Date.now(),
-        level: lvlConfig,
-        score: 0,
-        status: "in_progress",
-        duration_seconds: lvlConfig.match_seconds,
-        started_at: new Date().toISOString(),
-        ended_at: null,
-      };
-
-      const indices = LOCAL_QUESTIONS.map((_, i) => i).sort(() => Math.random() - 0.5);
-      activeLocalMatch = {
-        match: mockMatch,
-        questionIndices: indices,
-        cursor: 0,
-      };
-
-      return mockMatch;
+    } catch (error) {
+      // Partida local só com a API fora do ar. Um erro de regra (ex.: nível ainda não
+      // liberado) sobe para o jogo: virar partida local esconderia que nada é salvo.
+      if (!isApiUnavailable(error)) throw error;
+      return startLocalMatch(level);
     }
   },
 
-  async getMatch(matchId: number): Promise<Match> {
-    try {
-      return await httpGet<Match>(`/matches/${matchId}`);
-    } catch {
-      if (activeLocalMatch && activeLocalMatch.match.id === matchId) {
-        return activeLocalMatch.match;
-      }
-      return {
-        id: matchId,
-        level: LOCAL_LEVELS[0],
-        score: 0,
-        status: "in_progress",
-        duration_seconds: LOCAL_LEVELS[0].match_seconds,
-        started_at: new Date().toISOString(),
-        ended_at: null,
-      };
-    }
+  // A partida em andamento é a local (visitante ou API fora do ar)?
+  isLocalMatch(matchId: number): boolean {
+    return activeLocalMatch?.match.id === matchId;
   },
 
   async getNextQuestion(matchId: number): Promise<Question> {
     if (activeLocalMatch && activeLocalMatch.match.id === matchId) {
       const { questionIndices, cursor } = activeLocalMatch;
-      const question = LOCAL_QUESTIONS[questionIndices[cursor % questionIndices.length]];
+      // Cada afirmação local aparece uma vez por partida, como no banco da API.
+      if (cursor >= questionIndices.length) {
+        throw new HttpError("Não há mais questões disponíveis", 404);
+      }
+      const question = LOCAL_QUESTIONS[questionIndices[cursor]];
       activeLocalMatch.cursor += 1;
       return { id: question.id, statement: question.statement };
     }
@@ -229,40 +244,26 @@ export const matchService = {
     });
   },
 
-  async finishMatch(matchId: number): Promise<MatchResult> {
-    try {
-      return await httpPost<MatchResult>(`/matches/${matchId}/finish`);
-    } catch {
-      const currentScore = activeLocalMatch ? activeLocalMatch.match.score : 0;
-      const currentLvl = activeLocalMatch ? activeLocalMatch.match.level.number : 1;
-      const minScore = activeLocalMatch
-        ? activeLocalMatch.match.level.min_score_to_advance
-        : 30;
-      const advanced = currentScore >= minScore;
-      const nextLvl = advanced ? Math.min(6, currentLvl + 1) : currentLvl;
-
-      const finishedMatch: Match = activeLocalMatch
-        ? {
-            ...activeLocalMatch.match,
-            score: currentScore,
-            status: "finished",
-            ended_at: new Date().toISOString(),
-          }
-        : {
-            id: matchId,
-            level: LOCAL_LEVELS[0],
-            score: currentScore,
-            status: "finished",
-            duration_seconds: LOCAL_LEVELS[0].match_seconds,
-            started_at: new Date().toISOString(),
-            ended_at: new Date().toISOString(),
-          };
-
-      return {
-        match: finishedMatch,
-        advanced,
-        current_level: nextLvl,
-      };
+  // currentLevel: nível atual do jogador, usado só para decidir o avanço na partida local.
+  async finishMatch(matchId: number, currentLevel: number): Promise<MatchResult> {
+    const local = activeLocalMatch;
+    if (!local || local.match.id !== matchId) {
+      // Partida da API: uma falha sobe para o jogo avisar que o resultado não foi salvo.
+      return httpPost<MatchResult>(`/matches/${matchId}/finish`);
     }
+
+    activeLocalMatch = null;
+    const advanced = advancesLevel({
+      matchLevel: local.match.level.number,
+      currentLevel,
+      score: local.match.score,
+      minScoreToAdvance: local.match.level.min_score_to_advance,
+      maxLevel: LOCAL_LEVELS.length,
+    });
+    return {
+      match: { ...local.match, status: "finished", ended_at: new Date().toISOString() },
+      advanced,
+      current_level: advanced ? currentLevel + 1 : currentLevel,
+    };
   },
 };
