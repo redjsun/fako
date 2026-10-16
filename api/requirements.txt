@@ -4,7 +4,7 @@ uvicorn[standard]==0.34.0
 pydantic-settings==2.7.0
 sqlalchemy==2.0.36
 psycopg[binary]==3.2.3
-alembic==1.14.0
+alembic==1.20.0
 bcrypt==4.2.1
 pyjwt==2.15.1
 # Referência TF-IDF: a mesma versão do treino (imagem ml), senão o joblib não carrega
