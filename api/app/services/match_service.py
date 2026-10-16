@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
-from app.core.exceptions import BusinessRuleError, NotFoundError
+from app.core.exceptions import BusinessRuleError, ConflictError, NotFoundError
 from app.integrations.classificador_client import ClassificadorClient, FakeClassificador
 from app.models.match import Match, MatchAnswer, MatchStatus
 from app.models.question import QuestionStatus
@@ -35,7 +35,7 @@ class MatchService:
 
     def start(self, user: User, data: MatchStartRequest) -> MatchResponse:
         progress = self.progress.get_or_create(user.id)
-        number = data.level or progress.current_level
+        number = data.level if data.level is not None else progress.current_level
         if number > progress.highest_level:
             raise BusinessRuleError("Nível ainda não liberado para este jogador")
 
@@ -43,6 +43,10 @@ class MatchService:
         if level is None:
             raise NotFoundError("Nível não encontrado")
 
+        # Uma partida aberta por jogador: a que ficou no meio (aba fechada, saída sem encerrar)
+        # é abandonada, sem contar pontos. Assim ninguém junta partidas abertas para escolher
+        # depois quais encerrar.
+        self.matches.abandon_in_progress(user.id, datetime.now(timezone.utc))
         match = self.matches.add(
             Match(
                 user_id=user.id,
@@ -63,6 +67,10 @@ class MatchService:
         question = (
             self.questions.get(match.current_question_id) if match.current_question_id else None
         )
+        if question is not None and question.status != QuestionStatus.VALIDATED:
+            # Despublicada depois de servida: sai da partida, senão ela voltaria para sempre
+            # sem poder ser respondida.
+            question = None
         if question is None:
             answered = self.matches.answered_question_ids(match.id)
             if len(answered) >= game_rules.MAX_ANSWERS_PER_MATCH:
@@ -72,6 +80,8 @@ class MatchService:
             if question is None:
                 raise NotFoundError("Não há mais questões disponíveis")
             match.current_question_id = question.id
+            # A pergunta reenviada mantém a hora da primeira vez: pedir de novo não dá mais tempo.
+            match.current_question_served_at = datetime.now(timezone.utc)
         return QuestionResponse(
             id=question.id, statement=question.statement, category=question.category.name
         )
@@ -85,10 +95,17 @@ class MatchService:
         question = self.questions.get(data.question_id)
         if question is None or question.status != QuestionStatus.VALIDATED:
             raise NotFoundError("Questão não encontrada")
-        match.current_question_id = None
 
         level = match.level
-        is_correct = game_rules.is_within_tolerance(
+        served_at = match.current_question_served_at
+        timed_out = served_at is not None and datetime.now(timezone.utc) > served_at + timedelta(
+            seconds=game_rules.question_deadline_seconds(level.question_seconds)
+        )
+        match.current_question_id = None
+        match.current_question_served_at = None
+
+        # Fora do tempo vale como erro, qualquer que seja a confiabilidade marcada.
+        is_correct = not timed_out and game_rules.is_within_tolerance(
             data.reliability, question.reliability_reference, level.reliability_tolerance
         )
         match.score = game_rules.score_after_answer(
@@ -114,18 +131,19 @@ class MatchService:
             explanation=question.explanation,
             source=question.source,
             score=match.score,
+            timed_out=timed_out,
             model_guess=self.classificador.palpite_do_jogo(question.statement),
         )
 
     def finish(self, user: User, match_id: int) -> MatchResultResponse:
-        match = self._get_match(user, match_id)
-        if match.status == MatchStatus.FINISHED:
-            raise BusinessRuleError("Partida já encerrada")
+        # Mesma regra das respostas: partida aberta há mais que o teto não conta mais (nem
+        # pontos nem avanço) e fica aberta até o jogador começar outra, que a abandona.
+        match = self._get_active_match(user, match_id)
 
         match.status = MatchStatus.FINISHED
         match.ended_at = datetime.now(timezone.utc)
 
-        progress = self.progress.get_or_create(user.id)
+        progress = self.progress.get_or_create(user.id, bloquear=True)
         progress.total_score += match.score
         progress.matches_played += 1
 
@@ -145,16 +163,19 @@ class MatchService:
             current_level=progress.current_level,
         )
 
-    def _get_match(self, user: User, match_id: int) -> Match:
-        match = self.matches.get_for_user(match_id, user.id)
+    def _get_match(self, user: User, match_id: int, bloquear: bool = False) -> Match:
+        match = self.matches.get_for_user(match_id, user.id, bloquear)
         if match is None:
             raise NotFoundError("Partida não encontrada")
         return match
 
     def _get_active_match(self, user: User, match_id: int) -> Match:
-        match = self._get_match(user, match_id)
+        """A partida que vai mudar (pergunta, resposta, encerramento), travada até o commit:
+        pedidos simultâneos são atendidos um de cada vez e o segundo já vê o que o primeiro
+        gravou (a pergunta respondida, a partida encerrada)."""
+        match = self._get_match(user, match_id, bloquear=True)
         if match.status != MatchStatus.IN_PROGRESS:
-            raise BusinessRuleError("Partida já encerrada")
+            raise ConflictError("Partida já encerrada")
 
         # O tempo de jogo é controlado no front; aqui só o teto de partida aberta.
         deadline = match.started_at + timedelta(seconds=game_rules.MATCH_MAX_OPEN_SECONDS)

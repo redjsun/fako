@@ -32,6 +32,10 @@ class BusinessRuleError(DomainError):
     status_code = 422
 
 
+class TooManyRequestsError(DomainError):
+    status_code = 429
+
+
 class ServiceUnavailableError(DomainError):
     status_code = 503
 

@@ -1,7 +1,9 @@
 """Conexão com o banco de dados (camada de infraestrutura)."""
 
 from collections.abc import Iterator
+from typing import Annotated
 
+from fastapi import Depends
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -23,3 +25,11 @@ def get_db() -> Iterator[Session]:
         raise
     finally:
         db.close()
+
+
+# Sessão das rotas. Com o escopo "function", o commit roda quando a rota termina e antes de a
+# resposta sair: uma falha no commit vira erro para o cliente, e a próxima chamada já enxerga os
+# dados. Com o escopo padrão ("request"), o FastAPI só fecha a dependência depois de enviar a
+# resposta. Use sempre este tipo: o cache de dependências separa por escopo, então misturar com
+# `Depends(get_db)` abriria duas sessões na mesma requisição.
+SessaoDaRequisicao = Annotated[Session, Depends(get_db, scope="function")]

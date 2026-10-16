@@ -28,7 +28,3 @@ class BaseRepository(Generic[T]):
         self.db.add(entity)
         self.db.flush()
         return entity
-
-    def delete(self, entity: T) -> None:
-        self.db.delete(entity)
-        self.db.flush()

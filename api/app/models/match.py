@@ -3,7 +3,7 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, func
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Entity, enum_values
@@ -13,6 +13,8 @@ from app.models.level import Level
 class MatchStatus(str, enum.Enum):
     IN_PROGRESS = "in_progress"
     FINISHED = "finished"
+    # Deixada aberta quando o jogador começou outra: não conta pontos nem partida jogada.
+    ABANDONED = "abandoned"
 
 
 class Match(Entity):
@@ -21,8 +23,8 @@ class Match(Entity):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     level_id: Mapped[int] = mapped_column(ForeignKey("levels.id"))
     score: Mapped[int] = mapped_column(Integer, default=0)
-    # Duração máxima de 120 segundos.
-    duration_seconds: Mapped[int] = mapped_column(Integer, default=120)
+    # Tempo de cobra andando, copiado do nível (Level.match_seconds) quando a partida começa.
+    duration_seconds: Mapped[int] = mapped_column(Integer)
     status: Mapped[MatchStatus] = mapped_column(
         Enum(MatchStatus, native_enum=False, length=20, values_callable=enum_values),
         default=MatchStatus.IN_PROGRESS,
@@ -33,6 +35,10 @@ class Match(Entity):
     current_question_id: Mapped[int | None] = mapped_column(
         ForeignKey("questions.id"), nullable=True
     )
+    # Quando ela foi servida: a resposta tem o tempo de pergunta do nível (game_rules).
+    current_question_served_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     level: Mapped[Level] = relationship()
     answers: Mapped[list["MatchAnswer"]] = relationship(back_populates="match")
@@ -42,6 +48,10 @@ class MatchAnswer(Entity):
     """Confiabilidade (0 a 100) dada pelo jogador a uma questão durante a partida."""
 
     __tablename__ = "match_answers"
+    # Cada questão é respondida uma vez por partida, mesmo com pedidos simultâneos.
+    __table_args__ = (
+        UniqueConstraint("match_id", "question_id", name="uq_match_answers_match_question"),
+    )
 
     match_id: Mapped[int] = mapped_column(ForeignKey("matches.id"), index=True)
     question_id: Mapped[int] = mapped_column(ForeignKey("questions.id"))

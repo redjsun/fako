@@ -64,15 +64,6 @@ class BertimbauEngine:
 
         Não interrompe a aplicação caso os modelos não existam ou ocorra falha.
         """
-        try:
-            import torch  # noqa: F401
-            from transformers import AutoModelForSequenceClassification, AutoTokenizer
-        except ImportError as exc:
-            self.is_available = False
-            self.error_message = f"Dependências de ML não instaladas: {exc}"
-            logger.warning(self.error_message)
-            return False
-
         models_path = self._resolve_models_path()
         if not models_path:
             self.is_available = False
@@ -95,20 +86,33 @@ class BertimbauEngine:
             logger.warning(self.error_message)
             return False
 
+        # Só agora, com os artefatos no lugar: importar torch e transformers custa segundos e
+        # centenas de MB, à toa quando não há modelo para carregar.
+        try:
+            import torch  # noqa: F401
+            from transformers import AutoModelForSequenceClassification, AutoTokenizer
+        except ImportError as exc:
+            self.is_available = False
+            self.error_message = f"Dependências de ML não instaladas: {exc}"
+            logger.warning(self.error_message)
+            return False
+
         try:
             logger.info("Carregando tokenizador compartilhado de %s...", dir_y1)
             self.tokenizer = AutoTokenizer.from_pretrained(str(dir_y1), local_files_only=True)
 
             logger.info("Carregando classificador BERTimbau Y1 de %s...", dir_y1)
+            # Só safetensors: o formato .bin é um pickle, que executaria código de um artefato
+            # adulterado.
             self.model_y1 = AutoModelForSequenceClassification.from_pretrained(
-                str(dir_y1), local_files_only=True
+                str(dir_y1), local_files_only=True, use_safetensors=True
             )
             self.model_y1.to(self.device)
             self.model_y1.eval()
 
             logger.info("Carregando classificador BERTimbau Y2 de %s...", dir_y2)
             self.model_y2 = AutoModelForSequenceClassification.from_pretrained(
-                str(dir_y2), local_files_only=True
+                str(dir_y2), local_files_only=True, use_safetensors=True
             )
             self.model_y2.to(self.device)
             self.model_y2.eval()
@@ -124,18 +128,20 @@ class BertimbauEngine:
             )
             return True
 
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             self.is_available = False
             self.error_message = f"Falha ao carregar artefatos do BERTimbau: {exc}"
-            logger.error(self.error_message, exc_info=True)
+            logger.exception(self.error_message)
             return False
 
     def predict(self, text: str) -> dict[str, Any]:
         """Executa a inferência síncrona nos modelos Y1 e Y2."""
         if not self.is_available or self.model_y1 is None or self.model_y2 is None:
-            raise ServiceUnavailableError(
-                f"Serviço de IA indisponível: {self.error_message or 'modelos não inicializados'}"
+            # O motivo (caminhos, exceção) vai para o log; o cliente recebe só o aviso.
+            logger.warning(
+                "BERTimbau indisponível: %s", self.error_message or "modelos não inicializados"
             )
+            raise ServiceUnavailableError("Serviço de IA indisponível")
 
         import torch
 

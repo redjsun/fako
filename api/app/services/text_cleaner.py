@@ -1,6 +1,9 @@
-"""Limpeza textual para inferência, alinhada com o pipeline oficial de treino.
+"""Limpeza textual do BERTimbau Y1/Y2 (`POST /ai/analyze`), igual à do treino dele.
 
-Aplica as mesmas regras de `ml/dados.py:limpar_texto`:
+Cópia de `limpar_texto` do pipeline legado (`ml/dados.py`), onde esses modelos foram treinados.
+A referência TF-IDF e os modelos novos (`pesquisa/ml/`) limpam de outro jeito, com
+`integrations/normalizacao.py`: as duas não se juntam porque cada modelo precisa da limpeza do
+próprio treino. Regras:
 1. Remove URLs.
 2. Remove prefixos de agências/checagens (ex: "FATO OU FAKE: ", "COMPROVA: ").
 3. Remove sufixos de portais e checadores (ex: "| G1", "- Lupa").
