@@ -308,7 +308,9 @@ class NoticiasService:
             question.status = QuestionStatus.VALIDATED
             question.validated_at = datetime.now(timezone.utc)
         try:
-            analise = self.classificador.analisar(question.claim_text or manchete, "admin")
+            analise = self.classificador.analisar(
+                question.claim_text or manchete, "admin", enunciado=manchete
+            )
         except ClassificadorIndisponivel:
             analise = None
         if analise:

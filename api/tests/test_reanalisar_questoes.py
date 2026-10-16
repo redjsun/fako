@@ -11,7 +11,7 @@ class Registro(FakeClassificador):
         self.texto_de_entrada = texto_de_entrada
         self.entradas = []
 
-    def analisar(self, afirmacao, limiar):
+    def analisar(self, afirmacao, limiar, enunciado=None):
         self.entradas.append((afirmacao, limiar))
         return super().analisar(afirmacao, limiar)
 

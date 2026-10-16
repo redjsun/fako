@@ -67,7 +67,7 @@ def reanalisar(
         if not refazer:
             continue
         entrada = question.claim_text if padronizado and question.claim_text else question.statement
-        analise = classificador.analisar(entrada, "admin")
+        analise = classificador.analisar(entrada, "admin", enunciado=question.statement)
         question.model_category = analise.categoria
         question.model_score = analise.nota
         question.model_confidence = analise.confianca

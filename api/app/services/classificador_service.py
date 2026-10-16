@@ -45,7 +45,7 @@ class ClassificadorService:
         padronizado = self.classificador.texto_de_entrada != "original"
         entrada = claim_text if padronizado and claim_text else statement
         try:
-            return self.classificador.analisar(entrada, "jogador")
+            return self.classificador.analisar(entrada, "jogador", enunciado=statement)
         except ClassificadorIndisponivel:
             return None
 

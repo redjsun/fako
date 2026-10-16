@@ -61,11 +61,14 @@ class Analise:
 
 
 class ClassificadorClient(Protocol):
-    # "original" ou "padronizado": o texto em que o modelo foi treinado. No padronizado, a
-    # entrada é a afirmação extraída pela LLM (Question.claim_text), não o enunciado cru.
+    # "original", "padronizado" ou "hibrido": o texto em que o modelo foi treinado. Fora do
+    # original, a entrada é a afirmação extraída pela LLM (Question.claim_text), não o
+    # enunciado cru.
     texto_de_entrada: str
 
-    def analisar(self, afirmacao: str, limiar: Limiar) -> Analise: ...
+    # `enunciado`: o texto como o jogador leu, quando a entrada é a afirmação extraída. Só o
+    # conjunto usa (o membro do texto original recebe o enunciado); os outros o ignoram.
+    def analisar(self, afirmacao: str, limiar: Limiar, enunciado: str | None = None) -> Analise: ...
 
 
 def analise_das_fronteiras(
@@ -106,7 +109,7 @@ class FakeClassificador:
     versao = "fake"
     texto_de_entrada = "original"
 
-    def analisar(self, afirmacao: str, limiar: Limiar) -> Analise:
+    def analisar(self, afirmacao: str, limiar: Limiar, enunciado: str | None = None) -> Analise:
         return analise_das_fronteiras(afirmacao, 0.5, 0.25, LIMIARES_PADRAO[limiar], self.versao)
 
 
@@ -146,7 +149,7 @@ class ReferenciaTfidf:
         ordem = sorted(range(len(valores)), key=lambda i: -abs(valores[i]))[:n]
         return [(legivel(nomes[linha.indices[i]]), float(valores[i])) for i in ordem]
 
-    def analisar(self, afirmacao: str, limiar: Limiar) -> Analise:
+    def analisar(self, afirmacao: str, limiar: Limiar, enunciado: str | None = None) -> Analise:
         texto = limpar(afirmacao) or afirmacao.strip()
         p1, p2 = self.fronteiras(texto)
         analise = analise_das_fronteiras(afirmacao, p1, p2, self.limiares[limiar], self.versao)
@@ -203,7 +206,7 @@ class BertOnnx:
         p2 = min(1 / (1 + math.exp(-float(logits[1]))), p1)
         return calibradas(p1, p2, self.calibracao)
 
-    def analisar(self, afirmacao: str, limiar: Limiar) -> Analise:
+    def analisar(self, afirmacao: str, limiar: Limiar, enunciado: str | None = None) -> Analise:
         texto = limpar(afirmacao) or afirmacao.strip()
         p1, p2 = self.fronteiras(texto)
         return analise_das_fronteiras(afirmacao, p1, p2, self.limiares[limiar], self.versao)
@@ -235,7 +238,41 @@ def ler_limiares(pasta: Path) -> dict[str, float]:
     return {**LIMIARES_PADRAO, **json.loads(arquivo.read_text(encoding="utf-8"))}
 
 
-ADAPTADORES = {"referencia": ReferenciaTfidf, "bert": BertOnnx}
+class ConjuntoBert:
+    """Dois BERTimbau publicados juntos, com a média das fronteiras já calibradas de cada um.
+
+    `conjunto.json` lista os membros (subpastas no formato de `BertOnnx`, cada uma com a sua
+    calibração) e os pesos, mais os limiares e a versão do conjunto. O membro treinado no texto
+    original recebe o enunciado (a manchete, como o jogador leu); o do texto híbrido, a
+    afirmação extraída. Os dois erram em notícias diferentes: nas 225 notícias do jogo de
+    15/10/2026, a média 50/50 teve 88% de acerto balanceado, contra 82% e 78% de cada um
+    (doc/avaliacao-jogo.md).
+    """
+
+    ARQUIVO = "conjunto.json"
+    texto_de_entrada = "hibrido"
+
+    def __init__(self, pasta: Path):
+        meta = ler_json(pasta / self.ARQUIVO) or {}
+        self.membros = [(BertOnnx(pasta / m["pasta"]), float(m["peso"])) for m in meta["membros"]]
+        self.limiares = {**LIMIARES_PADRAO, **meta.get("limiares", {})}
+        self.versao = meta.get("versao", pasta.name)
+
+    def fronteiras(self, afirmacao: str, enunciado: str | None = None) -> tuple[float, float]:
+        p1 = p2 = 0.0
+        for membro, peso in self.membros:
+            bruto = enunciado if membro.texto_de_entrada == "original" and enunciado else afirmacao
+            a, b = membro.fronteiras(limpar(bruto) or bruto.strip())
+            p1, p2 = p1 + peso * a, p2 + peso * b
+        total = sum(peso for _, peso in self.membros)
+        return p1 / total, min(p2, p1) / total
+
+    def analisar(self, afirmacao: str, limiar: Limiar, enunciado: str | None = None) -> Analise:
+        p1, p2 = self.fronteiras(afirmacao, enunciado)
+        return analise_das_fronteiras(afirmacao, p1, p2, self.limiares[limiar], self.versao)
+
+
+ADAPTADORES = {"referencia": ReferenciaTfidf, "bert": BertOnnx, "conjunto": ConjuntoBert}
 
 
 class ClassificadorAusente:
@@ -246,7 +283,7 @@ class ClassificadorAusente:
     def __init__(self, motivo: str):
         self.motivo = motivo
 
-    def analisar(self, afirmacao: str, limiar: Limiar) -> Analise:
+    def analisar(self, afirmacao: str, limiar: Limiar, enunciado: str | None = None) -> Analise:
         raise ClassificadorIndisponivel(self.motivo)
 
 

@@ -11,7 +11,7 @@ class ClassificadorEspiao(FakeClassificador):
     def __init__(self):
         self.recebidos = []
 
-    def analisar(self, afirmacao, limiar):
+    def analisar(self, afirmacao, limiar, enunciado=None):
         self.recebidos.append(afirmacao)
         return super().analisar(afirmacao, limiar)
 
