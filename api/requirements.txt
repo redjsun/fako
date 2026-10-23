@@ -1,7 +1,7 @@
 fastapi==0.143.0
 starlette==1.7.0
 uvicorn[standard]==0.34.0
-pydantic-settings==2.7.0
+pydantic-settings==2.16.1
 sqlalchemy==2.0.36
 psycopg[binary]==3.2.3
 alembic==1.14.0
