@@ -1,4 +1,4 @@
-FROM node:22-alpine
+FROM node:26-alpine
 
 # Sem root dentro do container: a imagem já traz o usuário node
 WORKDIR /app
